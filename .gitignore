@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual envs / tooling
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
+
+# Generated artifacts
+*.log
+out/
+reports/
+data/generated/
+models/
+
+# Secrets (LLM API keys etc.)
+.env
+*.key
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

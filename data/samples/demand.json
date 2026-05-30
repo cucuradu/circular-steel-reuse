@@ -1,0 +1,15 @@
+{
+  "kind": "demand",
+  "source": "sample",
+  "units": "extract:mm | internal:N,mm",
+  "schema_version": 1,
+  "model_name": "SampleNewOfficeFrame",
+  "members": [
+    {"id": "N1", "role": "beam", "category": "Structural Framing", "raw_section": "IPE 240", "material_grade": "S275", "level": "L1", "length_mm": 12000, "spans_mm": [6000, 6000], "notes": "split into 2 span(s) at supports"},
+    {"id": "N2", "role": "beam", "category": "Structural Framing", "raw_section": "IPE 270", "material_grade": "S275", "level": "L1", "length_mm": 5800, "spans_mm": [5800]},
+    {"id": "N3", "role": "beam", "category": "Structural Framing", "raw_section": "IPE 330", "material_grade": "S355", "level": "L2", "length_mm": 6900, "spans_mm": [6900]},
+    {"id": "N4", "role": "column", "category": "Structural Columns", "raw_section": "HE 220 A", "material_grade": "S275", "level": "L1", "length_mm": 3500, "spans_mm": [3500]},
+    {"id": "N5", "role": "column", "category": "Structural Columns", "raw_section": "HE 240 B", "material_grade": "S355", "level": "L1", "length_mm": 4800, "spans_mm": [4800]},
+    {"id": "N6", "role": "beam", "category": "Structural Framing", "raw_section": "IPE 200", "material_grade": "S235", "level": "Roof", "length_mm": 4000, "spans_mm": [4000]}
+  ]
+}

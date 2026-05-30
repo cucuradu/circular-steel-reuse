@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "steelreuse"
+version = "0.1.0"
+description = "Circular Structural Reuse Matcher — match reclaimed steel members to new designs under Eurocode (EN 1993-1-1)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Radu" }]
+keywords = ["structural", "eurocode", "steel-reuse", "circular-economy", "bim", "revit"]
+
+# Phase 1 runs on the standard library only, so the base install stays tiny.
+# Heavier capabilities are opt-in via the extras below.
+dependencies = []
+
+[project.scripts]
+steelreuse = "steelreuse.cli:main"
+
+[project.optional-dependencies]
+analysis = ["numpy>=1.26", "pandas>=2.1"]
+fea = ["PyNiteFEA>=0.0.9"]              # license-free frame solver (default force backend)
+sap2000 = ["comtypes>=1.3; sys_platform == 'win32'", "pywin32>=306; sys_platform == 'win32'"]
+ml = ["scikit-learn>=1.4", "xgboost>=2.0"]
+opt = ["pulp>=2.8", "ortools>=9.9"]
+report = ["jinja2>=3.1"]
+llm = ["google-genai>=0.3"]
+ui = ["streamlit>=1.33", "plotly>=5.20"]
+bim = ["ifcopenshell>=0.7"]            # optional IFC extraction path
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/steelreuse"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# SIM108 would collapse readable if/else branch tables into nested ternaries — declined.
+ignore = ["SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+# The pyRevit extractor may run under IronPython 2.7 inside Revit: keep the coding
+# declaration and %-formatting, and don't enforce the line length on its docstrings.
+"extractor/*" = ["UP009", "UP031", "E501"]
+# SIM300 misfires on `value == pytest.approx(...)` comparisons.
+"tests/*" = ["SIM300"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+filterwarnings = [
+    # PuLP 3.x emits 4.0-migration deprecation notices for the bundled CBC solver; not actionable yet.
+    "ignore:.*PULP_CBC_CMD is deprecated.*:DeprecationWarning",
+    "ignore:.*Constructing LpVariable.*:DeprecationWarning",
+]

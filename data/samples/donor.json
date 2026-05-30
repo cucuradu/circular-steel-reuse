@@ -1,0 +1,17 @@
+{
+  "kind": "donor",
+  "source": "sample",
+  "units": "extract:mm | internal:N,mm",
+  "schema_version": 1,
+  "model_name": "SampleDonorWarehouse",
+  "members": [
+    {"id": "D1", "role": "beam", "category": "Structural Framing", "raw_section": "IPE 300", "material_grade": "S275", "level": "Roof", "length_mm": 6200, "spans_mm": [6200], "notes": "donor: physical stock length"},
+    {"id": "D2", "role": "beam", "category": "Structural Framing", "raw_section": "IPE300", "material_grade": "S235", "level": "Roof", "length_mm": 4100, "spans_mm": [4100]},
+    {"id": "D3", "role": "beam", "category": "Structural Framing", "raw_section": "IPE 360", "material_grade": "S275", "level": "L1", "length_mm": 7000, "spans_mm": [7000]},
+    {"id": "D4", "role": "column", "category": "Structural Columns", "raw_section": "HE 300 B", "material_grade": "S355", "level": "L1", "length_mm": 5000, "spans_mm": [5000]},
+    {"id": "D5", "role": "column", "category": "Structural Columns", "raw_section": "HEA 240", "material_grade": "S275", "level": "L1", "length_mm": 3800, "spans_mm": [3800]},
+    {"id": "D6", "role": "column", "category": "Structural Columns", "raw_section": "HE300A", "material_grade": "S275", "level": "L2", "length_mm": 3600, "spans_mm": [3600]},
+    {"id": "D7", "role": "beam", "category": "Structural Framing", "raw_section": "IPE_400", "material_grade": "S355", "level": "L1", "length_mm": 8200, "spans_mm": [8200]},
+    {"id": "D8", "role": "beam", "category": "Structural Framing", "raw_section": "W12x40", "material_grade": null, "level": "L2", "length_mm": 5500, "spans_mm": [5500], "notes": "imported US section - expected unknown"}
+  ]
+}
