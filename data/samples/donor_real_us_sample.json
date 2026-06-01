@@ -1,0 +1,5949 @@
+{
+  "source": "pyrevit",
+  "units": "extract:mm | internal:N,mm",
+  "kind": "donor",
+  "members": [
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568173"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568175"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568177"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568179"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568181"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568183"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568185"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568187"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568189"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568191"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568193"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568195"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568197"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568199"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568201"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568203"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568205"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568207"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568209"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568211"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568213"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568215"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568217"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568219"
+    },
+    {
+      "raw_section": "Concrete-Rectangular-Column 2'-6\" x 2'-6\"",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "T.O. Footing",
+      "length_mm": 0.0,
+      "id": "568221"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568475"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568477"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568479"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568481"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568483"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568485"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568487"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568489"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568491"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568493"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568495"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568497"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568499"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568501"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568503"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568505"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568507"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568509"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568511"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568513"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568515"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568517"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568519"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568521"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Level 1",
+      "length_mm": 0.0,
+      "id": "568523"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Roof",
+      "length_mm": 0.0,
+      "id": "575910"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Roof",
+      "length_mm": 0.0,
+      "id": "576016"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Roof",
+      "length_mm": 0.0,
+      "id": "576069"
+    },
+    {
+      "raw_section": "W Shapes-Column W10X33",
+      "end_xyz": null,
+      "spans_mm": [],
+      "material_grade": null,
+      "notes": "",
+      "section": null,
+      "start_xyz": null,
+      "category": "Structural Columns",
+      "role": "column",
+      "level": "Roof",
+      "length_mm": 0.0,
+      "id": "576156"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366647,
+        22014.309842669129,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487731
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366649,
+        22014.309842669158,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487731,
+      "id": "569313"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666479,
+        22014.309842669103,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487695
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366645,
+        22014.309842669129,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487695,
+      "id": "569353"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663335379,
+        22014.309842669081,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487722
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.703003366646,
+        22014.309842669107,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487722,
+      "id": "569374"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.296996633353,
+        22014.309842669056,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487695
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663335435,
+        22014.309842669081,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487695,
+      "id": "569419"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333421,
+        14394.309842669056,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.296996633354,
+        22014.309842669056,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569440"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333303,
+        6774.3098426690558,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333421,
+        14394.309842669056,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569458"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663333105,
+        6774.3098426690813,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333303,
+        6774.3098426690558,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569483"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666688,
+        6774.3098426691067,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663332997,
+        6774.3098426690822,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569523"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366669,
+        6774.3098426691304,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487722
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666706,
+        6774.3098426691058,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487722,
+      "id": "569542"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366671,
+        6774.3098426691568,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487685
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487685,
+      "id": "569574"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366656,
+        14394.309842669156,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366671,
+        6774.3098426691558,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569600"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366645,
+        22014.309842669158,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366656,
+        14394.309842669156,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569622"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333185,
+        -845.69015733094432,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333303,
+        6774.3098426690558,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569669"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333067,
+        -8465.6901573309442,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333185,
+        -845.69015733094432,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569687"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663330615,
+        -8465.6901573309206,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487722
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333067,
+        -8465.6901573309442,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487722,
+      "id": "569710"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666942,
+        -8465.6901573308933,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663330558,
+        -8465.6901573309187,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569746"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366696,
+        -8465.6901573308678,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666952,
+        -8465.6901573308933,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569780"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366692,
+        -8465.6901573308442,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487667
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366696,
+        -8465.6901573308714,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487667,
+      "id": "569811"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366678,
+        -845.69015733084473,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366692,
+        -8465.6901573308442,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569844"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366667,
+        6774.3098426691558,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366678,
+        -845.69015733084473,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "569862"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366683,
+        -845.69015733086928,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366682,
+        -845.69015733084473,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569902"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666833,
+        -845.69015733089532,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366683,
+        -845.69015733087065,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569926"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663331701,
+        -845.69015733091692,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666824,
+        -845.69015733089236,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569949"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333176,
+        -845.69015733094295,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.2969966333178,
+        -845.69015733091828,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "569978"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663334299,
+        14394.309842669079,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333421,
+        14394.309842669056,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "570015"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.703003366657,
+        14394.309842669107,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663334219,
+        14394.309842669083,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "570044"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366656,
+        14394.309842669132,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7626.0935635487704
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666588,
+        14394.309842669109,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487704,
+      "id": "570068"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366656,
+        14394.309842669156,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7626.0935635487685
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7626.0935635487685,
+      "id": "570102"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366645,
+        22014.309842669129,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "570140"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570176"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366685,
+        -845.69015733087065,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "570203"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366696,
+        -8465.6901573308714,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366683,
+        -845.69015733087065,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570232"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666833,
+        -845.69015733089236,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666952,
+        -8465.6901573308933,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570257"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666715,
+        6774.3098426691058,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666833,
+        -845.69015733089236,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "570275"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666597,
+        14394.309842669109,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666715,
+        6774.3098426691058,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "570297"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666479,
+        22014.309842669107,
+        7315.2000000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666597,
+        14394.309842669109,
+        7315.2000000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570317"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663334202,
+        14394.309842669083,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663335435,
+        22014.309842669081,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570369"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663332985,
+        6774.3098426690822,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663334219,
+        14394.309842669083,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570406"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663331769,
+        -845.69015733091828,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663332997,
+        6774.3098426690822,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570438"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663330547,
+        -8465.6901573309187,
+        7010.400000000468
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.2969966333178,
+        -845.69015733091828,
+        7010.400000000468
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "570467"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -21033.703003366645,
+        22014.30984266915,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366656,
+        14394.309842669152,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572641"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -19509.703003366645,
+        22014.309842669143,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366656,
+        14394.309842669147,
+        7193.2800000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "572643"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -17985.703003366645,
+        22014.309842669143,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.70300336666,
+        14394.309842669141,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "572645"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -16461.703003366649,
+        22014.309842669136,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.70300336666,
+        14394.309842669136,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "572647"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -8841.7030033666597,
+        14394.309842669112,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.703003366647,
+        22014.309842669107,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "572752"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -10365.703003366658,
+        14394.309842669118,
+        7193.2800000004672
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.703003366645,
+        22014.309842669114,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "572754"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -11889.703003366658,
+        14394.309842669121,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.703003366645,
+        22014.309842669121,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572756"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -13413.703003366658,
+        14394.309842669129,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.703003366645,
+        22014.309842669125,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "572758"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -5793.703003366646,
+        22014.309842669103,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666588,
+        14394.309842669101,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "572822"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -4269.703003366646,
+        22014.309842669099,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666579,
+        14394.309842669098,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "572824"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -2745.7030033666451,
+        22014.309842669092,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.703003366657,
+        14394.30984266909,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572826"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -1221.7030033666447,
+        22014.309842669089,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666565,
+        14394.309842669087,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572828"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        6398.296996633343,
+        14394.309842669061,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.2969966333549,
+        22014.309842669059,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572892"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        4874.296996633343,
+        14394.309842669065,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.2969966333549,
+        22014.309842669067,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572894"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        3350.296996633343,
+        14394.309842669069,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000045
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.2969966333549,
+        22014.309842669074,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000045,
+      "id": "572896"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        1826.2969966333428,
+        14394.309842669076,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.2969966333553,
+        22014.309842669078,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "572898"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        6398.2969966333312,
+        6774.3098426690613,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.296996633343,
+        14394.309842669061,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "572962"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        4874.2969966333312,
+        6774.3098426690658,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.296996633343,
+        14394.309842669065,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "572964"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        3350.2969966333312,
+        6774.3098426690713,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.296996633343,
+        14394.309842669072,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572966"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        1826.2969966333308,
+        6774.3098426690758,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.2969966333433,
+        14394.309842669076,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "572968"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -5793.7030033666588,
+        14394.309842669101,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666706,
+        6774.3098426691013,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573024"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -4269.7030033666579,
+        14394.309842669096,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666697,
+        6774.3098426690967,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "573026"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -2745.703003366657,
+        14394.30984266909,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666692,
+        6774.3098426690913,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573028"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -1221.7030033666565,
+        14394.309842669087,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666686,
+        6774.3098426690876,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573030"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -8841.7030033666706,
+        6774.3098426691113,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666579,
+        14394.309842669112,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573086"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -10365.703003366671,
+        6774.3098426691158,
+        7193.2800000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.703003366658,
+        14394.309842669118,
+        7193.2800000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573088"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -11889.703003366672,
+        6774.3098426691213,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.703003366658,
+        14394.309842669123,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "573090"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -13413.703003366672,
+        6774.3098426691249,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.703003366658,
+        14394.309842669129,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "573092"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -21033.703003366656,
+        14394.309842669152,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366671,
+        6774.3098426691513,
+        7254.2400000004673
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573148"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -19509.703003366656,
+        14394.309842669147,
+        7193.2800000004672
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366671,
+        6774.3098426691467,
+        7193.2800000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573150"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -17985.70300336666,
+        14394.309842669143,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.703003366671,
+        6774.3098426691413,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573152"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -16461.70300336666,
+        14394.309842669136,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.703003366674,
+        6774.3098426691367,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573154"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -21033.703003366667,
+        6774.3098426691513,
+        7254.2400000004673
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366678,
+        -845.6901573308495,
+        7254.2400000004673
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573210"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -19509.703003366667,
+        6774.3098426691467,
+        7193.2800000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366678,
+        -845.6901573308545,
+        7193.2800000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573212"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -17985.703003366671,
+        6774.3098426691413,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.703003366682,
+        -845.69015733085939,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573214"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -16461.703003366671,
+        6774.3098426691367,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.703003366685,
+        -845.69015733086439,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573216"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -8841.7030033666833,
+        -845.6901573308902,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666706,
+        6774.3098426691113,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573272"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -10365.703003366682,
+        -845.69015733088588,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.703003366669,
+        6774.3098426691158,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573274"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -11889.703003366682,
+        -845.69015733088042,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.703003366669,
+        6774.3098426691213,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573276"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -13413.703003366685,
+        -845.6901573308761,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.703003366672,
+        6774.3098426691249,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573278"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -5793.7030033666706,
+        6774.3098426691013,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666824,
+        -845.69015733089725,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "573334"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -4269.7030033666697,
+        6774.3098426690967,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666815,
+        -845.69015733090225,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573336"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -2745.7030033666692,
+        6774.3098426690913,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666811,
+        -845.69015733090703,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573338"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -1221.7030033666686,
+        6774.3098426690876,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666804,
+        -845.69015733091214,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573340"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        6398.2969966333194,
+        -845.69015733093784,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.2969966333312,
+        6774.3098426690613,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573396"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        4874.2969966333194,
+        -845.69015733093352,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.2969966333312,
+        6774.3098426690658,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573398"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        3350.2969966333189,
+        -845.69015733092806,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.2969966333308,
+        6774.3098426690713,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573400"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        1826.2969966333178,
+        -845.69015733092374,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.2969966333303,
+        6774.3098426690758,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "573402"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        6398.2969966333076,
+        -8465.6901573309387,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.2969966333194,
+        -845.69015733093806,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573458"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        4874.2969966333076,
+        -8465.6901573309351,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.2969966333194,
+        -845.69015733093306,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573460"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        3350.2969966333067,
+        -8465.6901573309297,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.2969966333189,
+        -845.69015733092817,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573462"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        1826.296996633306,
+        -8465.6901573309242,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.2969966333185,
+        -845.69015733092317,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "573464"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -5793.7030033666824,
+        -845.6901573308977,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666942,
+        -8465.6901573308987,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573520"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -4269.7030033666815,
+        -845.69015733090203,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666933,
+        -8465.6901573309042,
+        7193.2800000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573522"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -2745.7030033666811,
+        -845.69015733090748,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666929,
+        -8465.6901573309096,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573524"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -1221.7030033666804,
+        -845.6901573309118,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666922,
+        -8465.6901573309133,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573526"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -8841.7030033666961,
+        -8465.6901573308878,
+        7254.2400000004682
+      ],
+      "spans_mm": [
+        7619.9999999999973
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666815,
+        -845.69015733089043,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999973,
+      "id": "573582"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -10365.703003366692,
+        -8465.6901573308824,
+        7193.2800000004681
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.70300336668,
+        -845.69015733088543,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "573584"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -11889.703003366692,
+        -8465.6901573308769,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7619.9999999999973
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.70300336668,
+        -845.69015733088054,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999973,
+      "id": "573586"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -13413.703003366692,
+        -8465.6901573308733,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.70300336668,
+        -845.69015733087554,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "573588"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -21033.703003366678,
+        -845.69015733085007,
+        7254.2400000004673
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366692,
+        -8465.6901573308496,
+        7254.2400000004682
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573644"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -19509.703003366678,
+        -845.69015733085439,
+        7193.2800000004672
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366692,
+        -8465.6901573308551,
+        7193.2800000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573646"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -17985.703003366682,
+        -845.69015733085985,
+        7132.3200000004672
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.703003366696,
+        -8465.6901573308605,
+        7132.3200000004672
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "573648"
+    },
+    {
+      "raw_section": "K-Series Bar Joist-Angle Web 16K7",
+      "end_xyz": [
+        -16461.703003366682,
+        -845.69015733086417,
+        7071.3600000004681
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.703003366696,
+        -8465.690157330866,
+        7071.3600000004681
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "573650"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366656,
+        14394.309842669156,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366649,
+        22014.309842669158,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574362"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366671,
+        6774.3098426691558,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366656,
+        14394.309842669156,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574366"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366682,
+        -845.69015733084473,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366671,
+        6774.3098426691558,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574369"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -22557.703003366692,
+        -8465.6901573308442,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366682,
+        -845.69015733084473,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574372"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366645,
+        22014.309842669129,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574375"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574378"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366683,
+        -845.69015733087065,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574381"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366696,
+        -8465.6901573308714,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366683,
+        -845.69015733087065,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574384"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666588,
+        14394.309842669109,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.703003366646,
+        22014.309842669107,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574387"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666706,
+        6774.3098426691058,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666588,
+        14394.309842669109,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574390"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666824,
+        -845.69015733089236,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666706,
+        6774.3098426691058,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574393"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666952,
+        -8465.6901573308933,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666824,
+        -845.69015733089236,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574396"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663334219,
+        14394.309842669083,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663335435,
+        22014.309842669081,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574399"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663332997,
+        6774.3098426690822,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663334219,
+        14394.309842669083,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574402"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.2969966333178,
+        -845.69015733091828,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663332997,
+        6774.3098426690822,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574405"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663330558,
+        -8465.6901573309187,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.2969966333178,
+        -845.69015733091828,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574408"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333421,
+        14394.309842669056,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.296996633354,
+        22014.309842669056,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574411"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333303,
+        6774.3098426690558,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333421,
+        14394.309842669056,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574414"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333185,
+        -845.69015733094432,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333303,
+        6774.3098426690558,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574417"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333058,
+        -8465.6901573309442,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        7922.2969966333185,
+        -845.69015733094432,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574420"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366645,
+        22014.309842669129,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366649,
+        22014.309842669158,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574423"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666479,
+        22014.309842669107,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366645,
+        22014.309842669129,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574426"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663335271,
+        22014.309842669081,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666479,
+        22014.309842669107,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574429"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.296996633353,
+        22014.309842669056,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663335271,
+        22014.309842669081,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574432"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366656,
+        14394.309842669156,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574435"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666588,
+        14394.309842669107,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366658,
+        14394.309842669132,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574438"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663334407,
+        14394.309842669083,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666588,
+        14394.309842669107,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574441"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333403,
+        14394.309842669056,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663334407,
+        14394.309842669083,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "574444"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366671,
+        6774.3098426691568,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574447"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666688,
+        6774.3098426691067,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366672,
+        6774.3098426691322,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574450"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663333105,
+        6774.3098426690822,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666688,
+        6774.3098426691067,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574453"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333312,
+        6774.3098426690567,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663333105,
+        6774.3098426690822,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574456"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366683,
+        -845.6901573308686,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366682,
+        -845.6901573308437,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574459"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666824,
+        -845.69015733089373,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366683,
+        -845.6901573308686,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574462"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663331809,
+        -845.69015733091862,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666824,
+        -845.69015733089373,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574465"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333185,
+        -845.69015733094352,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663331809,
+        -845.69015733091862,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574468"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -14937.703003366696,
+        -8465.6901573308696,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -22557.703003366692,
+        -8465.6901573308442,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "574471"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666952,
+        -8465.6901573308933,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -14937.703003366696,
+        -8465.6901573308696,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574474"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663330507,
+        -8465.6901573309187,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666952,
+        -8465.6901573308933,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574477"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        7922.2969966333058,
+        -8465.6901573309442,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663330507,
+        -8465.6901573309187,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574480"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -16461.703003366656,
+        14394.309842669136,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.703003366645,
+        22014.309842669136,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574545"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -17985.703003366656,
+        14394.309842669143,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999964
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.703003366645,
+        22014.309842669139,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999964,
+      "id": "574547"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -19509.703003366656,
+        14394.309842669147,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366649,
+        22014.309842669147,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574549"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -21033.703003366656,
+        14394.309842669152,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366649,
+        22014.30984266915,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574551"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -8841.7030033666579,
+        14394.309842669112,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666451,
+        22014.309842669114,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574581"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -10365.703003366658,
+        14394.309842669118,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.703003366645,
+        22014.309842669118,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574583"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -11889.703003366658,
+        14394.309842669121,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.703003366645,
+        22014.309842669121,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574585"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -13413.703003366658,
+        14394.309842669125,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.703003366645,
+        22014.309842669125,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574587"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -1221.7030033666565,
+        14394.309842669087,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666447,
+        22014.309842669089,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574616"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -2745.703003366657,
+        14394.30984266909,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666451,
+        22014.309842669092,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574618"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -4269.7030033666579,
+        14394.309842669096,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000045
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.703003366646,
+        22014.309842669099,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000045,
+      "id": "574620"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -5793.7030033666588,
+        14394.309842669101,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.703003366646,
+        22014.309842669103,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574622"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        6398.2969966333421,
+        14394.309842669061,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.296996633354,
+        22014.309842669059,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574651"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        4874.2969966333421,
+        14394.309842669067,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.296996633354,
+        22014.309842669067,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574653"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        3350.2969966333421,
+        14394.309842669072,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.296996633354,
+        22014.309842669074,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "574655"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        1826.2969966333417,
+        14394.309842669078,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.296996633354,
+        22014.309842669078,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574657"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        6398.2969966333312,
+        6774.3098426690622,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.296996633343,
+        14394.309842669061,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574686"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        4874.2969966333312,
+        6774.3098426690667,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.296996633343,
+        14394.309842669067,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574688"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        3350.2969966333312,
+        6774.3098426690722,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.296996633343,
+        14394.309842669072,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574690"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        1826.2969966333308,
+        6774.3098426690767,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.296996633343,
+        14394.309842669078,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "574692"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -1221.7030033666695,
+        6774.3098426690876,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666576,
+        14394.309842669087,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574713"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -2745.7030033666701,
+        6774.3098426690913,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666583,
+        14394.30984266909,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574715"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -4269.7030033666706,
+        6774.3098426690967,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666579,
+        14394.309842669098,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574717"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -5793.7030033666715,
+        6774.3098426691013,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666597,
+        14394.309842669101,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574719"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -8841.7030033666706,
+        6774.3098426691122,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666579,
+        14394.30984266911,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574740"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -10365.703003366669,
+        6774.3098426691167,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.703003366656,
+        14394.309842669118,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574742"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -11889.703003366669,
+        6774.3098426691222,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.703003366656,
+        14394.309842669121,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574744"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -13413.703003366672,
+        6774.3098426691267,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.703003366658,
+        14394.309842669129,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "574746"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -16461.703003366671,
+        6774.3098426691367,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.70300336666,
+        14394.309842669136,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574767"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -17985.703003366671,
+        6774.3098426691413,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.70300336666,
+        14394.309842669141,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574769"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -19509.703003366674,
+        6774.3098426691467,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.70300336666,
+        14394.309842669147,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574771"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -21033.703003366674,
+        6774.3098426691513,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.70300336666,
+        14394.309842669152,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574773"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -16461.703003366682,
+        -845.69015733086314,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.703003366671,
+        6774.3098426691367,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574794"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -17985.703003366682,
+        -845.69015733085871,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.703003366671,
+        6774.3098426691413,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574796"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -19509.703003366682,
+        -845.69015733085337,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366671,
+        6774.3098426691467,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574798"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -21033.703003366682,
+        -845.69015733084905,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366671,
+        6774.3098426691513,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574800"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -8841.7030033666815,
+        -845.69015733088906,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666706,
+        6774.3098426691122,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "574821"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -10365.703003366682,
+        -845.69015733088361,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.703003366671,
+        6774.3098426691167,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574823"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -11889.703003366682,
+        -845.69015733087826,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.703003366672,
+        6774.3098426691222,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574825"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -13413.703003366685,
+        -845.69015733087394,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.703003366674,
+        6774.3098426691267,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574827"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -1221.7030033666815,
+        -845.69015733091294,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666695,
+        6774.3098426690876,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574848"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -2745.703003366682,
+        -845.69015733090862,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666701,
+        6774.3098426690913,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574850"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -4269.7030033666824,
+        -845.69015733090316,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666706,
+        6774.3098426690967,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574852"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -5793.7030033666824,
+        -845.69015733089884,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666706,
+        6774.3098426691013,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574854"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        6398.2969966333185,
+        -845.69015733093784,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.2969966333303,
+        6774.3098426690622,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574875"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        4874.2969966333185,
+        -845.69015733093352,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.2969966333303,
+        6774.3098426690667,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574877"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        3350.2969966333176,
+        -845.69015733092806,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.2969966333294,
+        6774.3098426690722,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574879"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        1826.2969966333167,
+        -845.69015733092374,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.2969966333289,
+        6774.3098426690767,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574881"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        6398.2969966333067,
+        -8465.6901573309387,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        6398.2969966333185,
+        -845.69015733093852,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574902"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        4874.2969966333067,
+        -8465.6901573309333,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        4874.2969966333185,
+        -845.69015733093352,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574904"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        3350.2969966333062,
+        -8465.6901573309297,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        3350.296996633318,
+        -845.69015733092863,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574906"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        1826.296996633306,
+        -8465.6901573309242,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        1826.2969966333185,
+        -845.69015733092363,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574908"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -1221.7030033666949,
+        -8465.6901573309115,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999982
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.703003366682,
+        -845.69015733091362,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999982,
+      "id": "574929"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -2745.7030033666952,
+        -8465.6901573309096,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.703003366682,
+        -845.69015733090862,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574931"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -4269.7030033666952,
+        -8465.6901573309042,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666824,
+        -845.69015733090373,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574933"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -5793.7030033666952,
+        -8465.6901573308987,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666824,
+        -845.69015733089873,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574935"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -8841.7030033666961,
+        -8465.6901573308878,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7619.9999999999991
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -8841.7030033666815,
+        -845.69015733088872,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7619.9999999999991,
+      "id": "574956"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -10365.703003366692,
+        -8465.6901573308842,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -10365.70300336668,
+        -845.69015733088361,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574958"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -11889.703003366692,
+        -8465.6901573308787,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -11889.70300336668,
+        -845.69015733087861,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574960"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -13413.703003366692,
+        -8465.6901573308751,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -13413.70300336668,
+        -845.6901573308736,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574962"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -16461.703003366692,
+        -8465.6901573308642,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -16461.703003366682,
+        -845.6901573308636,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574983"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -17985.703003366692,
+        -8465.6901573308587,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -17985.703003366682,
+        -845.6901573308586,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574985"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -19509.703003366692,
+        -8465.6901573308533,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -19509.703003366682,
+        -845.69015733085371,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574987"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -21033.703003366692,
+        -8465.6901573308496,
+        3530.6000000004688
+      ],
+      "spans_mm": [
+        7620.0
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -21033.703003366682,
+        -845.69015733084871,
+        3530.6000000004688
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0,
+      "id": "574989"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663333105,
+        6774.3098426690822,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666715,
+        6774.3098426691067,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "576261"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        302.29699663331877,
+        -845.69015733091942,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663333105,
+        6774.3098426690822,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "576283"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666824,
+        -845.69015733089475,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        302.29699663331877,
+        -845.69015733091942,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "576303"
+    },
+    {
+      "raw_section": "W Shapes W14X30",
+      "end_xyz": [
+        -7317.7030033666706,
+        6774.3098426691067,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -7317.7030033666824,
+        -845.69015733089475,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "576321"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -5793.7030033666688,
+        6774.3098426691013,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -5793.7030033666815,
+        -845.69015733089964,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "576349"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -4269.7030033666688,
+        6774.3098426690967,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -4269.7030033666806,
+        -845.69015733090464,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "576351"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -2745.7030033666679,
+        6774.3098426690913,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000018
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -2745.7030033666797,
+        -845.69015733090953,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000018,
+      "id": "576353"
+    },
+    {
+      "raw_section": "W Shapes W12X26",
+      "end_xyz": [
+        -1221.7030033666674,
+        6774.3098426690885,
+        9144.0000000004675
+      ],
+      "spans_mm": [
+        7620.0000000000027
+      ],
+      "material_grade": null,
+      "notes": "donor: physical stock length",
+      "section": null,
+      "start_xyz": [
+        -1221.7030033666792,
+        -845.69015733091453,
+        9144.0000000004675
+      ],
+      "category": "Structural Framing",
+      "role": "beam",
+      "level": null,
+      "length_mm": 7620.0000000000027,
+      "id": "576355"
+    }
+  ],
+  "model_name": "STRUCTURAL",
+  "schema_version": 1
+}

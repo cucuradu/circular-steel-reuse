@@ -49,6 +49,9 @@ uv run steelreuse --donor data/samples/donor.json --demand data/samples/demand.j
 
 uv run streamlit run app.py            # interactive dashboard
 uv run python -m steelreuse.ml.train   # regenerate synthetic dataset + train the surrogate
+
+# pre-demolition inventory from ANY extracted model (works even when sections don't map):
+uv run python -m steelreuse.inventory donor.json --out reports/inventory.html
 ```
 
 Revit-free ingestion: `steelreuse.ifc_extract.extract_ifc(path)` reads an IFC model (IfcOpenShell)

@@ -49,6 +49,8 @@ ignore = ["SIM108"]
 # declaration and %-formatting, and don't enforce the line length on their docstrings.
 "extractor/*" = ["UP009", "UP031", "E501"]
 "pyrevit_extension/*" = ["UP009", "UP031", "E501"]
+# Embedded HTML/CSS template strings are unavoidably long.
+"src/steelreuse/inventory.py" = ["E501"]
 # SIM300 misfires on `value == pytest.approx(...)` comparisons.
 "tests/*" = ["SIM300"]
 

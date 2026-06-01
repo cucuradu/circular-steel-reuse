@@ -90,6 +90,46 @@ def _endpoints(elem):
         return None, None, None
 
 
+def _column_length_mm(elem):
+    """Length of a (point-placed) structural column, in mm.
+
+    Columns have a LocationPoint, not a curve, so we can't use ``curve.Length``. Try, in order:
+      1. the built-in INSTANCE_LENGTH_PARAM (correct for slanted/curve-driven columns);
+      2. top-level+offset minus base-level+offset (the usual vertical case);
+      3. the element bounding-box height as a last resort.
+    All Revit lengths are feet -> mm. Returns 0.0 only if nothing is readable.
+    """
+    try:
+        p = elem.get_Parameter(DB.BuiltInParameter.INSTANCE_LENGTH_PARAM)
+        if p and p.HasValue and p.AsDouble() > 0:
+            return _mm(p.AsDouble())
+    except Exception:
+        pass
+
+    try:
+        base_p = elem.get_Parameter(DB.BuiltInParameter.FAMILY_BASE_LEVEL_PARAM)
+        top_p = elem.get_Parameter(DB.BuiltInParameter.FAMILY_TOP_LEVEL_PARAM)
+        base_lvl = doc.GetElement(base_p.AsElementId()) if base_p else None
+        top_lvl = doc.GetElement(top_p.AsElementId()) if top_p else None
+        if base_lvl is not None and top_lvl is not None:
+            base_off = elem.get_Parameter(DB.BuiltInParameter.FAMILY_BASE_LEVEL_OFFSET_PARAM)
+            top_off = elem.get_Parameter(DB.BuiltInParameter.FAMILY_TOP_LEVEL_OFFSET_PARAM)
+            base = base_lvl.Elevation + (base_off.AsDouble() if base_off else 0.0)
+            top = top_lvl.Elevation + (top_off.AsDouble() if top_off else 0.0)
+            if abs(top - base) > 1e-6:
+                return _mm(abs(top - base))
+    except Exception:
+        pass
+
+    try:
+        bb = elem.get_BoundingBox(None)
+        if bb is not None:
+            return _mm(abs(bb.Max.Z - bb.Min.Z))
+    except Exception:
+        pass
+    return 0.0
+
+
 def _collect(category):
     return (DB.FilteredElementCollector(doc)
             .OfCategory(category)
@@ -153,7 +193,8 @@ def extract(kind):
 
     for col in columns:
         s, e, crv = _endpoints(col)
-        length = _mm(crv.Length) if crv else 0.0
+        # Most columns are point-placed (no curve); use a column-specific length helper.
+        length = _mm(crv.Length) if crv else _column_length_mm(col)
         members.append({
             "id": _id_str(col.Id), "role": "column",
             "category": "Structural Columns", "raw_section": _type_name(col),
