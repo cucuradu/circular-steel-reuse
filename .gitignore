@@ -23,6 +23,9 @@ models/
 .env
 *.key
 
+# Scratch
+_commitmsg.txt
+
 # Editor / OS
 .vscode/
 .idea/
