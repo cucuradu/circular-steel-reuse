@@ -1,6 +1,8 @@
-#! python3
 # -*- coding: utf-8 -*-
 """Extract structural steel members from the active model to a JSON file.
+
+Runs on the default IronPython 3 engine (no ``#! python3``): pyRevit 6.x's CPython 3.12 engine has a
+version-parsing bug under Revit 2026. Both this button and the extractor are IronPython-safe.
 
 Thin pyRevit pushbutton: it locates the project's `extractor/pyrevit_extract.py` (five folders up
 from this button, then into `extractor/`) and runs its `main()`. Keeping the logic in one place means

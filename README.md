@@ -59,7 +59,7 @@ into the same JSON schema as the pyRevit extractor — so the whole pipeline run
 ```
 data/sections/eu_sections.csv   # standard steel section catalog (IPE/HE...)
 data/samples/*.json             # sample extracted models for offline testing
-extractor/pyrevit_extract.py    # runs INSIDE Revit (pyRevit CPython3 engine)
+extractor/pyrevit_extract.py    # runs INSIDE Revit (IronPython 3 engine; stdlib-only)
 src/steelreuse/
   schema.py                     # JSON schema for extracted members
   core/sections.py              # catalog loader + robust section-name mapping

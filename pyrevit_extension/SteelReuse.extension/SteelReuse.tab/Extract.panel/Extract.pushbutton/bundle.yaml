@@ -1,6 +1,6 @@
-title: Extract\nSteel
+title: |-
+  Extract
+  Steel
 tooltip: >-
   Extract structural steel framing + columns from the active Revit model to a JSON file
   (donor = reclaimed supply, or demand = new design). Feeds the Circular Steel Reuse Matcher.
-engine:
-  clean: true

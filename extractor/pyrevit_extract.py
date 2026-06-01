@@ -1,10 +1,13 @@
-#! python3
 # -*- coding: utf-8 -*-
-"""pyRevit extractor — runs INSIDE Revit (pyRevit CPython3 engine).
+"""pyRevit extractor — runs INSIDE Revit on the default IronPython 3 engine.
+
+NOTE on engine choice: there is intentionally NO ``#! python3`` shebang. pyRevit 6.x's bundled
+CPython 3.12 engine has a version-parsing bug under Revit 2026 ("input string '3.12.3' was not in a
+correct format"), so we run on the stable IronPython 3 engine instead. This script is therefore kept
+strictly IronPython-safe: stdlib only (json, re), no f-strings, %-formatting, no third-party libs.
 
 Reads structural steel framing + columns from the active document and writes a JSON file matching
-``steelreuse.schema``. This script must stay free of heavy libraries (numpy/sklearn/ortools): it only
-reads the model and serializes. All analysis happens later in the external CPython pipeline.
+``steelreuse.schema``. All heavy analysis happens later in the external CPython pipeline.
 
 Usage in Revit: open the model, run via pyRevit, pick whether it is a DONOR (supply) or DEMAND
 (new design) model and where to save the JSON.

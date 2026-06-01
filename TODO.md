@@ -28,12 +28,17 @@ licenses). Check items off as you go.
   git init; git add .; git commit -m "Phase 0+1: scaffold, schema, section mapping"
   ```
 
-## 2. Install Revit + pyRevit (once)
-- [ ] Confirm Autodesk **Revit** is installed (you have student/uni access).
-- [ ] Install **pyRevit**: https://github.com/eirannejad/pyRevit/releases
-- [ ] In Revit, make sure pyRevit loads the **CPython3 engine** (pyRevit Settings → Engines).
-- [ ] Learn how to run a script: pyRevit → *Add-in* → or drop the script into a pyRevit extension.
-      For a quick test you can paste `extractor/pyrevit_extract.py` into the pyRevit Python console.
+## 2. Install Revit + pyRevit (once)  ✅ DONE — Revit 2026 + pyRevit 6.4.0
+- [x] Autodesk **Revit 2026** installed.
+- [x] **pyRevit 6.4.0** installed (the version that supports Revit 2026 / .NET 8). pyRevit tab loads.
+- [ ] **Leave the engine on the default IronPython 3.** Do NOT set the CPython engine: pyRevit 6.x's
+      CPython 3.12 has a Revit-2026 bug ("input string '3.12.3' was not in a correct format"). Our
+      extractor is stdlib-only and runs fine on IronPython 3.
+- [ ] **Install the extractor as a toolbar button** (pyRevit 6.x has no generic "Run script" button):
+      pyRevit tab → **Settings** → **Custom Extension Directories** → **Add Folder** →
+      `c:\Users\Radu\OneDrive\Documents\Python\circular-steel-reuse\pyrevit_extension`
+      → **Save Settings** → **pyRevit → Reload**. A **SteelReuse** tab with an **Extract Steel**
+      button appears. (Details: `pyrevit_extension/README.md`.)
 
 ## 3. Build small sample Revit models (the test data)
 You need two tiny models to exercise the tool end-to-end:

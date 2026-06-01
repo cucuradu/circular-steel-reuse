@@ -22,8 +22,10 @@ You register the *parent* folder of `SteelReuse.extension` as a pyRevit extensio
 4. Pick where to save the JSON (e.g. `donor.json` / `demand.json`).
 5. A message reports how many members were extracted.
 
-The button runs `../extractor/pyrevit_extract.py` (single source of truth) under the **CPython 3**
-engine — the `#! python3` shebang in both files selects it automatically.
+The button runs `../extractor/pyrevit_extract.py` (single source of truth) under the **default
+IronPython 3 engine**. We deliberately do *not* request the CPython engine: pyRevit 6.x's bundled
+CPython 3.12 has a version-parsing bug under Revit 2026 ("input string '3.12.3' was not in a correct
+format"). The extractor is stdlib-only and IronPython-safe, so it runs fine on the default engine.
 
 ## Folder layout (pyRevit's required nesting)
 
