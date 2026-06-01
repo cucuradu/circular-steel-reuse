@@ -42,6 +42,8 @@ class DemandSlot:
     role: str
     required_length_mm: float
     demand: MemberDemand
+    grade: str | None = None         # design grade of the new member (for the avoided-new baseline)
+    design_section: str | None = None  # canonical section the new design specified, if known
 
 
 @dataclass
@@ -90,6 +92,46 @@ class _Cell:
     score: float
 
 
+def _passes(sec: SectionProps, grade: str, demand: MemberDemand, knockdown: float = 1.0) -> bool:
+    """The single feasibility bar reused by both supply and the avoided-new baseline."""
+    res = check_member(sec, grade, demand, knockdown)
+    return res.status != "FAIL" and res.utilization <= 1.0
+
+
+def _degenerate(slot: DemandSlot) -> bool:
+    """Garbage geometry whose zero/negative length would divide by zero inside the EN buckling/LTB
+    checks. Such slots are dropped (and surface as unmatched) rather than crashing the run."""
+    if slot.required_length_mm <= 0:
+        return True
+    d = slot.demand
+    needs_buckling_len = d.N_Ed > 0 or (abs(d.My_Ed) > 0 and not d.compression_flange_restrained)
+    return needs_buckling_len and d.L <= 0
+
+
+def baseline_new_mass_kg(
+    slot: DemandSlot, catalog: dict[str, SectionProps], new_build_grade: str = "S355"
+) -> float | None:
+    """Mass (kg) of the *new member you would otherwise buy* for this slot.
+
+    The avoided-production baseline is the **lightest catalog section that passes the slot's exact EN
+    check** at the design grade (the demand's own grade if known, else ``new_build_grade``), over the
+    slot's required length. Using this instead of the donor's mass is what keeps CO2-saved honest:
+    dropping a heavy IPE600 into a slot that only needs an IPE240 must not book IPE600's carbon as
+    "saved", and the optimizer must not be rewarded for wasting heavy stock on light demands.
+    Returns ``None`` if nothing in the catalog passes (then the slot is infeasible for reuse too).
+    """
+    if _degenerate(slot):
+        return None
+    grade = slot.grade or new_build_grade
+    best: float | None = None
+    for sec in catalog.values():
+        if _passes(sec, grade, slot.demand):
+            mass = sec.mass_kgm * slot.required_length_mm / 1000.0
+            if best is None or mass < best:
+                best = mass
+    return best
+
+
 def _feasible_cell(
     supply: SupplyItem,
     slot: DemandSlot,
@@ -99,8 +141,13 @@ def _feasible_cell(
     factor: CarbonFactor,
     w_offcut: float,
     connection_penalty_kg: float,
+    baseline_mass_kg: float | None,
 ) -> _Cell | None:
     """Return an economics cell if the pair is feasible, else ``None``."""
+    # Skip degenerate geometry (garbage rows) before any EN check that could divide by zero; such
+    # rows never become feasible pairs and instead surface in unused_supply / unmatched_slots.
+    if supply.length_mm <= 0 or _degenerate(slot):
+        return None
     if supply.length_mm < slot.required_length_mm + CUT_TOLERANCE_MM:
         return None
     sec = catalog.get(supply.section)
@@ -114,7 +161,12 @@ def _feasible_cell(
     offcut_mm = supply.length_mm - used_len
     mass_used = sec.mass_kgm * used_len / 1000.0
     offcut_mass = sec.mass_kgm * offcut_mm / 1000.0
-    co2_saved = mass_used * factor.saved_per_kg
+    # Net CO2 saved (avoided-burden): avoid producing the right-sized new member (baseline_mass x
+    # A1-A3), but still pay the process carbon to recover/refabricate the donor we actually use.
+    # The donor always passes the same check, so a baseline exists; fall back to the donor's own
+    # mass only if the catalog lookup somehow yields nothing.
+    avoided_new = (baseline_mass_kg if baseline_mass_kg is not None else mass_used) * factor.a1a3
+    co2_saved = avoided_new - mass_used * factor.reuse_process
     # objective contribution: benefit - wasted-material penalty - connection refabrication penalty
     score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg - connection_penalty_kg
     return _Cell(si, sj, res.utilization, res.status, offcut_mm, co2_saved, score)
@@ -128,15 +180,20 @@ def match(
     w_offcut: float = 0.3,
     connection_penalty_kg: float = 5.0,
     time_limit_s: float = 30.0,
+    new_build_grade: str = "S355",
 ) -> MatchResult:
     """Optimal supply->slot assignment maximizing net CO2 saved (with greedy fallback)."""
     factor = (factors or load_factors())["steel"]
     weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg}
 
+    # Avoided-new baseline per slot (lightest adequate section), computed once — see A1.
+    baselines = [baseline_new_mass_kg(slot, catalog, new_build_grade) for slot in slots]
+
     cells: list[_Cell] = []
     for i, sup in enumerate(supply):
         for j, slot in enumerate(slots):
-            cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut, connection_penalty_kg)
+            cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
+                                  connection_penalty_kg, baselines[j])
             if cell is not None:
                 cells.append(cell)
 
@@ -146,8 +203,10 @@ def match(
 
     try:
         chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s)
+        if not _is_optimal(status):  # timeout / "Not Solved" -> don't trust a partial MILP result
+            chosen, status = _solve_greedy(cells, len(supply), len(slots)), f"greedy_fallback ({status})"
     except Exception:  # pragma: no cover - solver edge cases -> graceful fallback
-        chosen, status = _solve_greedy(cells, len(supply), len(slots)), "greedy_fallback"
+        chosen, status = _solve_greedy(cells, len(supply), len(slots)), "greedy_fallback (solver error)"
 
     assignments = [
         Assignment(
@@ -167,6 +226,12 @@ def match(
         solver_status=status,
         weights=weights,
     )
+
+
+def _is_optimal(status: str) -> bool:
+    """Only a proven-optimal CBC result is trustworthy; anything else (e.g. a timeout's
+    'Not Solved' with a partial/empty assignment) is escalated to the greedy fallback."""
+    return status == "Optimal"
 
 
 def _solve_milp(cells, n_supply, n_slots, time_limit_s) -> tuple[list[_Cell], str]:

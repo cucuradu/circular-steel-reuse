@@ -13,7 +13,7 @@ from steelreuse.core.sections import (
     normalize_name,
     resolve_members,
 )
-from steelreuse.schema import ExtractedModel
+from steelreuse.schema import ExtractedMember, ExtractedModel
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 
@@ -75,6 +75,20 @@ def test_map_unknown_us_section(catalog):
 def test_override_wins(catalog):
     r = map_section("MYSTEEL", catalog, overrides={"MYSTEEL": "IPE300"})
     assert r.method == "override" and r.canonical == "IPE300"
+
+
+def test_fuzzy_matches_are_quarantined_by_default(catalog):
+    # "IPE305" is a near-miss (~0.83 to IPE300/IPE330) -> a fuzzy hit, not exact/normalized/unknown.
+    assert map_section("IPE305", catalog).method == "fuzzy"
+
+    m = ExtractedMember(id="x", raw_section="IPE305")
+    report = resolve_members([m], catalog)              # default: include_fuzzy=False
+    assert len(report.fuzzy) == 1
+    assert m.section is None        # quarantined: a guessed section never enters the analysis silently
+
+    m2 = ExtractedMember(id="y", raw_section="IPE305")
+    resolve_members([m2], catalog, include_fuzzy=True)  # opt in to the guess
+    assert m2.section == map_section("IPE305", catalog).canonical
 
 
 # --- end-to-end on the sample donor ---------------------------------------

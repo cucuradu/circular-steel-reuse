@@ -58,6 +58,7 @@ def build_slots(
             slots.append(DemandSlot(
                 id=f"{m.id}#{idx}", member_id=m.id, role=m.role,
                 required_length_mm=req_len, demand=d,
+                grade=m.material_grade, design_section=m.section,
             ))
     return slots
 
@@ -83,6 +84,9 @@ def run_pipeline(
     demand = ExtractedModel.load(demand_path)
 
     supply, report = build_supply(donor, catalog, knockdown)
+    # Map the new-design sections too, so each slot carries its design grade/section for the
+    # avoided-new CO2 baseline (A1/A6). Matching itself stays force-based, not section-based.
+    resolve_members(demand.members, catalog)
     slots = build_slots(demand, loads)
     passport = build_passport(donor.members, catalog)
     result = match(supply, slots, catalog)

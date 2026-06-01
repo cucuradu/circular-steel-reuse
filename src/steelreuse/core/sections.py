@@ -184,24 +184,32 @@ def load_overrides(path: str | Path) -> dict[str, str]:
 
 
 def resolve_members(
-    members, catalog, overrides=None, fuzzy_cutoff: float = 0.82
+    members, catalog, overrides=None, fuzzy_cutoff: float = 0.82, include_fuzzy: bool = False
 ) -> ValidationReport:
     """Map every member's ``raw_section`` -> ``section`` in place and return a validation report.
 
     ``members`` is any iterable of objects with ``raw_section`` and a writable ``section`` attribute
     (e.g. :class:`steelreuse.schema.ExtractedMember`). Unknown members keep ``section=None`` and are
     reported, never guessed.
+
+    Fuzzy matches are **quarantined by default** (``include_fuzzy=False``): a near-miss like
+    ``IPE300`` vs ``IPE330`` scores ~0.83 and would otherwise enter the structural analysis with the
+    wrong section properties. Quarantined fuzzy members keep ``section=None`` (excluded from supply,
+    passport, and matching) but are still listed in the report so the user can confirm them via an
+    override CSV. Set ``include_fuzzy=True`` only when the caller has accepted that risk.
     """
     mapped: list[MappingResult] = []
     fuzzy: list[MappingResult] = []
     unknown: list[MappingResult] = []
     for m in members:
         res = map_section(m.raw_section, catalog, overrides, fuzzy_cutoff)
-        m.section = res.canonical  # None for unknown
         if res.method == "fuzzy":
             fuzzy.append(res)
+            m.section = res.canonical if include_fuzzy else None  # quarantined unless confirmed
         elif res.method == "unknown":
             unknown.append(res)
+            m.section = None
         else:
             mapped.append(res)
+            m.section = res.canonical
     return ValidationReport(mapped=mapped, fuzzy=fuzzy, unknown=unknown)

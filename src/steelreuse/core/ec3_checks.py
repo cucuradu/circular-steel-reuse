@@ -272,13 +272,24 @@ def check_member(
         vrd = V_c_Rd(sec, fy)
         checks.append(CheckResult("shear_z", abs(demand.Vz_Ed) / vrd, {"V_c_Rd": vrd}))
 
-    # Combined N + M (simplified conservative linear interaction, cl. 6.2.1(7) / member 6.3.3 approx)
+    # Combined N + M (simplified conservative linear interaction, cl. 6.2.1(7) / member 6.3.3 approx).
+    # LTB-aware: an unrestrained beam-column uses M_b_Rd (chi_LT-reduced), never the full M_c_Rd, so
+    # the interaction cannot pass a member that lateral-torsional buckling would govern. This stays
+    # conservative relative to the full 6.3.3 form (no favourable k_yy/k_zy factors are applied).
     if demand.N_Ed > 0 and abs(demand.My_Ed) > 0:
         nb_y, _ = N_b_Rd(sec, fy, demand.L, demand.ky, "y")
         nb_z, _ = N_b_Rd(sec, fy, demand.L, demand.kz, "z")
-        mrd = M_c_Rd(sec, fy, section_class)
+        mc = M_c_Rd(sec, fy, section_class)
+        if demand.compression_flange_restrained:
+            mrd, ltb = mc, 1.0
+        else:
+            ltb = chi_LT(sec, fy, demand.L, section_class, demand.C1)
+            mrd = ltb * mc
         u = demand.N_Ed / min(nb_y, nb_z) + abs(demand.My_Ed) / mrd
-        checks.append(CheckResult("interaction_NM", u, {"method": "linear (conservative)"}))
+        checks.append(CheckResult(
+            "interaction_NM", u,
+            {"method": "linear, LTB-aware (conservative)", "chi_LT": round(ltb, 4)},
+        ))
 
     # Deflection (SLS), simply-supported UDL: delta = 5 w L^4 / (384 E I_y)
     if demand.w_service and demand.L > 0:

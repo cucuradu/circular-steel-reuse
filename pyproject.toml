@@ -45,9 +45,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["SIM108"]
 
 [tool.ruff.lint.per-file-ignores]
-# The pyRevit extractor may run under IronPython 2.7 inside Revit: keep the coding
-# declaration and %-formatting, and don't enforce the line length on its docstrings.
+# The pyRevit extractor + extension buttons may run under IronPython inside Revit: keep the coding
+# declaration and %-formatting, and don't enforce the line length on their docstrings.
 "extractor/*" = ["UP009", "UP031", "E501"]
+"pyrevit_extension/*" = ["UP009", "UP031", "E501"]
 # SIM300 misfires on `value == pytest.approx(...)` comparisons.
 "tests/*" = ["SIM300"]
 

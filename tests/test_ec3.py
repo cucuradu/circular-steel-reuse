@@ -125,3 +125,21 @@ def test_deflection_check_simply_supported(cat):
 
 def test_grades_table():
     assert FY_BY_GRADE["S355"] == 355 and math.isclose(FY_BY_GRADE["S235"], 235)
+
+
+def test_interaction_nm_is_ltb_aware(cat):
+    # A beam-column under combined N+M: the interaction must use M_b_Rd (chi_LT-reduced) when the
+    # compression flange is unrestrained, so LTB cannot be silently ignored in the combined check.
+    sec = cat["IPE300"]
+    N, M, L = 200e3, 60e6, 6000
+    restrained = check_member(
+        sec, "S275", MemberDemand(N_Ed=N, My_Ed=M, L=L, compression_flange_restrained=True)
+    )
+    unrestrained = check_member(
+        sec, "S275", MemberDemand(N_Ed=N, My_Ed=M, L=L, compression_flange_restrained=False)
+    )
+    ir = next(c for c in restrained.checks if c.name == "interaction_NM")
+    iu = next(c for c in unrestrained.checks if c.name == "interaction_NM")
+    assert ir.detail["chi_LT"] == 1.0
+    assert iu.detail["chi_LT"] < 1.0          # ~0.45 for IPE300, L=6 m
+    assert iu.utilization > ir.utilization    # LTB lowers M_b_Rd -> higher combined utilization
