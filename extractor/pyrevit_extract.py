@@ -34,6 +34,18 @@ def _mm(length_ft):
     return float(length_ft) * FT_TO_MM
 
 
+def _id_str(element_id):
+    """Stable element-id string across Revit versions.
+
+    Revit 2024 deprecated ``ElementId.IntegerValue`` and it was removed in Revit 2026 in favour of
+    ``ElementId.Value`` (a 64-bit long). Prefer ``.Value`` and fall back for older Revit.
+    """
+    val = getattr(element_id, "Value", None)
+    if val is None:
+        val = element_id.IntegerValue
+    return str(val)
+
+
 def _type_name(elem):
     """Best raw section name: '<Family> <Type>' (the mapping layer normalizes this later)."""
     try:
@@ -143,7 +155,7 @@ def extract(kind):
         s, e, crv = _endpoints(col)
         length = _mm(crv.Length) if crv else 0.0
         members.append({
-            "id": str(col.Id.IntegerValue), "role": "column",
+            "id": _id_str(col.Id), "role": "column",
             "category": "Structural Columns", "raw_section": _type_name(col),
             "section": None, "material_grade": _grade(col), "level": _level_name(col),
             "length_mm": length, "spans_mm": [length] if length else [],
@@ -160,7 +172,7 @@ def extract(kind):
             spans = [length] if length else []
             note = "donor: physical stock length" if kind == "donor" else ""
         members.append({
-            "id": str(bm.Id.IntegerValue), "role": "beam",
+            "id": _id_str(bm.Id), "role": "beam",
             "category": "Structural Framing", "raw_section": _type_name(bm),
             "section": None, "material_grade": _grade(bm), "level": _level_name(bm),
             "length_mm": length, "spans_mm": spans,
