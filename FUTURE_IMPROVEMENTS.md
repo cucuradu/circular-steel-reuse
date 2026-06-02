@@ -10,23 +10,29 @@ Severity: 🔴 blocks credibility / wrong result · 🟠 important methodology g
 
 ## Tier 2 — Structural credibility (the thesis core)
 
-### 🔴 1. Column loads are one magic number applied to every column
-`AreaLoadModel.loads_for(column)` ([core/loads.py](src/steelreuse/core/loads.py)) calls
-`column_axial_N()` with no arguments, so **every column gets the same axial** (default 9 m² × 1 floor
-≈ 83 kN) regardless of size, grid position, or how many storeys it carries; columns also get **no
-moment**, and the geometry tributary estimator (`estimate_tributary_widths`) is **beam-only**. The
-"real loads" (WS2) work only landed for beams.
+### 🟡 1. Column loads — per-column tributary/floors (MOSTLY DONE), residuals below
+**Shipped:** `estimate_column_loads` ([core/loads.py](src/steelreuse/core/loads.py)) derives a
+per-column tributary **area** (2-D plan-grid, half-bay each side, edge = half present bay assuming no
+overhang) and **floor count** (stack accumulation: the lowest column in a vertical stack carries every
+floor above it). Wired through `AreaLoadModel`/`run_pipeline` under `--trib-from-geometry`, plus an
+opt-in notional column **moment** via `--col-ecc` (eccentricity → `My_Ed = N·e`) so the N+M check
+engages. The pyRevit extractor now also captures **point-placed column plan coordinates** (it only
+recorded location-*curve* endpoints before, so every column's x,y was lost → the estimator could never
+fire on real models). Verified end-to-end: lower-storey columns now carry N× the top, corner/edge/
+interior tributaries differ (9/18/36 m² on a 6 m grid).
 
-Why it matters: lower-storey columns are under-loaded by ~N-storeys, and a tiny column and a heavy
-one are checked against the identical 83 kN. An examiner will flag this first.
-
-Fix sketch:
-- Derive a per-column tributary **area** from the grid (Voronoi/nearest-neighbour of column points
-  in plan) — analogous to `estimate_tributary_widths` but 2-D.
-- Accumulate **floor count** per column from levels (count levels above the column base) or expose a
-  reliable `--col-floors` per level.
-- Add a nominal column **moment** (e.g. notional eccentricity `e = max(h/30, 20 mm)`, or a small
-  fixed % of N) so the N+M interaction actually exercises.
+**Residuals (still open):**
+- **Re-extract** the test models in real Revit so the columns carry coordinates (the bundled
+  `pyrevit_extension/*_test2.json` were extracted with the old extractor → still no column x,y, so they
+  fall back to the uniform default until re-run). This is the Tier-4 human task.
+- **IFC extractor** ([ifc_extract.py](src/steelreuse/ifc_extract.py)) writes no `start_xyz`/`end_xyz`
+  at all, so the IFC path can't use geometry loads either — add placement-transform extraction.
+- **Frame moments** are still not modelled: `--col-ecc` is only a notional lever, not real beam-to-
+  column moment transfer / unbalanced-span / sway moments.
+- **Default-on?** Geometry estimation stays opt-in (`--trib-from-geometry`); flipping it on by default
+  is a one-line change if desired (it already falls back per-member where geometry is missing).
+- **Overhang**: the half-bay edge rule assumes the slab edge sits at the perimeter columns (no
+  cantilever); a real overhang would add load.
 
 ### 🟠 2. Demand forces are *assumed*, not analyzed
 The feasibility gate checks reclaimed members against a synthesized single ULS gravity case on simply-

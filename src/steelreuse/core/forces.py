@@ -74,6 +74,7 @@ class Load:
     udl_Npmm: float = 0.0          # beam uniformly distributed load (N/mm)
     axial_N: float = 0.0           # column axial (N), compression-positive
     w_service_Npmm: float | None = None  # service UDL for deflection (defaults to udl)
+    axial_moment_Nmm: float = 0.0  # nominal column moment (e.g. from a notional eccentricity)
 
 
 def member_demands(
@@ -93,8 +94,11 @@ def member_demands(
     out: list[MemberDemand] = []
 
     if member.role == "column":
+        # A nonzero moment (from a notional eccentricity) engages the N+M interaction check; left
+        # unrestrained so LTB is considered conservatively when it does (CLAUDE.md rule 4).
         out.append(MemberDemand(
-            N_Ed=load.axial_N, L=member.length_mm or 0.0, ky=ky, kz=kz,
+            N_Ed=load.axial_N, My_Ed=load.axial_moment_Nmm,
+            L=member.length_mm or 0.0, ky=ky, kz=kz,
         ))
         return out
 

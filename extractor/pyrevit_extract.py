@@ -130,6 +130,25 @@ def _column_length_mm(elem):
     return 0.0
 
 
+def _column_point_xyz(elem, length_mm):
+    """Plan position + base/top of a point-placed column, in mm: (start_xyz, end_xyz) or (None, None).
+
+    Most structural columns have a LocationPoint (not a curve), so ``_endpoints`` returns nothing for
+    them and their plan (x, y) is lost. Without it the downstream per-column tributary-area / floor-
+    count estimator cannot run and every column falls back to the same default load. Capture the
+    insertion point here and project the top from the column length so the grid can be reconstructed.
+    """
+    try:
+        loc = elem.Location
+        if isinstance(loc, DB.LocationPoint):
+            p = loc.Point
+            x, y, z = _mm(p.X), _mm(p.Y), _mm(p.Z)
+            return [x, y, z], [x, y, z + (length_mm or 0.0)]
+    except Exception:
+        pass
+    return None, None
+
+
 def _collect(category):
     return (DB.FilteredElementCollector(doc)
             .OfCategory(category)
@@ -195,6 +214,8 @@ def extract(kind):
         s, e, crv = _endpoints(col)
         # Most columns are point-placed (no curve); use a column-specific length helper.
         length = _mm(crv.Length) if crv else _column_length_mm(col)
+        if s is None and e is None:
+            s, e = _column_point_xyz(col, length)   # recover plan x,y for point-placed columns
         members.append({
             "id": _id_str(col.Id), "role": "column",
             "category": "Structural Columns", "raw_section": _type_name(col),

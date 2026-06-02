@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from .core.carbon import Passport, build_passport
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
-from .core.loads import AreaLoadModel, estimate_tributary_widths
+from .core.loads import AreaLoadModel, estimate_column_loads, estimate_tributary_widths
 from .core.sections import (
     SectionProps,
     ValidationReport,
@@ -131,11 +131,15 @@ def run_pipeline(
     resolve_members(demand.members, catalog)
     _fill_default_grades(demand.members)
 
-    # Optionally refine beam tributary widths from the model geometry (falls back to the configured
-    # default for any beam without a detectable parallel neighbour).
+    # Optionally refine per-member loads from the model geometry: beam tributary widths, and column
+    # tributary areas + floor counts (each falls back to the configured default where the geometry is
+    # insufficient — an isolated beam/column, too little grid to size a bay, etc.).
     if tributary_from_geometry and isinstance(loads, AreaLoadModel):
         loads.tributary_overrides = estimate_tributary_widths(
             demand.members, default_m=loads.beam_tributary_width_m
+        )
+        loads.column_area_overrides, loads.column_floor_overrides = estimate_column_loads(
+            demand.members, default_area_m2=loads.column_tributary_area_m2
         )
 
     slots = build_slots(demand, loads, steel_only=steel_only_demand)

@@ -43,8 +43,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--trib-width", type=float, default=3.0, help="default beam tributary width (m)")
     ap.add_argument("--col-trib-area", type=float, default=9.0, help="column tributary area / floor (m^2)")
     ap.add_argument("--col-floors", type=float, default=1.0, help="floors a column accumulates")
+    ap.add_argument("--col-ecc", type=float, default=0.0,
+                    help="notional column moment eccentricity (mm); 0 = pure axial")
     ap.add_argument("--trib-from-geometry", action="store_true",
-                    help="estimate per-beam tributary width from model geometry (else use --trib-width)")
+                    help="estimate per-beam width AND per-column tributary area/floors from geometry")
     ap.add_argument("--all-demand", action="store_true",
                     help="also slot non-steel demand (concrete, joists); default is steel members only")
     # Legacy flat model: if either is given, override the area model with one UDL / one axial.
@@ -63,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         loads = AreaLoadModel(
             dead_kpa=args.dead, live_kpa=args.live, gamma_g=args.gamma_g, gamma_q=args.gamma_q,
             beam_tributary_width_m=args.trib_width, column_tributary_area_m2=args.col_trib_area,
-            column_floors=args.col_floors,
+            column_floors=args.col_floors, column_eccentricity_mm=args.col_ecc,
         )
     res = run_pipeline(
         args.donor, args.demand, loads=loads, knockdown=args.knockdown,

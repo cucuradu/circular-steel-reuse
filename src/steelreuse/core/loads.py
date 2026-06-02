@@ -41,9 +41,12 @@ class AreaLoadModel:
     gamma_q: float = 1.5           # EN 1990, leading variable
     beam_tributary_width_m: float = 3.0    # default load width per beam
     column_tributary_area_m2: float = 9.0  # default floor area per column, per level
-    column_floors: float = 1.0             # number of floors a column accumulates
+    column_floors: float = 1.0             # default floors a column accumulates
+    column_eccentricity_mm: float = 0.0    # notional moment lever for columns (0 = pure axial)
     flange_restrained: bool = True         # a floor slab restrains the beam's compression flange
-    tributary_overrides: dict[str, float] = field(default_factory=dict)  # member id -> width (m)
+    tributary_overrides: dict[str, float] = field(default_factory=dict)         # beam id -> width (m)
+    column_area_overrides: dict[str, float] = field(default_factory=dict)       # col id -> area (m^2)
+    column_floor_overrides: dict[str, float] = field(default_factory=dict)      # col id -> floor count
 
     # Alias so the pipeline can treat this and the legacy flat model uniformly.
     @property
@@ -69,9 +72,12 @@ class AreaLoadModel:
         return self.factored_area_kpa() * a * n * 1.0e3   # kN -> N
 
     def loads_for(self, member) -> Load:
-        """Per-member :class:`Load`, using a geometry-estimated tributary width when available."""
+        """Per-member :class:`Load`, using geometry-estimated tributary/floors when available."""
         if member.role == "column":
-            return Load(axial_N=self.column_axial_N())
+            area = self.column_area_overrides.get(member.id, self.column_tributary_area_m2)
+            floors = self.column_floor_overrides.get(member.id, self.column_floors)
+            n = self.column_axial_N(area, floors)
+            return Load(axial_N=n, axial_moment_Nmm=n * self.column_eccentricity_mm)
         trib = self.tributary_overrides.get(member.id) if self.tributary_overrides else None
         width = self.beam_tributary_width_m if trib is None else trib
         return Load(
@@ -167,3 +173,102 @@ def estimate_tributary_widths(
 
 def _dot(a: tuple[float, float], b: tuple[float, float]) -> float:
     return a[0] * b[0] + a[1] * b[1]
+
+
+# ---------------------------------------------------------------------------
+# Geometry-based column tributary area + floor count
+# ---------------------------------------------------------------------------
+
+def _half_bay(neg: float, pos: float) -> float | None:
+    """Tributary half-width from the nearest neighbour gap on each side (mm), or ``None`` if isolated.
+
+    Interior point (a neighbour both sides): half of each bay -> ``(neg + pos) / 2``. Edge point
+    (one side only): half of the present bay, i.e. the slab edge is assumed at the column with no
+    cantilever overhang. This is the exact tributary for a regular no-overhang grid (unlike the beam
+    estimator's full-bay edge rule, full-bay here would 4x a corner column — too pessimistic in 2-D).
+    """
+    n = neg if math.isfinite(neg) else None
+    p = pos if math.isfinite(pos) else None
+    if n is None and p is None:
+        return None
+    if n is None:
+        return p / 2.0
+    if p is None:
+        return n / 2.0
+    return (n + p) / 2.0
+
+
+def estimate_column_loads(
+    members,
+    default_area_m2: float = 9.0,
+    min_area_m2: float = 2.0,
+    max_area_m2: float = 100.0,
+    plan_tol_mm: float = 300.0,
+    align_tol_mm: float = 600.0,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Per-column tributary floor area (m^2) and floor count, estimated from the model geometry.
+
+    Returns ``(area_overrides, floor_overrides)`` keyed by member id. Columns without usable geometry
+    are omitted from a dict (the caller falls back to its configured default for those).
+
+    Method (conservative, plan-grid based):
+      * Columns are collapsed to **plan grid points** — a vertical stack at one (x, y) location (within
+        ``plan_tol_mm``) shares one tributary area.
+      * **Tributary area** = half-bay in x times half-bay in y, from the nearest grid neighbour on each
+        of +x/-x/+y/-y (see :func:`_half_bay`); clamped to ``[min_area_m2, max_area_m2]``.
+      * **Floor count** for a column = the number of columns in its own stack at or above its base
+        elevation: the lowest column carries every floor above it, the top one carries one floor.
+
+    ``default_area_m2`` is accepted for signature symmetry with the caller (unused: missing columns are
+    simply omitted so the model's own default applies).
+    """
+    cols = []
+    for m in members:
+        if m.role != "column" or not m.start_xyz or not m.end_xyz:
+            continue
+        x = (m.start_xyz[0] + m.end_xyz[0]) / 2.0
+        y = (m.start_xyz[1] + m.end_xyz[1]) / 2.0
+        z_base = min(m.start_xyz[2], m.end_xyz[2])
+        cols.append({"id": m.id, "x": x, "y": y, "z": z_base})
+
+    # Greedy-cluster columns into vertical stacks by plan position.
+    stacks: list[dict] = []
+    for c in cols:
+        for s in stacks:
+            if abs(s["x"] - c["x"]) <= plan_tol_mm and abs(s["y"] - c["y"]) <= plan_tol_mm:
+                s["cols"].append(c)
+                break
+        else:
+            stacks.append({"x": c["x"], "y": c["y"], "cols": [c]})
+
+    floor_overrides: dict[str, float] = {}
+    for s in stacks:
+        ordered = sorted(s["cols"], key=lambda c: c["z"])   # lowest first
+        n = len(ordered)
+        for rank, c in enumerate(ordered):
+            floor_overrides[c["id"]] = float(n - rank)       # lowest carries n, top carries 1
+
+    area_overrides: dict[str, float] = {}
+    for i, s in enumerate(stacks):
+        left = right = back = front = math.inf
+        for j, t in enumerate(stacks):
+            if j == i:
+                continue
+            dx, dy = t["x"] - s["x"], t["y"] - s["y"]
+            if abs(dy) <= align_tol_mm:                      # same row -> x-spacing
+                if dx > align_tol_mm:
+                    right = min(right, dx)
+                elif dx < -align_tol_mm:
+                    left = min(left, -dx)
+            if abs(dx) <= align_tol_mm:                      # same column line -> y-spacing
+                if dy > align_tol_mm:
+                    front = min(front, dy)
+                elif dy < -align_tol_mm:
+                    back = min(back, -dy)
+        wx, wy = _half_bay(left, right), _half_bay(back, front)
+        if wx is None or wy is None:
+            continue                                         # too little grid -> use the default
+        area_m2 = max(min_area_m2, min(max_area_m2, wx * wy / 1.0e6))
+        for c in s["cols"]:
+            area_overrides[c["id"]] = area_m2
+    return area_overrides, floor_overrides

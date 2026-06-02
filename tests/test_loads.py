@@ -2,7 +2,12 @@
 
 import pytest
 
-from steelreuse.core.loads import AreaLoadModel, estimate_tributary_widths
+from steelreuse.core.forces import member_demands
+from steelreuse.core.loads import (
+    AreaLoadModel,
+    estimate_column_loads,
+    estimate_tributary_widths,
+)
 from steelreuse.schema import ExtractedMember
 
 
@@ -58,3 +63,47 @@ def test_estimate_skips_isolated_and_nonbeam_members():
                                               end_xyz=[0, 0, 3000])]
     widths = estimate_tributary_widths(members)
     assert widths == {}
+
+
+def _col(i, x, y, z0=0.0, z1=3000.0):
+    return ExtractedMember(id=str(i), role="column", start_xyz=[x, y, z0], end_xyz=[x, y, z1])
+
+
+def test_estimate_column_floor_counts_from_a_stack():
+    # two columns stacked at one plan location = a 2-storey column: the lower carries 2 floors, the
+    # upper 1. (One grid point has no neighbours, so no area is estimated -> caller uses the default.)
+    members = [_col("lo", 0.0, 0.0, 0.0, 3000.0), _col("hi", 0.0, 0.0, 3000.0, 6000.0)]
+    areas, floors = estimate_column_loads(members)
+    assert floors == {"lo": 2.0, "hi": 1.0}
+    assert areas == {}                                   # single stack -> no bay to size
+
+
+def test_estimate_column_tributary_area_on_a_3x3_grid():
+    # 3x3 grid at 6 m spacing: interior tributary = 36 m^2, edge-mid = 18 m^2, corner = 9 m^2
+    # (edge = half the present bay, i.e. slab edge at the column, no overhang).
+    members = [_col(f"{ix}_{iy}", ix * 6000.0, iy * 6000.0) for ix in range(3) for iy in range(3)]
+    areas, floors = estimate_column_loads(members)
+    assert areas["1_1"] == pytest.approx(36.0)           # centre
+    assert areas["1_0"] == pytest.approx(18.0)           # edge midside
+    assert areas["0_0"] == pytest.approx(9.0)            # corner
+    assert set(floors.values()) == {1.0}                 # single-storey grid
+
+
+def test_loads_for_column_uses_overrides_and_eccentricity():
+    m = AreaLoadModel(column_area_overrides={"c": 18.0}, column_floor_overrides={"c": 3.0},
+                      column_eccentricity_mm=50.0)
+    col = ExtractedMember(id="c", role="column", length_mm=4000)
+    n_expected = 9.225 * 18.0 * 3.0 * 1e3                # pressure * area * floors, kN -> N
+    load = m.loads_for(col)
+    assert load.axial_N == pytest.approx(n_expected)
+    assert load.axial_moment_Nmm == pytest.approx(n_expected * 50.0)
+    # the moment flows into the column's MemberDemand so the N+M interaction can engage
+    d = member_demands(col, load)[0]
+    assert d.N_Ed == pytest.approx(n_expected) and d.My_Ed == pytest.approx(n_expected * 50.0)
+
+
+def test_default_column_load_is_pure_axial_no_moment():
+    # without overrides / eccentricity, behaviour is unchanged: one axial, no moment.
+    col = ExtractedMember(id="c", role="column", length_mm=4000)
+    load = AreaLoadModel().loads_for(col)
+    assert load.axial_N == pytest.approx(83025.0) and load.axial_moment_Nmm == 0.0
