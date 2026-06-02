@@ -108,6 +108,23 @@ def _degenerate(slot: DemandSlot) -> bool:
     return needs_buckling_len and d.L <= 0
 
 
+def _slot_standard(slot: DemandSlot, catalog: dict[str, SectionProps]) -> str | None:
+    """Design standard the new-build baseline should stay within ('EU'/'US'), or ``None`` if unknown.
+
+    Prefer the standard of the demand's own mapped section; fall back to the grade prefix (EN grades
+    start 'S', ASTM start 'A'). ``None`` means "can't tell" -> search the whole catalog (old behaviour).
+    """
+    if slot.design_section and slot.design_section in catalog:
+        return catalog[slot.design_section].standard
+    if slot.grade:
+        g = slot.grade.upper()
+        if g.startswith("S"):
+            return "EU"
+        if g.startswith("A"):
+            return "US"
+    return None
+
+
 def baseline_new_mass_kg(
     slot: DemandSlot, catalog: dict[str, SectionProps], new_build_grade: str = "S355"
 ) -> float | None:
@@ -118,13 +135,21 @@ def baseline_new_mass_kg(
     slot's required length. Using this instead of the donor's mass is what keeps CO2-saved honest:
     dropping a heavy IPE600 into a slot that only needs an IPE240 must not book IPE600's carbon as
     "saved", and the optimizer must not be rewarded for wasting heavy stock on light demands.
-    Returns ``None`` if nothing in the catalog passes (then the slot is infeasible for reuse too).
+
+    The search is **restricted to the slot's own design standard** (a US slot's baseline is the lightest
+    adequate W-shape, not a coincidentally-lighter IPE, and vice-versa) — you would buy new steel in the
+    standard you are designing to. Reclaimed *supply* is deliberately not restricted (reusing a donor
+    across standards is fine). Falls back to the whole catalog when the standard can't be determined.
+    Returns ``None`` if nothing passes (then the slot is infeasible for reuse too).
     """
     if _degenerate(slot):
         return None
     grade = slot.grade or new_build_grade
+    target_std = _slot_standard(slot, catalog)
     best: float | None = None
     for sec in catalog.values():
+        if target_std is not None and sec.standard != target_std:
+            continue
         if _passes(sec, grade, slot.demand):
             mass = sec.mass_kgm * slot.required_length_mm / 1000.0
             if best is None or mass < best:

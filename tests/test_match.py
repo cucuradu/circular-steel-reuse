@@ -1,5 +1,6 @@
 """Phase 5 tests: MILP matching (known-answer) + end-to-end pipeline on the sample models."""
 
+import dataclasses
 from pathlib import Path
 
 import pytest
@@ -168,3 +169,23 @@ def test_slots_carry_design_grade_and_section(cat):
     by_member = {s.member_id: s for s in build_slots(demand)}
     assert by_member["N1"].grade == "S275"
     assert by_member["N1"].design_section == "IPE240"
+
+
+def test_baseline_stays_within_slot_standard(cat):
+    # EU<->US leak: a US slot's avoided-new baseline must be the lightest adequate W-shape, not a
+    # coincidentally-lighter IPE. Two sections with identical IPE300 geometry (so both pass the same
+    # checks) differing only in mass + standard make the restriction observable purely by mass.
+    ipe = cat["IPE300"]
+    light_eu = dataclasses.replace(ipe, name="EU_LIGHT", mass_kgm=10.0, standard="EU")
+    heavy_us = dataclasses.replace(ipe, name="US_HEAVY", mass_kgm=30.0, standard="US")
+    mini = {"EU_LIGHT": light_eu, "US_HEAVY": heavy_us}
+
+    eu_slot = _beam_slot(4000, 8.0)
+    eu_slot.grade = "S355"
+    eu_slot.design_section = "EU_LIGHT"
+    us_slot = _beam_slot(4000, 8.0)
+    us_slot.grade = "A992"
+    us_slot.design_section = "US_HEAVY"
+    # Without the standard filter both would pick EU_LIGHT (10 kg/m); with it each stays in its own.
+    assert baseline_new_mass_kg(eu_slot, mini) == pytest.approx(10.0 * 4.0)   # 40 kg
+    assert baseline_new_mass_kg(us_slot, mini) == pytest.approx(30.0 * 4.0)   # 120 kg

@@ -73,6 +73,8 @@ class SectionProps:
     Wel_z: float
     Wpl_z: float
     iz: float
+    standard: str = "EU"   # "EU" (IPE/HE...) or "US" (AISC W...) — used to keep the new-build baseline
+                           # within the slot's own design standard (see match.baseline_new_mass_kg)
 
     @property
     def Av_z(self) -> float:
@@ -105,6 +107,7 @@ def load_catalog(path: str | Path = DEFAULT_CATALOG) -> dict[str, SectionProps]:
                 Wel_z=float(row["Wel_z_cm3"]) * 1e3,
                 Wpl_z=float(row["Wpl_z_cm3"]) * 1e3,
                 iz=float(row["iz_cm"]) * 10,
+                standard="EU",
             )
     return out
 
@@ -149,6 +152,7 @@ def load_catalog_imperial(path: str | Path = DEFAULT_US_CATALOG) -> dict[str, Se
                 Wel_z=float(row["Sy_in3"]) * _IN3_MM3,
                 Wpl_z=float(row["Zy_in3"]) * _IN3_MM3,
                 iz=float(row["ry_in"]) * _IN_MM,
+                standard="US",
             )
     return out
 

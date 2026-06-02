@@ -42,23 +42,29 @@ for *pre-feasibility*, but it is **the** headline limitation and must be stated 
 Fix sketch: add a small **load-combination envelope** (e.g. 1.35G+1.5Q, 1.0G+1.5Q, and a notional
 horizontal) and take the worst per slot; document the gravity-only scope prominently in the report.
 
-### 🟠 3. Avoided-new baseline leaks across standards (EU↔US)
-`baseline_new_mass_kg` ([match/optimize.py](src/steelreuse/match/optimize.py)) searches the **merged**
-EU+US catalog, so a US (W-shape) slot's "lightest adequate new member" can come out as an IPE (and
-vice-versa), distorting the CO₂-saved economics and the "what you'd buy new" story.
+### ✅ 3. Avoided-new baseline leaks across standards (EU↔US) — DONE
+`SectionProps` now carries a `standard` ("EU"/"US"); `baseline_new_mass_kg`
+([match/optimize.py](src/steelreuse/match/optimize.py)) restricts the lightest-adequate search to the
+slot's own standard (from its mapped design section, else its grade prefix), falling back to the whole
+catalog only when the standard can't be determined. Reclaimed **supply** is intentionally left
+unrestricted (cross-standard reuse is fine). Tested with two identical-geometry sections differing only
+in mass + standard. *(Residual: a `--mixed-standards` opt-in if anyone ever wants the old behaviour.)*
 
-Fix sketch: tag each `SectionProps` with a `standard` ("EU"/"US"); restrict the baseline search (and
-arguably the candidate **supply**) to the slot's own standard/family. Add a `--mixed-standards` opt-in
-for the rare cross-standard case.
+### 🟠 4. EU catalog is thin — PARTIALLY DONE (validator added; HE/HEM still pending)
+**Done:** added IPE550/IPE600 (verified against the eurocodeapplied table, which reproduces our IPE300
+anchor exactly; `Iy` reconstructed from `Wel·h/2` to avoid the source's large-number display
+truncation). Added a **catalog property-consistency test** (`test_catalog_property_consistency` in
+[tests/test_sections.py](tests/test_sections.py)) that recomputes mass/`Wel`/`i` from the primaries and
+checks `Wpl ≥ Wel` for **all 305 rows** (EU + the 283 US) — a transcription guard for any future row.
 
-### 🟠 4. EU catalog is too thin to be credible (20 profiles)
-[data/sections/eu_sections.csv](src/steelreuse/data/sections/eu_sections.csv) has IPE160–500 + a
-partial HEA/HEB set only — **no HEM, no HEB220/260/280, no UB/UC/UPN/IPN/angles**. The lightest-
-adequate baseline is coarse and real EU demand lands in `fuzzy`/`unknown`. The US side has 283
-W-shapes — badly asymmetric.
-
-Fix sketch: extend to full IPE / HEA / HEB / HEM (source: EN 10365 / ArcelorMittal tables), keeping the
-same verbatim-then-convert pattern used for the AISC CSV so values stay auditable.
+**Still pending:** [eu_sections.csv](src/steelreuse/data/sections/eu_sections.csv) is still light on
+columns — no HEM at all, missing HEB220/260/280/320, several HEA, no UB/UC/UPN/IPN/angles. The blocker
+is sourcing authoritative **plastic moduli** `Wpl`: the static-fetchable tables (piping-world,
+build-your-vision) carry dimensions + `Wel` only, and the complete ones (Dlubal, eurocodeapplied HE
+tabs) are JS-driven so a page fetch can't read them. *Do it properly:* obtain a machine-readable EU
+dataset (EN 10365 / ArcelorMittal / a vetted CSV) and convert it verbatim like the AISC catalog was, so
+`Wpl` is auditable rather than guessed; the consistency test will then guard the import. **Do not
+hand-enter `Wpl` from memory** — it feeds bending capacity directly.
 
 ### 🟠 5. The flagship LTB (real χ_LT) is dormant in the default run
 `AreaLoadModel` defaults `flange_restrained=True` (slab restrains the compression flange) ⇒ LTB is

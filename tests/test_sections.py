@@ -3,6 +3,7 @@
 Standard library + the package only (no heavy deps), so these run on a bare Python install.
 """
 
+import math
 from pathlib import Path
 
 import pytest
@@ -181,3 +182,30 @@ def test_schema_roundtrip(tmp_path):
     out = tmp_path / "rt.json"
     model.save(out)
     assert ExtractedModel.load(out).to_dict() == model.to_dict()
+
+
+# --- catalog data integrity ------------------------------------------------
+
+def test_catalog_property_consistency():
+    """Every catalog row (EU + the 283-shape US import) must obey the physical relations between its
+    properties, so a transcription slip (cm vs mm, an Iy/Wpl swap, a strong/weak-axis mix-up) fails
+    loudly instead of silently corrupting a capacity check. This also guards any future catalog
+    expansion: add rows and this recomputes the derived quantities from the primaries.
+
+    Relations (catalogue units): mass ≈ 0.785·A_cm2 (steel at 7850 kg/m³, +fillets);
+    Wel_y ≈ Iy/(h/2); iy ≈ √(Iy/A); Wel_z ≈ Iz/(b/2); iz ≈ √(Iz/A); and Wpl ≥ Wel on both axes.
+    Tolerances have generous headroom over the worst real deviation (~1.5%).
+    """
+    cat = load_default_catalog()
+    assert len(cat) > 250                                   # EU + US merged
+    for s in cat.values():
+        A, Iy, Iz = s.A / 1e2, s.Iy / 1e4, s.Iz / 1e4       # -> cm^2, cm^4
+        Wely, Welz = s.Wel_y / 1e3, s.Wel_z / 1e3           # -> cm^3
+        Wply, Wplz = s.Wpl_y / 1e3, s.Wpl_z / 1e3
+        h, b, iy, iz = s.h / 10, s.b / 10, s.iy / 10, s.iz / 10  # -> cm
+        assert s.mass_kgm == pytest.approx(0.785 * A, rel=0.05), f"{s.name}: mass vs area"
+        assert Wely == pytest.approx(Iy / (h / 2), rel=0.03), f"{s.name}: Wel_y vs Iy/(h/2)"
+        assert iy == pytest.approx(math.sqrt(Iy / A), rel=0.03), f"{s.name}: iy vs sqrt(Iy/A)"
+        assert Welz == pytest.approx(Iz / (b / 2), rel=0.03), f"{s.name}: Wel_z vs Iz/(b/2)"
+        assert iz == pytest.approx(math.sqrt(Iz / A), rel=0.03), f"{s.name}: iz vs sqrt(Iz/A)"
+        assert Wply >= Wely and Wplz >= Welz, f"{s.name}: Wpl < Wel"
