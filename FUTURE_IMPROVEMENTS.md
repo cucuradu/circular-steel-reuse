@@ -99,13 +99,12 @@ Decision needed — pick one:
 - **Reframe**: present the ML as an exploratory side-study in the writeup and drop the strong-accuracy
   framing (state the circularity honestly).
 
-### 🟠 8. No methodology document (roadmap WS3)
-A thesis needs a methods section mapping **each EN 1993-1-1 clause → code → assumption → validation
-source**. Doesn't exist yet.
-
-Fix sketch: `docs/METHODOLOGY.md` with a clause table (classification 5.2, 6.2.x resistances, 6.3.x
-buckling/LTB, 6.3.3 interaction, SLS), every assumption (γ factors, C1=1.0, k=1.0, knockdown,
-restraint, carbon factors), and an **end-to-end validation against one worked textbook example**.
+### ✅ 8. Methodology document — DONE
+[docs/METHODOLOGY.md](docs/METHODOLOGY.md) maps each EN 1993-1-1 clause → code → assumption → validation
+source (classification 5.2, 6.2.x resistances, 6.3.x buckling/LTB, the simplified 6.3.3 interaction,
+SLS), with an assumptions register and the hand-calc validation basis. **Residual:** add an explicit
+**end-to-end validation against one published worked example** (currently the validation is the
+per-check hand calcs encoded in the tests, not a single textbook frame run start-to-finish).
 
 ### 🟡 9. Optimizer / reporting refinements
 - **Off-cut as pure waste**: the objective penalizes off-cut but a long donor cut to a short slot

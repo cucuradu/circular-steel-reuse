@@ -9,6 +9,9 @@ embodied-CO₂ saved. A pyRevit + Python + AI project focused on circular-econom
 > and its results are **decision-support, not code-certified**. Reused steel still requires physical
 > verification (coupon testing, corrosion/fatigue survey) and connection design by an engineer.
 
+📖 **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — the EN 1993-1-1 clause→code mapping, every
+assumption, and the validation basis. **[FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md)** — backlog.
+
 ## How it works (pipeline)
 
 ```
