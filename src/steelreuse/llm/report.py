@@ -8,6 +8,7 @@ if it introduces any figure not present in the computed results.
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 from ..pipeline import PipelineResult
 from .providers import LLMProvider, NullProvider
@@ -31,13 +32,20 @@ def build_report_context(res: PipelineResult) -> dict:
         }
         for a in m.assignments
     ]
+    # Summarize unknowns by distinct raw name + count, so a model with hundreds of identical
+    # non-steel members (bar joists, concrete) yields a short table instead of a wall of text.
+    unknown_counts = Counter(u.raw for u in res.validation.unknown)
+    unknown_breakdown = [
+        {"name": name, "count": n} for name, n in unknown_counts.most_common()
+    ]
     ctx = {
         "supply_count": res.supply_count,
         "slot_count": res.slot_count,
         "mapped": len(res.validation.mapped),
         "fuzzy": len(res.validation.fuzzy),
         "unknown": len(res.validation.unknown),
-        "unknown_names": [u.raw for u in res.validation.unknown],
+        "unknown_kinds": len(unknown_breakdown),
+        "unknown_breakdown": unknown_breakdown,
         "total_mass_kg": round(p.total_mass_kg, 1),
         "total_new_co2_kg": round(p.total_new_kgco2e, 1),
         "donor_saved_co2_kg": round(p.total_saved_kgco2e, 1),
@@ -99,8 +107,9 @@ def deterministic_narrative(ctx: dict) -> str:
         parts.append(f"{ctx['n_unused']} reclaimed member(s) were left unused and remain "
                      "available for other projects.")
     if ctx["unknown"]:
-        parts.append(f"{ctx['unknown']} donor member(s) could not be identified and were excluded "
-                     f"from analysis ({', '.join(ctx['unknown_names'])}).")
+        top = "; ".join(f"{b['count']}x {b['name']}" for b in ctx["unknown_breakdown"][:5])
+        parts.append(f"{ctx['unknown']} donor member(s) across {ctx['unknown_kinds']} type(s) could "
+                     f"not be identified and were excluded from analysis (top: {top}).")
     return " ".join(parts)
 
 
@@ -155,8 +164,12 @@ _TEMPLATE = """<!doctype html>
  <td class="{{ 'review' if a.status=='REVIEW' else '' }}">{{ a.status }}</td>
  <td>{{ a.offcut_mm }}</td><td>{{ a.co2_saved_kg }}</td></tr>{% endfor %}
 </table>
-{% if ctx.unknown %}<div class="warn">⚠ {{ ctx.unknown }} donor member(s) unidentified and excluded:
- {{ ctx.unknown_names|join(', ') }}. Add them to the section catalog or an override CSV.</div>{% endif %}
+{% if ctx.unknown %}<div class="warn">⚠ {{ ctx.unknown }} donor member(s) across
+ {{ ctx.unknown_kinds }} type(s) unidentified and excluded (not in the steel catalog — e.g. concrete,
+ bar joists, or shapes outside the W-shape set). Add steel ones to the catalog or an override CSV.
+ <table><tr><th>Unidentified type</th><th>Count</th></tr>
+ {% for b in ctx.unknown_breakdown %}<tr><td>{{ b.name }}</td><td>{{ b.count }}</td></tr>{% endfor %}
+ </table></div>{% endif %}
 <p>Mapped {{ ctx.mapped }} · fuzzy {{ ctx.fuzzy }} · unknown {{ ctx.unknown }} ·
  solver: {{ ctx.solver_status }}</p>
 <p class="disc">{{ ctx.disclaimer }}</p>

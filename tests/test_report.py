@@ -34,6 +34,13 @@ def test_context_has_expected_keys(ctx):
     assert ctx["disclaimer"].startswith("Member-level")
 
 
+def test_unknown_breakdown_is_summarized(ctx):
+    # the report must summarize unknowns by distinct name + count, not list every member
+    assert ctx["unknown_kinds"] == 1
+    assert ctx["unknown_breakdown"] == [{"name": "W12x40", "count": 1}]
+    assert "unknown_names" not in ctx          # the old wall-of-text key is gone
+
+
 def test_numeric_guard_flags_invented_numbers():
     allowed = {12.0, 45.5}
     assert find_invented_numbers("we saved 45.5 kg across 12 members", allowed) == []

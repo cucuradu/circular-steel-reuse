@@ -73,8 +73,9 @@ def main() -> None:
         st.warning("No feasible reuse matches for these inputs.")
 
     if ctx["unknown"]:
-        st.warning(f"{ctx['unknown']} donor member(s) unidentified and excluded: "
-                   f"{', '.join(ctx['unknown_names'])}")
+        st.warning(f"{ctx['unknown']} donor member(s) across {ctx['unknown_kinds']} type(s) "
+                   "unidentified and excluded (not in the steel catalog):")
+        st.dataframe(pd.DataFrame(ctx["unknown_breakdown"]), use_container_width=True)
 
     st.subheader("Material passport (donor)")
     st.dataframe(pd.DataFrame([e.__dict__ for e in res.passport.entries]), use_container_width=True)

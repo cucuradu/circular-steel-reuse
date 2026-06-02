@@ -30,7 +30,8 @@ Pluggable in `core/forces.py`: `PyNiteFEA` (default, used in CI/tests via mocks)
 (optional), SAP2000 table scrape (fallback). Tests must not require Revit or SAP2000.
 
 ## Dev workflow
-- `uv venv && uv pip install -e ".[analysis,fea,ml,opt,llm,ui,dev]"`
+- `uv venv && uv pip install -e ".[analysis,fea,ml,opt,report,llm,ui,bim,dev]"`
+  (the `report` extra ships Jinja2, which the CLI/report layer needs — don't drop it).
 - `uv run pytest` — Phase 1 tests use the standard library only (no heavy deps needed).
 - `uv run ruff check .`
 - Keep each phase shippable on its own (see README status table).

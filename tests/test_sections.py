@@ -8,7 +8,10 @@ from pathlib import Path
 import pytest
 
 from steelreuse.core.sections import (
+    default_grade_for_section,
     load_catalog,
+    load_catalog_imperial,
+    load_default_catalog,
     map_section,
     normalize_name,
     resolve_members,
@@ -68,6 +71,7 @@ def test_map_normalized_variants(catalog):
 
 
 def test_map_unknown_us_section(catalog):
+    # Against the *European* catalog a W-shape is still unknown (no AISC entries present).
     r = map_section("W12x40", catalog)
     assert r.method == "unknown" and r.canonical is None
 
@@ -104,6 +108,67 @@ def test_resolve_sample_donor(catalog):
     assert by_id["D1"].section == "IPE300"
     assert by_id["D4"].section == "HEB300"
     assert report.n_total == 8
+
+
+# --- US / AISC (imperial) --------------------------------------------------
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("W Shapes W18x55", "W18X55"),            # lowercase 'x' separator
+        ("W Shapes W12X26", "W12X26"),            # uppercase 'X'
+        ("W Shapes-Column W14x109", "W14X109"),   # family-name junk + size
+        ("W18X55", "W18X55"),
+        ("C Shapes C8X11.5", "C8X11.5"),          # channel, decimal weight
+        ("HSS-Hollow Structural Section-Column HSS6x6x5/8", "HSS6X6X5/8"),  # tube, fraction
+    ],
+)
+def test_normalize_name_us(raw, expected):
+    assert normalize_name(raw) == expected
+
+
+def test_us_does_not_break_eu_normalization():
+    # the AISC detector must not fire on European names (no 'x'-joined size token).
+    assert normalize_name("IPE 300") == "IPE300"
+    assert normalize_name("HE 300 B") == "HEB300"
+
+
+def test_load_catalog_imperial_converts_units():
+    # W18X55 from AISC v15: A=16.2 in^2, Ix=890 in^4, w=55 lb/ft, d=18.1 in. Verify the in->mm/SI
+    # conversion lands on the published soft-metric values (W460x82 ~ A=10500 mm^2, Ix=370e6 mm^4).
+    us = load_catalog_imperial()
+    w = us["W18X55"]
+    assert w.A == pytest.approx(10451.6, rel=1e-4)        # 16.2 in^2 -> mm^2
+    assert w.Iy == pytest.approx(3.7045e8, rel=1e-3)      # 890 in^4 -> mm^4 (AISC x -> EN y)
+    assert w.mass_kgm == pytest.approx(81.85, rel=1e-3)   # 55 lb/ft -> kg/m
+    assert w.h == pytest.approx(459.74, rel=1e-4)         # 18.1 in -> mm
+    assert w.r > 0 and w.Av_z > 0                          # fillet recovered, shear area positive
+
+
+def test_default_catalog_merges_eu_and_us():
+    cat = load_default_catalog()
+    assert "IPE300" in cat and "W18X55" in cat            # both standards in one catalog
+    assert cat["W18X55"].mass_kgm == pytest.approx(81.85, rel=1e-3)
+
+
+def test_map_us_section_against_default_catalog():
+    cat = load_default_catalog()
+    r = map_section("W Shapes W18x55", cat)
+    assert r.canonical == "W18X55" and r.method == "normalized"
+
+
+@pytest.mark.parametrize(
+    "name,grade",
+    [
+        ("W18X55", "A992"),       # wide-flange -> A992
+        ("HSS6X6X5/8", "A500"),   # tube -> A500
+        ("C8X11.5", "A36"),       # channel -> A36
+        ("IPE300", None),         # European -> untouched (keeps existing EN behaviour)
+        ("HEB300", None),
+    ],
+)
+def test_default_grade_for_section(name, grade):
+    assert default_grade_for_section(name) == grade
 
 
 # --- schema round-trip -----------------------------------------------------

@@ -10,7 +10,7 @@ from steelreuse.core.forces import AnalyticBackend
 from steelreuse.core.sections import load_catalog, resolve_members
 from steelreuse.match.optimize import DemandSlot, SupplyItem, baseline_new_mass_kg, match
 from steelreuse.pipeline import build_slots, run_pipeline
-from steelreuse.schema import ExtractedModel
+from steelreuse.schema import ExtractedMember, ExtractedModel
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 
@@ -73,6 +73,48 @@ def test_end_to_end_pipeline_on_samples(cat):
     assert res.match.total_co2_saved_kg > 0
 
 
+def test_us_pipeline_reads_imperial_model(tmp_path):
+    # A US/AISC model (AISC type names, no material grade) must read end-to-end on the default merged
+    # catalog: W-shapes map and default to A992, the concrete column is the only unknown (never
+    # guessed), and reuse + CO2 are computed.
+    donor = ExtractedModel(kind="donor", source="pyrevit", members=[
+        ExtractedMember(id="D1", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W18x55", length_mm=7000),
+        ExtractedMember(id="D2", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W18x55", length_mm=7000),
+        ExtractedMember(id="D3", role="column", category="Structural Columns",
+                        raw_section="Concrete-Rectangular-Column CC24x24", length_mm=4000),
+    ])
+    demand = ExtractedModel(kind="demand", source="pyrevit", members=[
+        ExtractedMember(id="N1", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W16x26", spans_mm=[6000]),
+    ])
+    dp, mp = tmp_path / "donor.json", tmp_path / "demand.json"
+    donor.save(dp)
+    demand.save(mp)
+
+    res = run_pipeline(str(dp), str(mp))   # no catalog arg -> load_default_catalog() (EU + US)
+    assert len(res.validation.mapped) == 2                       # both W18x55 mapped
+    assert len(res.validation.unknown) == 1                      # only the concrete column
+    assert res.validation.unknown[0].raw == "Concrete-Rectangular-Column CC24x24"
+    assert res.supply_count == 2                                 # concrete excluded from supply
+    assert res.match.n_reused >= 1
+    assert res.match.total_co2_saved_kg > 0
+
+
+def test_build_slots_steel_only_drops_unmapped(cat):
+    # Non-steel demand (concrete, joists) maps to no catalog section; steel_only must skip it so it
+    # never becomes a slot we'd try to fill with reclaimed steel.
+    demand = ExtractedModel(kind="demand", members=[
+        ExtractedMember(id="S1", role="beam", raw_section="IPE300", spans_mm=[6000]),
+        ExtractedMember(id="X1", role="beam",
+                        raw_section="Concrete-Rectangular Beam CB24x24", spans_mm=[6000]),
+    ])
+    resolve_members(demand.members, cat)
+    assert {s.member_id for s in build_slots(demand)} == {"S1", "X1"}            # default: keep all
+    assert {s.member_id for s in build_slots(demand, steel_only=True)} == {"S1"}  # drop the concrete
+
+
 def test_co2_saved_uses_avoided_new_baseline_not_donor_mass(cat):
     # A1: a hugely oversized donor in a small slot must book the carbon of the *right-sized new
     # member* (the baseline), not the donor's own mass.
@@ -86,11 +128,24 @@ def test_co2_saved_uses_avoided_new_baseline_not_donor_mass(cat):
     f = load_factors()["steel"]
     base = baseline_new_mass_kg(slot, cat, "S355")        # ~IPE160 over 4 m
     donor_used = cat["IPE500"].mass_kgm * 4000 / 1000.0
-    expected = base * f.a1a3 - donor_used * f.reuse_process
+    # Booked CO2 is the net figure the optimiser uses: avoided new minus the reuse process carbon
+    # minus the default 5 kg connection-refabrication carbon (match()'s connection_penalty_kg).
+    expected = base * f.a1a3 - donor_used * f.reuse_process - 5.0
     assert a.co2_saved_kg == pytest.approx(expected, abs=0.5)
     # the baseline is far lighter than the donor -> saved is well below the naive donor-mass figure
     assert base < donor_used
     assert a.co2_saved_kg < donor_used * f.saved_per_kg
+
+
+def test_greedy_fallback_skips_net_negative_pairs():
+    # The greedy fallback must mirror the MILP, which leaves a negative-score x_ij at 0: never book a
+    # net-negative (carbon-losing) reuse just to fill a slot, even on a solver timeout. Feasible but
+    # net-negative pairs do reach the cell list, so the guard has to drop them here too.
+    from steelreuse.match.optimize import _Cell, _solve_greedy
+
+    pos = _Cell(si=0, sj=0, utilization=0.5, status="OK", offcut_mm=10.0, co2_saved_kg=20.0, score=20.0)
+    neg = _Cell(si=1, sj=1, utilization=0.9, status="OK", offcut_mm=10.0, co2_saved_kg=-3.0, score=-3.0)
+    assert _solve_greedy([pos, neg], n_supply=2, n_slots=2) == [pos]
 
 
 def test_degenerate_member_does_not_crash(cat):

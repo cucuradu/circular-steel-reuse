@@ -10,7 +10,7 @@ licenses). Check items off as you go.
 - [x] Project scaffolded at `circular-steel-reuse/`
 - [x] `uv` + a managed Python 3.12 installed; `.venv` created
 - [x] Phase 0 (scaffold + section catalog) and Phase 1 (extractor + schema + section mapping) built
-- [x] 16 tests passing, lint clean
+- [x] 88 tests passing, lint clean (was 16 at Phase 0+1)
 
 ---
 
@@ -20,7 +20,7 @@ licenses). Check items off as you go.
   ```powershell
   uv --version
   cd "c:\Users\Radu\OneDrive\Documents\Python\circular-steel-reuse"
-  uv run pytest          # expect: 16 passed
+  uv run pytest          # expect: 88 passed
   uv run ruff check .    # expect: All checks passed!
   ```
 - [ ] (Optional but recommended) Put the project under version control:
@@ -58,7 +58,7 @@ You need two tiny models to exercise the tool end-to-end:
       and report anything that lands in the `unknown` bucket.
 
 ## 5. Tune the section catalog to your reality (as needed)
-- [ ] If your models use sections **not** in `data/sections/eu_sections.csv`, tell me which ones and
+- [ ] If your models use sections **not** in `src/steelreuse/data/sections/eu_sections.csv`, tell me which ones and
       I'll add their properties. (Currently: IPE160–500, HEA/HEB200–300.)
 - [ ] If Revit type names don't auto-map, we'll create a small override CSV (`raw,canonical`) — you
       just paste the offending names and the section they mean.

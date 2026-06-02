@@ -60,7 +60,7 @@ into the same JSON schema as the pyRevit extractor — so the whole pipeline run
 ## Layout
 
 ```
-data/sections/eu_sections.csv   # standard steel section catalog (IPE/HE...)
+src/steelreuse/data/sections/   # steel section catalogs (EU IPE/HE + US AISC W) — bundled in the wheel
 data/samples/*.json             # sample extracted models for offline testing
 extractor/pyrevit_extract.py    # runs INSIDE Revit (IronPython 3 engine; stdlib-only)
 src/steelreuse/
@@ -78,7 +78,7 @@ Requires Python ≥ 3.11. Using [uv](https://docs.astral.sh/uv/):
 
 ```powershell
 uv venv
-uv pip install -e ".[analysis,fea,ml,opt,llm,ui,dev]"
+uv pip install -e ".[analysis,fea,ml,opt,report,llm,ui,bim,dev]"
 uv run pytest
 ```
 

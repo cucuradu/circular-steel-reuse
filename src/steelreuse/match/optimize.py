@@ -162,13 +162,17 @@ def _feasible_cell(
     mass_used = sec.mass_kgm * used_len / 1000.0
     offcut_mass = sec.mass_kgm * offcut_mm / 1000.0
     # Net CO2 saved (avoided-burden): avoid producing the right-sized new member (baseline_mass x
-    # A1-A3), but still pay the process carbon to recover/refabricate the donor we actually use.
-    # The donor always passes the same check, so a baseline exists; fall back to the donor's own
-    # mass only if the catalog lookup somehow yields nothing.
+    # A1-A3), but still pay the carbon to recover/refabricate the donor we actually use — both the
+    # process carbon and the extra connection refabrication a reused member needs. The donor always
+    # passes the same check, so a baseline exists; fall back to the donor's own mass only if the
+    # catalog lookup somehow yields nothing. This net figure is what gets booked AND reported, so the
+    # headline "CO2 saved" matches the basis the optimiser actually used (no silent over-count).
     avoided_new = (baseline_mass_kg if baseline_mass_kg is not None else mass_used) * factor.a1a3
-    co2_saved = avoided_new - mass_used * factor.reuse_process
-    # objective contribution: benefit - wasted-material penalty - connection refabrication penalty
-    score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg - connection_penalty_kg
+    co2_saved = avoided_new - mass_used * factor.reuse_process - connection_penalty_kg
+    # The off-cut term is a *soft preference* only: the remainder is cut off and returns to stock, it
+    # is not emitted, so it steers the optimiser away from wasting long stock but is deliberately not
+    # booked into co2_saved.
+    score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg
     return _Cell(si, sj, res.utilization, res.status, offcut_mm, co2_saved, score)
 
 
@@ -255,9 +259,16 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s) -> tuple[list[_Cell], st
 
 
 def _solve_greedy(cells, n_supply, n_slots) -> list[_Cell]:
-    """Take highest-score feasible pairs first, respecting one-use-each constraints."""
+    """Take highest-score feasible pairs first, respecting one-use-each constraints.
+
+    Only net-positive pairs are taken: the MILP leaves a negative-score x_ij at 0, so the greedy
+    fallback must match that — never book a reuse whose net benefit is negative just to fill a slot.
+    Cells are sorted by descending score, so the first non-positive one ends the scan.
+    """
     used_s, used_j, chosen = set(), set(), []
     for c in sorted(cells, key=lambda c: c.score, reverse=True):
+        if c.score <= 0:
+            break
         if c.si in used_s or c.sj in used_j:
             continue
         chosen.append(c)

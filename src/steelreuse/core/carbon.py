@@ -3,7 +3,7 @@
 For each member: mass, volume, the embodied carbon of buying it new (A1-A3), the small process
 carbon of reusing it (clean/test/refabricate), and the net CO2 *saved* by reusing instead of new.
 
-Factors are loaded from ``data/carbon/factors.csv`` (ICE database values; swap for Okobaudat/Climatiq).
+Factors are loaded from ``steelreuse/data/carbon/factors.csv`` (ICE values; swap for Okobaudat/Climatiq).
 All numbers are plain arithmetic here so they can later be injected into reports verbatim — the LLM
 never recomputes them.
 """
@@ -16,8 +16,8 @@ from pathlib import Path
 
 from .sections import SectionProps
 
-DEFAULT_FACTORS = Path(__file__).resolve().parents[3] / "data" / "carbon" / "factors.csv"
-STEEL_DENSITY_KG_M3 = 7850.0
+# Ships inside the package (see sections.py) so the factor table is found in an installed wheel too.
+DEFAULT_FACTORS = Path(__file__).resolve().parent.parent / "data" / "carbon" / "factors.csv"
 
 
 @dataclass(frozen=True)
