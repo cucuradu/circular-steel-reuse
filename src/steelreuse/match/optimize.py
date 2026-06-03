@@ -56,6 +56,8 @@ class Assignment:
     offcut_mm: float
     co2_saved_kg: float
     score: float
+    chi_lt: float | None = None       # LTB reduction used (1.0 if restrained, None if no bending)
+    chi_lt_if_free: float | None = None  # what chi_LT would be if the flange were unrestrained
 
 
 @dataclass
@@ -90,6 +92,8 @@ class _Cell:
     offcut_mm: float
     co2_saved_kg: float
     score: float
+    chi_lt: float | None = None
+    chi_lt_if_free: float | None = None
 
 
 def _passes(sec: SectionProps, grade: str, demand: MemberDemand, knockdown: float = 1.0) -> bool:
@@ -198,7 +202,12 @@ def _feasible_cell(
     # is not emitted, so it steers the optimiser away from wasting long stock but is deliberately not
     # booked into co2_saved.
     score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg
-    return _Cell(si, sj, res.utilization, res.status, offcut_mm, co2_saved, score)
+    # Surface the LTB factor for the report: chi_LT used, and what it would be if unrestrained.
+    bending = next((c for c in res.checks if c.name == "bending_y"), None)
+    chi_lt = bending.detail.get("chi_LT") if bending else None
+    chi_lt_if_free = bending.detail.get("chi_LT_if_unrestrained", chi_lt) if bending else None
+    return _Cell(si, sj, res.utilization, res.status, offcut_mm, co2_saved, score,
+                 chi_lt, chi_lt_if_free)
 
 
 def match(
@@ -243,6 +252,7 @@ def match(
             utilization=round(c.utilization, 4), status=c.status,
             offcut_mm=round(c.offcut_mm, 1), co2_saved_kg=round(c.co2_saved_kg, 2),
             score=round(c.score, 2),
+            chi_lt=c.chi_lt, chi_lt_if_free=c.chi_lt_if_free,
         )
         for c in chosen
     ]

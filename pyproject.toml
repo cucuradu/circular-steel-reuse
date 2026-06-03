@@ -51,6 +51,7 @@ ignore = ["SIM108"]
 "pyrevit_extension/*" = ["UP009", "UP031", "E501"]
 # Embedded HTML/CSS template strings are unavoidably long.
 "src/steelreuse/inventory.py" = ["E501"]
+"src/steelreuse/llm/report.py" = ["E501"]
 # SIM300 misfires on `value == pytest.approx(...)` comparisons.
 "tests/*" = ["SIM300"]
 

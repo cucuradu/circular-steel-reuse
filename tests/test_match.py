@@ -171,6 +171,16 @@ def test_slots_carry_design_grade_and_section(cat):
     assert by_member["N1"].design_section == "IPE240"
 
 
+def test_assignment_carries_chi_lt_for_the_report(cat):
+    # #5: assignments surface the LTB factor so the report can show it. A restrained beam uses
+    # chi_LT = 1.0 but still reports what it would be unrestrained.
+    slot = _beam_slot(6000, 20.0)   # _beam_slot sets compression_flange_restrained=True
+    supply = [SupplyItem(id="s", section="IPE360", grade="S275", length_mm=7000)]
+    a = match(supply, [slot], cat).assignments[0]
+    assert a.chi_lt == 1.0
+    assert a.chi_lt_if_free is not None and 0.0 < a.chi_lt_if_free <= 1.0
+
+
 def test_baseline_stays_within_slot_standard(cat):
     # EU<->US leak: a US slot's avoided-new baseline must be the lightest adequate W-shape, not a
     # coincidentally-lighter IPE. Two sections with identical IPE300 geometry (so both pass the same

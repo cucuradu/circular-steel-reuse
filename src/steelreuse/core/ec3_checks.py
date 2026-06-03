@@ -255,7 +255,16 @@ def check_member(
         mc = M_c_Rd(sec, fy, section_class)
         if demand.compression_flange_restrained:
             mrd = mc
-            detail = {"M_c_Rd": mc, "chi_LT": 1.0, "restrained": True}
+            # Surface what LTB *would* do without the slab restraint, so the chi_LT computation is
+            # visible even on the (default) restrained path and restraint-critical beams are flagged.
+            x_lt_free = chi_LT(sec, fy, demand.L, section_class, demand.C1) if demand.L > 0 else 1.0
+            detail = {"M_c_Rd": mc, "chi_LT": 1.0, "restrained": True,
+                      "chi_LT_if_unrestrained": round(x_lt_free, 4)}
+            if x_lt_free < 0.85:
+                warnings.append(
+                    f"relies on compression-flange restraint: chi_LT would be {x_lt_free:.2f} if "
+                    "unrestrained (verify the slab/bracing, especially at the construction stage)"
+                )
         else:
             x_lt = chi_LT(sec, fy, demand.L, section_class, demand.C1)
             mrd = x_lt * mc

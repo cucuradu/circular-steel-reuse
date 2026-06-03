@@ -29,9 +29,16 @@ def build_report_context(res: PipelineResult) -> dict:
             "slot": a.slot_id, "supply": a.supply_id, "section": a.section,
             "utilization": a.utilization, "status": a.status,
             "offcut_mm": a.offcut_mm, "co2_saved_kg": a.co2_saved_kg,
+            "chi_lt": a.chi_lt, "chi_lt_if_free": a.chi_lt_if_free,
         }
         for a in m.assignments
     ]
+    # Beams that pass only because the slab restrains the compression flange: chi_LT would drop below
+    # 0.85 if unrestrained. Surfacing this makes the LTB check visible and flags construction-stage risk.
+    ltb_restraint_reliant = sum(
+        1 for a in m.assignments
+        if a.chi_lt == 1.0 and a.chi_lt_if_free is not None and a.chi_lt_if_free < 0.85
+    )
     # Summarize unknowns by distinct raw name + count, so a model with hundreds of identical
     # non-steel members (bar joists, concrete) yields a short table instead of a wall of text.
     unknown_counts = Counter(u.raw for u in res.validation.unknown)
@@ -58,6 +65,7 @@ def build_report_context(res: PipelineResult) -> dict:
         "unused_supply": m.unused_supply,
         "solver_status": m.solver_status,
         "assignments": assignments,
+        "ltb_restraint_reliant": ltb_restraint_reliant,
         "disclaimer": SCOPE_DISCLAIMER,
     }
     return ctx
@@ -157,13 +165,18 @@ _TEMPLATE = """<!doctype html>
 </div>
 <h2>Assignments</h2>
 <table><tr><th>Demand slot</th><th>Reclaimed member</th><th>Section</th><th>Utilization</th>
-<th>Status</th><th>Off-cut (mm)</th><th>CO2e saved (kg)</th></tr>
+<th>Status</th><th>&chi;<sub>LT</sub></th><th>Off-cut (mm)</th><th>CO2e saved (kg)</th></tr>
 {% for a in ctx.assignments %}<tr>
  <td>{{ a.slot }}</td><td>{{ a.supply }}</td><td>{{ a.section }}</td>
  <td>{{ '%.2f'|format(a.utilization) }}</td>
  <td class="{{ 'review' if a.status=='REVIEW' else '' }}">{{ a.status }}</td>
+ <td>{% if a.chi_lt is none %}—{% else %}{{ '%.2f'|format(a.chi_lt) }}{% if a.chi_lt == 1.0 and a.chi_lt_if_free is not none and a.chi_lt_if_free < 0.85 %} <span class="review" title="would be {{ '%.2f'|format(a.chi_lt_if_free) }} if the flange were unrestrained">⚠</span>{% endif %}{% endif %}</td>
  <td>{{ a.offcut_mm }}</td><td>{{ a.co2_saved_kg }}</td></tr>{% endfor %}
 </table>
+{% if ctx.ltb_restraint_reliant %}<div class="warn">⚠ {{ ctx.ltb_restraint_reliant }} reused beam(s)
+ pass bending only because the floor slab restrains the compression flange (&chi;<sub>LT</sub> would
+ fall below 0.85 if unrestrained) — confirm the restraint, especially at the construction stage before
+ the slab is composite.</div>{% endif %}
 {% if ctx.unknown %}<div class="warn">⚠ {{ ctx.unknown }} donor member(s) across
  {{ ctx.unknown_kinds }} type(s) unidentified and excluded (not in the steel catalog — e.g. concrete,
  bar joists, or shapes outside the W-shape set). Add steel ones to the catalog or an override CSV.

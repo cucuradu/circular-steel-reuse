@@ -127,6 +127,17 @@ def test_grades_table():
     assert FY_BY_GRADE["S355"] == 355 and math.isclose(FY_BY_GRADE["S235"], 235)
 
 
+def test_restrained_beam_surfaces_unrestrained_chi_lt(cat):
+    # #5: even when the slab restrains the flange (chi_LT used = 1.0), the "if unrestrained" chi_LT is
+    # computed for the report and a restraint-reliance warning is raised when it would be low.
+    d = MemberDemand(My_Ed=80e6, L=6000, compression_flange_restrained=True)
+    res = check_member(cat["IPE300"], "S275", d)
+    bend = next(c for c in res.checks if c.name == "bending_y")
+    assert bend.detail["chi_LT"] == 1.0
+    assert 0.3 < bend.detail["chi_LT_if_unrestrained"] < 0.7        # ~0.45 for IPE300, L=6 m
+    assert any("relies on compression-flange restraint" in w for w in res.warnings)
+
+
 def test_interaction_nm_is_ltb_aware(cat):
     # A beam-column under combined N+M: the interaction must use M_b_Rd (chi_LT-reduced) when the
     # compression flange is unrestrained, so LTB cannot be silently ignored in the combined check.

@@ -64,14 +64,16 @@ recomputes mass/`Wel`/`i` from the primaries and checks `Wpl ≥ Wel` across all
 (UB/UC, UPN/UPE channels, IPN, L-angles, RHS/CHS) — same gist/source covers most; add as needed. Channels
 and angles also need shape-aware checks (the EN I/H formulas don't apply to mono-symmetric/hollow shapes).
 
-### 🟠 5. The flagship LTB (real χ_LT) is dormant in the default run
-`AreaLoadModel` defaults `flange_restrained=True` (slab restrains the compression flange) ⇒ LTB is
-skipped for **every** beam by default ([core/ec3_checks.py](src/steelreuse/core/ec3_checks.py)); the
-real-χ_LT computation only fires when a user opts into unrestrained. Physically defensible, but the
-showcase feature isn't exercised by the default path.
+### ✅ 5. Surface χ_LT in the default run — DONE
+The restrained bending path now also computes the **"if unrestrained" χ_LT**
+([core/ec3_checks.py](src/steelreuse/core/ec3_checks.py)) and warns when it would fall below 0.85, so the
+flagship LTB calculation is visible even though a slab-restrained beam correctly uses χ_LT = 1.0. The
+matcher threads `chi_lt` / `chi_lt_if_free` onto each `Assignment`; the report shows a **χ_LT column** and
+a note counting beams that pass only because of the slab restraint (construction-stage risk). On the
+sample model, 4 reused beams are flagged (χ_LT 0.45–0.71 if unrestrained).
 
-Fix sketch: report χ_LT alongside the restrained result anyway (informational), and/or add a
-construction/erection-stage check where the slab isn't yet present so LTB governs.
+Residual: a full **construction-stage load case** (reduced load, no slab) as a second check, rather than
+the current informational flag.
 
 ### 🟡 6. Heavy-section edge cases (t_f > 40 mm)
 Flexural-buckling curve selection (`_buckling_alpha`) and the `FY_BY_GRADE` table both assume
