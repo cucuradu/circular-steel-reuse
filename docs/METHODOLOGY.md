@@ -200,7 +200,24 @@ degenerate-geometry safety, and the greedy net-positive guard.
 
 **Whole suite:** 94 tests, ruff clean.
 
-## 11. Out of scope (explicit non-claims)
+## 11. ML modules (exploratory, not in the certified path)
+
+`ml/` is an **exploratory side-study and is not wired into the matching pipeline** — the result path is
+entirely deterministic (sections → loads → EN 1993 → carbon → MILP). Three modules:
+
+- **Capacity surrogate** (`ml/surrogate.py`, XGBoost) imitates the deterministic utilization for a fast
+  pre-screen. Its reported test R² (~1.0) is **circular**: the labels are produced by the EN 1993
+  checker itself over a synthetic sweep, so a high score only shows the model can reproduce the checker,
+  not real-world predictive power. It is never authoritative (CLAUDE.md rule 3).
+- **Reuse score** (`ml/reuse_score.py`) is a transparent weighted heuristic (section standardization ×
+  length usability) — the honest, non-formula judgement, replaceable by a trained model when real reuse
+  outcomes are available.
+- **Clustering** (`ml/clustering.py`) groups similar sections (KMeans) for exploration.
+
+Wiring any of these into the pipeline (surrogate as a pre-filter, reuse-score as an objective term) is a
+deliberate future decision, logged in `FUTURE_IMPROVEMENTS.md` #7 — not a default.
+
+## 12. Out of scope (explicit non-claims)
 
 Connection design and capacity; global/sway frame analysis and load combinations beyond a single ULS
 gravity case; lateral (wind/seismic) and pattern loading; biaxial bending and the shear–moment (6.2.8)

@@ -38,7 +38,7 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
 | 1 | pyRevit extractor + JSON schema + section mapping | ✅ (extractor pending real-Revit test) |
 | 2 | EN 1993-1-1 checks + force backend (PyNite) | ✅ |
 | 3 | Mass + embodied-carbon material passport | ✅ |
-| 4 | Synthetic dataset + ML (surrogate / reuse score / clustering) | ✅ |
+| 4 | Synthetic dataset + ML (surrogate / reuse score / clustering) | ✅ *(exploratory; not wired into the pipeline — see [METHODOLOGY §11](docs/METHODOLOGY.md))* |
 | 5 | MILP matching (the flagship) | ✅ |
 | 6 | Report (Jinja2 HTML) + provider-agnostic LLM narrative | ✅ (Gemini verified live; Ollama optional) |
 | 7 | Real LTB (χ_LT), IFC extractor, Streamlit dashboard, trained-model artifacts | ✅ |

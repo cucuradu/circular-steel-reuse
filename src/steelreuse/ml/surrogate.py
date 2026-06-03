@@ -1,8 +1,13 @@
-"""Capacity surrogate — an XGBoost regressor that predicts beam utilization fast.
+"""Capacity surrogate — an XGBoost regressor that predicts beam utilization fast (EXPLORATORY).
 
-Trained on the synthetic dataset (:mod:`steelreuse.synthetic`). Its only job is to *pre-screen*
-large supply x demand grids cheaply before the exact EN 1993 check confirms survivors. It is never
-the source of truth (see CLAUDE.md). We report test R^2 so its accuracy is explicit.
+Trained on the synthetic dataset (:mod:`steelreuse.synthetic`). Intended as a cheap *pre-screen* of
+large supply x demand grids before the exact EN 1993 check confirms survivors — but it is **not wired
+into the pipeline** (see :mod:`steelreuse.ml`).
+
+Honesty note: the reported test R^2 (~1.0) is **circular** — the training labels are produced by the
+deterministic EN 1993 checker itself, so a high score only shows the model can reproduce that checker
+over the sampled range, not that it predicts anything the checker doesn't already give exactly. It is
+never the source of truth (CLAUDE.md rule 3).
 """
 
 from __future__ import annotations

@@ -87,17 +87,18 @@ Table 3.1 / 6.2), keyed off `sec.tf`; or flag/exclude those rows with a warning.
 
 ## Tier 3 — Narrative & validation
 
-### 🟠 7. The "AI" is built but unwired (D1/D2/D3)
-The surrogate, reuse-score, and clustering ([ml/](src/steelreuse/ml/)) are tested but the pipeline
-([pipeline.py](src/steelreuse/pipeline.py)) never calls them — the matching flow is purely
-deterministic. Also, the surrogate's R² ≈ 1.0 is **circular**: it is trained on labels produced by the
-very EN checker it "predicts," on synthetic data.
+### ✅ 7. The "AI" story — DECIDED: exploratory, reframed honestly
+**Decision (user):** keep the ML as an **exploratory side-study**, not wired into the certified path.
+Reframed accordingly: [ml/__init__.py](src/steelreuse/ml/__init__.py) and
+[ml/surrogate.py](src/steelreuse/ml/surrogate.py) now state the surrogate's R² ≈ 1.0 is **circular**
+(trained on labels from the EN checker itself → only shows it can reproduce the checker), the README
+status row marks Phase 4 exploratory, and [METHODOLOGY §11](docs/METHODOLOGY.md) documents all three
+modules as not-in-the-pipeline.
 
-Decision needed — pick one:
-- **Wire it in**: reuse-score → a term in the MILP objective (prefer standardized/long stock);
-  surrogate → a cheap feasibility pre-screen before the exact check, and report the measured speedup.
-- **Reframe**: present the ML as an exploratory side-study in the writeup and drop the strong-accuracy
-  framing (state the circularity honestly).
+**If ever wired in (future, deliberate):** reuse-score → a term in the MILP objective (prefer
+standardized/long stock); surrogate → a cheap feasibility pre-screen before the exact check, reporting
+the measured speed-up. Would need a non-circular validation (real reuse outcomes, or hold-out cases the
+checker and surrogate can disagree on).
 
 ### ✅ 8. Methodology document — DONE
 [docs/METHODOLOGY.md](docs/METHODOLOGY.md) maps each EN 1993-1-1 clause → code → assumption → validation
