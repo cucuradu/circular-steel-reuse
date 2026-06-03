@@ -50,21 +50,19 @@ catalog only when the standard can't be determined. Reclaimed **supply** is inte
 unrestricted (cross-standard reuse is fine). Tested with two identical-geometry sections differing only
 in mass + standard. *(Residual: a `--mixed-standards` opt-in if anyone ever wants the old behaviour.)*
 
-### 🟠 4. EU catalog is thin — PARTIALLY DONE (validator added; HE/HEM still pending)
-**Done:** added IPE550/IPE600 (verified against the eurocodeapplied table, which reproduces our IPE300
-anchor exactly; `Iy` reconstructed from `Wel·h/2` to avoid the source's large-number display
-truncation). Added a **catalog property-consistency test** (`test_catalog_property_consistency` in
-[tests/test_sections.py](tests/test_sections.py)) that recomputes mass/`Wel`/`i` from the primaries and
-checks `Wpl ≥ Wel` for **all 305 rows** (EU + the 283 US) — a transcription guard for any future row.
+### ✅ 4. EU catalog expanded — DONE for the common range (residual: small sizes + other families)
+**Done:** [eu_sections.csv](src/steelreuse/data/sections/eu_sections.csv) now covers IPE160–600 and the
+**full HEA / HEB / HEM 200–400 column range** (40 EU sections, up from 20). Sourced from the ArcelorMittal
+section table in the [PedroBiel gist](https://gist.github.com/PedroBiel/980d8bc914d8abffca6d)
+(`sections_ArcelorMittal.csv`) — validated by checking that the source reproduces our hand-verified
+IPE300 / HEB200 / HEB240 / HEB300 rows (incl. `Wpl`) **exactly** before trusting its `Wpl` column for the
+new sizes. Every added row passes the **catalog property-consistency test**
+(`test_catalog_property_consistency` in [tests/test_sections.py](tests/test_sections.py)), which
+recomputes mass/`Wel`/`i` from the primaries and checks `Wpl ≥ Wel` across all rows (EU + the 283 US).
 
-**Still pending:** [eu_sections.csv](src/steelreuse/data/sections/eu_sections.csv) is still light on
-columns — no HEM at all, missing HEB220/260/280/320, several HEA, no UB/UC/UPN/IPN/angles. The blocker
-is sourcing authoritative **plastic moduli** `Wpl`: the static-fetchable tables (piping-world,
-build-your-vision) carry dimensions + `Wel` only, and the complete ones (Dlubal, eurocodeapplied HE
-tabs) are JS-driven so a page fetch can't read them. *Do it properly:* obtain a machine-readable EU
-dataset (EN 10365 / ArcelorMittal / a vetted CSV) and convert it verbatim like the AISC catalog was, so
-`Wpl` is auditable rather than guessed; the consistency test will then guard the import. **Do not
-hand-enter `Wpl` from memory** — it feeds bending capacity directly.
+**Residual (lower priority):** small sections (HEA/HEB/HEM 100–180, IPE80–140) and the other families
+(UB/UC, UPN/UPE channels, IPN, L-angles, RHS/CHS) — same gist/source covers most; add as needed. Channels
+and angles also need shape-aware checks (the EN I/H formulas don't apply to mono-symmetric/hollow shapes).
 
 ### 🟠 5. The flagship LTB (real χ_LT) is dormant in the default run
 `AreaLoadModel` defaults `flange_restrained=True` (slab restrains the compression flange) ⇒ LTB is
