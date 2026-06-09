@@ -16,8 +16,7 @@ from pathlib import Path
 from steelreuse.llm.providers import select_provider
 from steelreuse.llm.report import build_report_context, generate_narrative, render_html
 from steelreuse.pipeline import LoadModel, run_pipeline
-
-SAMPLES = Path(__file__).parent / "data" / "samples"
+from steelreuse.resources import SAMPLES_DIR as SAMPLES
 
 
 def _save_upload(upload, fallback: Path) -> str:

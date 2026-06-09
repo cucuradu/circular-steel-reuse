@@ -19,7 +19,7 @@ from steelreuse.core.sections import (
 )
 from steelreuse.schema import ExtractedMember, ExtractedModel
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+DATA = Path(__file__).resolve().parents[1] / "src" / "steelreuse" / "data"
 
 
 @pytest.fixture(scope="module")

@@ -51,7 +51,7 @@ Entry points:
 
 ```powershell
 # full matching pipeline -> HTML report (uses Gemini narrative if GEMINI_API_KEY in .env)
-uv run steelreuse --donor data/samples/donor.json --demand data/samples/demand.json --out reports/report.html
+uv run steelreuse --donor src/steelreuse/data/samples/donor.json --demand src/steelreuse/data/samples/demand.json --out reports/report.html
 
 uv run streamlit run app.py            # interactive dashboard
 uv run python -m steelreuse.ml.train   # regenerate synthetic dataset + train the surrogate
@@ -67,7 +67,7 @@ into the same JSON schema as the pyRevit extractor — so the whole pipeline run
 
 ```
 src/steelreuse/data/sections/   # steel section catalogs (EU IPE/HE + US AISC W) — bundled in the wheel
-data/samples/*.json             # sample extracted models for offline testing
+src/steelreuse/data/samples/*.json  # sample extracted models for offline testing — bundled in the wheel
 extractor/pyrevit_extract.py    # runs INSIDE Revit (IronPython 3 engine; stdlib-only)
 src/steelreuse/
   schema.py                     # JSON schema for extracted members

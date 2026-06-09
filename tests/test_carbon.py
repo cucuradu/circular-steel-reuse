@@ -13,7 +13,7 @@ from steelreuse.core.carbon import (
 from steelreuse.core.sections import load_catalog, resolve_members
 from steelreuse.schema import ExtractedModel
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+DATA = Path(__file__).resolve().parents[1] / "src" / "steelreuse" / "data"
 
 
 @pytest.fixture(scope="module")

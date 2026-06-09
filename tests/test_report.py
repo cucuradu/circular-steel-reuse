@@ -14,7 +14,7 @@ from steelreuse.llm.report import (
 )
 from steelreuse.pipeline import run_pipeline
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+DATA = Path(__file__).resolve().parents[1] / "src" / "steelreuse" / "data"
 
 
 @pytest.fixture(scope="module")

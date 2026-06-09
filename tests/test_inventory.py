@@ -8,7 +8,7 @@ from steelreuse.core.sections import load_catalog
 from steelreuse.inventory import build_inventory, render_inventory_html, render_inventory_text
 from steelreuse.schema import ExtractedMember, ExtractedModel
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+DATA = Path(__file__).resolve().parents[1] / "src" / "steelreuse" / "data"
 
 
 @pytest.fixture(scope="module")

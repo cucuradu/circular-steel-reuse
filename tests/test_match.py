@@ -13,7 +13,7 @@ from steelreuse.match.optimize import DemandSlot, SupplyItem, baseline_new_mass_
 from steelreuse.pipeline import build_slots, run_pipeline
 from steelreuse.schema import ExtractedMember, ExtractedModel
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+DATA = Path(__file__).resolve().parents[1] / "src" / "steelreuse" / "data"
 
 
 @pytest.fixture(scope="module")

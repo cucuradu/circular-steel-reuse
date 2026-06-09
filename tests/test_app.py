@@ -24,5 +24,5 @@ def test_app_imports_and_exposes_main():
 
 def test_save_upload_falls_back_to_sample():
     app = _load_app()
-    fallback = APP.parent / "data" / "samples" / "donor.json"
+    fallback = APP.parent / "src" / "steelreuse" / "data" / "samples" / "donor.json"
     assert app._save_upload(None, fallback) == str(fallback)

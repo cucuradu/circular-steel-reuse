@@ -1,7 +1,7 @@
 """Command-line entry point: donor.json + demand.json -> matching report (HTML + console summary).
 
-    uv run steelreuse --donor data/samples/donor.json --demand data/samples/demand.json \
-        --out reports/report.html
+    uv run steelreuse --donor src/steelreuse/data/samples/donor.json \
+        --demand src/steelreuse/data/samples/demand.json --out reports/report.html
 """
 
 from __future__ import annotations
