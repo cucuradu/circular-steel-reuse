@@ -52,6 +52,8 @@ ignore = ["SIM108"]
 # Embedded HTML/CSS template strings are unavoidably long.
 "src/steelreuse/inventory.py" = ["E501"]
 "src/steelreuse/llm/report.py" = ["E501"]
+# Hand-authored inline SVG figures are unavoidably long single lines.
+"build_thesis_pdf.py" = ["E501"]
 # SIM300 misfires on `value == pytest.approx(...)` comparisons.
 "tests/*" = ["SIM300"]
 

@@ -18,6 +18,10 @@ out/
 reports/
 data/generated/
 models/
+# Thesis: only the markdown source is tracked; html/pdf are rebuilt by build_thesis_pdf.py
+# (the PDF ships attached to the GitHub release).
+THESIS*.html
+THESIS*.pdf
 
 # Secrets (LLM API keys etc.)
 .env
