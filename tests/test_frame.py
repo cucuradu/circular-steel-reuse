@@ -60,6 +60,32 @@ def test_snap_nodes_skips_members_without_geometry():
     assert "nogeo" not in topo.member_nodes
 
 
+def test_snap_nodes_supports_each_disconnected_component():
+    # Two separate portals; the second is far away AND 5 m higher. Each must be supported at its OWN
+    # lowest level, otherwise the higher piece floats and the whole solve is unstable.
+    members = [
+        _col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000),
+        _col("c3", 0, 20000, 5000, 8000), _col("c4", 6000, 20000, 5000, 8000),
+        ExtractedMember(id="b2", role="beam", section="IPE300", material_grade="S275",
+                        start_xyz=[0, 20000, 8000], end_xyz=[6000, 20000, 8000], spans_mm=[6000]),
+    ]
+    topo = snap_nodes(members)
+    base_z = {round(topo.nodes[b].z) for b in topo.base_node_ids}
+    assert 0 in base_z and 5000 in base_z          # both pieces grounded at their own level
+
+
+def test_stabilize_topology_prunes_hanging_member():
+    from steelreuse.core.frame import _stabilize_topology
+    # A valid portal plus a beam hanging off one column top into space (its far end connects to nothing
+    # and neither end is a support): it must be pruned to analytic, the bay kept.
+    members = [_col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000),
+               _beam("hang", 6000, 12000, 3000)]
+    topo = snap_nodes(members)
+    pruned = _stabilize_topology(topo)
+    assert "hang" in pruned and "hang" in topo.skipped_member_ids
+    assert "b1" not in pruned and "b1" in topo.member_nodes
+
+
 def test_snap_tolerance_merges_near_coincident_endpoints():
     # endpoints 40 mm apart (< 50 mm default tol) collapse to one node; 200 mm apart do not.
     members = [_col("c1", 0, 0, 0, 3000), _beam("b1", 40, 6000, 3000)]

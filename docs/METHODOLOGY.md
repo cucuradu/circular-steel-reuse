@@ -106,11 +106,19 @@ default and fallback.
   (50 mm default) are snapped into shared nodes so beams and columns connect. Members without usable
   coordinates are reported and **fall back to the per-member analytic load** (a robust hybrid for messy
   real models); if no connectable geometry exists at all, the whole run falls back.
-- **Idealisation — simple braced frame** (the project default): beam-to-column connections are **pinned**
-  (both bending rotations released at each end → beams stay simply-supported, recovering `wL²/8`),
-  columns are **continuous**, and column bases are **fixed** so the lateral load (§4.1 sway case) is
-  carried by the column bases where the model has no explicit vertical bracing, or by the **braces**
-  (modelled as pin-ended axial members) where it does. Torsion is kept connected at joints for stability.
+- **Idealisation — simple braced frame** (the project default): beam-to-column connections release the
+  **major-axis bending moment** at each end (beams stay simply-supported, recovering `wL²/8`) while
+  retaining minor-axis and torsional continuity — a realistic shear connection that also gives
+  beam-to-beam joints rotational stiffness about the vertical axis, avoiding spurious singularities on
+  real BIM. Columns are **continuous** and column bases are **fixed** so the lateral load (§4.1 sway
+  case) is carried by the column bases (no explicit bracing) or by the **braces** (pin-ended axial).
+- **Robustness on messy real models** (`snap_nodes` / `_stabilize_topology`): each **disconnected
+  component is supported at its own lowest level** (so a multi-piece or split-level model doesn't leave
+  higher pieces floating); members that **hang off the structure** (a free, unsupported end) are pruned
+  to the analytic path; and if an irregular model still solves but yields **non-physical forces**
+  (an ill-conditioned near-mechanism), a magnitude guard rejects the result and falls back to the
+  per-member analytic loads. The frame solve therefore either produces sane forces or falls back — it
+  never feeds garbage to the checker (CLAUDE.md rule 4).
 - **Loads & load path**: the floor pressure (§4) is applied as a UDL on the **beams only**, split into
   permanent (`DL`) and imposed (`LL`) load *cases*; the ULS/SLS *combinations* apply the EN 1990 factors
   (`γ_G·DL + γ_Q·LL`). **Columns carry no applied load** — each column's axial comes from the solved load

@@ -58,6 +58,7 @@ class FrameOptions:
 
     snap_tol_mm: float = 50.0      # endpoints within this distance share a node
     base_tol_mm: float = 500.0     # nodes within this of the lowest level become supports
+    prune_free_ends: bool = True   # drop members hanging off the structure (free, unsupported end)
     pin_beams: bool = True         # simple braced: release beam end moments (simply-supported beams)
     fixed_base: bool = True        # fix column bases (gravity stability without a lateral system yet)
     second_order: bool = False     # force a P-Delta solve (auto-on with notional_phi/wind)
@@ -186,13 +187,67 @@ def snap_nodes(members, snap_tol_mm: float = 50.0, base_tol_mm: float = 500.0) -
             col_endpoint_ids.add(j)
 
     node_map = {n.name: n for n in nodes}
+    # Support each connected component at ITS OWN lowest level: a real model can contain several
+    # disconnected structures sitting at different elevations, so a single global-minimum base would
+    # leave the higher pieces floating (a global instability). Within each component the column feet
+    # at the lowest level are the supports (falling back to every lowest node if none are columns).
     base_ids: list[str] = []
-    if node_map:
-        min_z = min(n.z for n in node_map.values())
-        at_base = [n.name for n in node_map.values() if n.z - min_z <= base_tol_mm]
-        col_base = [nid for nid in at_base if nid in col_endpoint_ids]
-        base_ids = col_base or at_base
+    adj: dict[str, set[str]] = {}
+    for i, j in member_nodes.values():
+        adj.setdefault(i, set()).add(j)
+        adj.setdefault(j, set()).add(i)
+    seen: set[str] = set()
+    for start in adj:
+        if start in seen:
+            continue
+        comp: list[str] = []
+        stack = [start]
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            comp.append(x)
+            stack.extend(adj[x] - seen)
+        cmin = min(node_map[c].z for c in comp)
+        at_base = [c for c in comp if node_map[c].z - cmin <= base_tol_mm]
+        col_base = [c for c in at_base if c in col_endpoint_ids]
+        base_ids.extend(col_base or at_base)
     return Topology(node_map, member_nodes, base_ids, skipped)
+
+
+def _stabilize_topology(topo: Topology) -> list[str]:
+    """Remove members that hang off the structure and would make the stiffness matrix singular.
+
+    A member is pruned if it has a **free end** (a degree-1 node that is not a support) **and is not
+    anchored to a support** at either end — i.e. a column hanging from above, or a member floating with
+    both ends loose. A genuine fixed-base cantilever (free top, supported foot) is *kept* because it is
+    stable. Pruning is iterative (removing one member can free another). Pruned members are appended to
+    ``skipped_member_ids`` so the caller analyses them per-member, and any orphaned nodes are dropped.
+    Returns the list of pruned member ids.
+    """
+    base = set(topo.base_node_ids)
+    pruned: list[str] = []
+    changed = True
+    while changed:
+        changed = False
+        deg: dict[str, int] = {}
+        for i, j in topo.member_nodes.values():
+            deg[i] = deg.get(i, 0) + 1
+            deg[j] = deg.get(j, 0) + 1
+        for mid, (i, j) in list(topo.member_nodes.items()):
+            anchored = i in base or j in base
+            free_end = (deg[i] == 1 and i not in base) or (deg[j] == 1 and j not in base)
+            if free_end and not anchored:
+                del topo.member_nodes[mid]
+                pruned.append(mid)
+                changed = True
+    if pruned:
+        topo.skipped_member_ids = list(topo.skipped_member_ids) + pruned
+        referenced = {n for ends in topo.member_nodes.values() for n in ends}
+        topo.nodes = {k: v for k, v in topo.nodes.items() if k in referenced}
+        topo.base_node_ids = [b for b in topo.base_node_ids if b in referenced]
+    return pruned
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +445,7 @@ def analyze_frame(
     expanded = expand_spans(demand_members)
     members_by_id = {m.id: m for m in expanded}
     topo = snap_nodes(expanded, options.snap_tol_mm, options.base_tol_mm)
+    pruned_free = _stabilize_topology(topo) if options.prune_free_ends else []
 
     if not topo.member_nodes or not topo.base_node_ids:
         return FrameResult({}, len(topo.nodes), 0, topo.base_node_ids,
@@ -423,9 +479,12 @@ def analyze_frame(
         fm.add_section(sname, a, iy, iz, jt)
         fm.add_member(mid, i, j, "steel", sname)
         if options.pin_beams and m.role in ("beam", "brace"):
-            # Pin the connection: release both bending rotations at each end (torsion stays connected
-            # for stability). The beam is then simply-supported between columns.
-            fm.def_releases(mid, Ryi=True, Rzi=True, Ryj=True, Rzj=True)
+            # Pin the connection by releasing the MAJOR-axis bending moment at each end (local My, the
+            # one that carries gravity → recovers the simply-supported wL^2/8). Minor-axis bending and
+            # torsion stay connected: a realistic shear connection retains some continuity there, and
+            # keeping them connected gives beam-to-beam nodes (no column) rotational stiffness about the
+            # vertical axis, which otherwise leaves that DOF singular on real BIM models.
+            fm.def_releases(mid, Ryi=True, Ryj=True)
         if m.role == "beam":
             beam_ids.append(mid)
 
@@ -455,6 +514,9 @@ def analyze_frame(
     second_order = (options.second_order or options.notional_phi > 0.0
                     or options.wind_kpa > 0.0 or options.seismic_cs > 0.0)
     warnings: list[str] = []
+    if pruned_free:
+        warnings.append(f"pruned {len(pruned_free)} member(s) with a free/unsupported end "
+                        "(fell back to analytic)")
     nhf_cases: dict[str, str] = {}     # lateral dir -> sway load-case name (for the wind combos)
 
     # EN 1993-1-1 5.3.2 global sway imperfection as **equivalent horizontal forces** (the frame-level
@@ -566,6 +628,15 @@ def analyze_frame(
                 L=length, compression_flange_restrained=restrained, w_service=w_serv,
             )))
         demands_by_member[mid] = per_combo
+
+    # Guard against an ill-conditioned "success": an irregular/near-mechanism model can solve yet yield
+    # non-physical forces. Rather than feed garbage to the checker, fall back to the analytic path.
+    _CAP_N, _CAP_NMM = 1e9, 1e12   # 1e6 kN / 1e6 kNm — far above any real member force
+    for combos in demands_by_member.values():
+        for _, d in combos:
+            if abs(d.N_Ed) > _CAP_N or abs(d.Vz_Ed) > _CAP_N or abs(d.My_Ed) > _CAP_NMM:
+                return _fallback(
+                    "frame solve ill-conditioned (non-physical forces) — using analytic loads")
 
     return FrameResult(
         demands_by_member=demands_by_member,

@@ -11,10 +11,11 @@ The models (`pyrevit_extension/donor_test2.json`, `demand_test2.json`) are US/AI
 | Donor (supply, building to deconstruct) | 1016 | 74 | 942 |
 | Demand (new design) | 270 | 54 | 216 |
 
-Reproduce:
+Reproduce (the `…test3` models were re-extracted with the current extractor, so every column carries
+its plan coordinates — 74/74 donor, 54/54 demand):
 
 ```powershell
-steelreuse --donor pyrevit_extension/donor_test2.json --demand pyrevit_extension/demand_test2.json --out reports/case_study.html
+steelreuse --donor pyrevit_extension/donortest3.json --demand pyrevit_extension/demandtest3.json --frame-analysis --out reports/case_study.html
 ```
 
 ## Result (default area-load model, steel-only demand)
@@ -43,13 +44,17 @@ Narrative source: deterministic (rejected gemini output)
 
 ## Limitations this run surfaced (honest reporting)
 
-1. **Column coordinates missing → frame analysis falls back.** These models were extracted with an
-   earlier extractor that recorded only location-*curve* endpoints, so the point-placed **columns
-   carry no x,y**. Running `--frame-analysis` therefore detects unstable (disconnected) nodes and
-   **gracefully falls back to the per-member analytic load path** (no crash; identical headline
-   numbers). The fix is a **re-extraction** with the current extractor (which captures
-   `LocationPoint` column coordinates) — a human/Revit task. Until then the connected load path
-   (multi-storey column accumulation) cannot engage on these specific files.
+1. **Frame analysis gracefully falls back on this irregular model.** With the re-extracted models the
+   columns now carry coordinates, so the frame assembler connects the geometry, supports each
+   disconnected piece at its own lowest level, and releases only the major-axis beam moment (removing
+   the spurious vertical-axis rotational singularities). This particular building, however, is **three
+   disconnected, irregular pieces** that together form a near-mechanism: the solve becomes
+   ill-conditioned and yields non-physical forces, which the **result-sanity guard catches → it falls
+   back to the per-member analytic load path** (no crash, sane headline numbers). Auto-idealising
+   arbitrary multi-piece BIM into a well-conditioned global frame is a known hard problem; the tool's
+   job here is to *recognise* it and fall back rather than emit garbage. On a regular, connected frame
+   `--frame-analysis` engages fully (the multi-storey column accumulation is validated in
+   [VALIDATION.md](VALIDATION.md) §1).
 2. **W-shapes only.** ~57% of donor members fall in the `unknown` bucket because they are not
    doubly-symmetric I-sections. Extending the catalog + checks to C/HSS/L is the obvious next step to
    raise the mappable fraction.

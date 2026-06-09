@@ -45,7 +45,17 @@ load dumped at the two far ends, leaving interior columns unloaded); the pipelin
 `F_i = F_b·(W_i·z_i)/Σ(W_j·z_j)` lumped on the level's column tops, as a `G + ψ₂·Q + E` situation (unit
 factors). `Cs = Sd(T₁)·λ/g` is a user input.
 
+**Robustness on real BIM (added):** the assembler now supports each **disconnected component at its own
+lowest level**, releases only the **major-axis** beam moment (kills spurious vertical-axis rotational
+singularities while keeping `wL²/8`), **prunes members that hang off** the structure to the analytic
+path, and **guards against ill-conditioned "successes"** (non-physical forces → fall back). On a real
+~1000-member building (see `docs/CASE_STUDY.md`) the demand model turned out to be three disconnected
+irregular pieces that form a near-mechanism; the tool correctly falls back rather than emit garbage.
+
 **Residuals (the obvious next increments):**
+- **Auto-idealisation of irregular multi-piece BIM:** turning an arbitrary, disconnected real model into
+  a *well-conditioned* global frame (vs. the current "solve cleanly or fall back") is the open problem —
+  e.g. per-piece solves, mechanism detection/repair, or user-guided support assignment.
 - **Modal/response-spectrum seismic:** the current seismic is the simplified lateral force method with a
   user base-shear coefficient — no modal spectrum, accidental torsion, or `q`-factor/site spectrum.
 - **Biaxial columns:** a lateral case can bend a column about both axes, but the EN check is uniaxial
