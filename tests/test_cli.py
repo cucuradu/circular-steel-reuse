@@ -1,10 +1,11 @@
-"""CLI smoke tests: --version, the no-input error, and bundled-sample resolution."""
+"""CLI smoke tests: --version, the no-input error, bundled samples, and graceful failures."""
 
 import pytest
 
 from steelreuse import __version__
 from steelreuse.cli import main
 from steelreuse.resources import sample_path
+from steelreuse.schema import ExtractedModel, ExtractionError
 
 
 def test_version_prints_and_exits_zero(capsys):
@@ -24,3 +25,30 @@ def test_no_inputs_errors_with_exit_two():
 def test_bundled_samples_resolve():
     assert sample_path("donor.json").exists()
     assert sample_path("demand.json").exists()
+
+
+def test_missing_file_exits_one_with_message(tmp_path, capsys):
+    missing = str(tmp_path / "nope.json")
+    assert main(["--donor", missing, "--demand", missing]) == 1
+    assert "not found" in capsys.readouterr().err.lower()
+
+
+def test_malformed_json_exits_one_no_traceback(tmp_path, capsys):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{ this is not json", encoding="utf-8")
+    assert main(["--donor", str(bad), "--demand", str(bad)]) == 1
+    assert "error" in capsys.readouterr().err.lower()
+
+
+def test_load_rejects_non_object_top_level(tmp_path):
+    f = tmp_path / "x.json"
+    f.write_text("[]", encoding="utf-8")  # valid JSON, but not an object
+    with pytest.raises(ExtractionError):
+        ExtractedModel.load(f)
+
+
+def test_load_rejects_non_numeric_length(tmp_path):
+    f = tmp_path / "y.json"
+    f.write_text('{"kind": "donor", "members": [{"id": "b1", "length_mm": "oops"}]}', encoding="utf-8")
+    with pytest.raises(ExtractionError):
+        ExtractedModel.load(f)

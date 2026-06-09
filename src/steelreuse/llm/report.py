@@ -207,6 +207,11 @@ _TEMPLATE = """<!doctype html>
 
 
 def render_html(ctx: dict, narrative: str, narrative_source: str = "deterministic") -> str:
-    from jinja2 import Template
+    try:
+        from jinja2 import Template
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            'HTML report rendering needs Jinja2 — install it with: pip install "steelreuse[report]"'
+        ) from e
 
     return Template(_TEMPLATE).render(ctx=ctx, narrative=narrative, narrative_source=narrative_source)

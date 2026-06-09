@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 from . import __version__
@@ -19,6 +20,7 @@ from .llm.providers import select_provider
 from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
 from .resources import sample_path
+from .schema import ExtractionError
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -39,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--version", action="version", version=f"steelreuse {__version__}")
     ap.add_argument("--demo", action="store_true",
                     help="run on the bundled sample donor/demand models (no --donor/--demand needed)")
+    ap.add_argument("--debug", action="store_true",
+                    help="show the full Python traceback on error (default: a short message)")
     ap.add_argument("--donor", help="donor (supply) extraction JSON")
     ap.add_argument("--demand", help="new-design (demand) extraction JSON")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
@@ -92,6 +96,20 @@ def main(argv: list[str] | None = None) -> int:
     else:
         ap.error("provide --donor and --demand (or use --demo to run the bundled sample models)")
 
+    try:
+        return _execute(args, donor, demand)
+    except ExtractionError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:  # noqa: BLE001 — top-level guard: a friendly message, not a traceback
+        if args.debug:
+            raise
+        print(f"error: {type(e).__name__}: {e}\n(run with --debug for the full traceback)",
+              file=sys.stderr)
+        return 1
+
+
+def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     load_dotenv()  # pick up GEMINI_API_KEY etc. from a .env in the working directory
 
     if args.beam_udl is not None or args.column_axial is not None:

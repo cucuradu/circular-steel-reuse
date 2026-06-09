@@ -23,6 +23,13 @@ ROLES = ("beam", "column", "brace", "unknown")
 KINDS = ("donor", "demand")
 
 
+class ExtractionError(ValueError):
+    """A model file is missing, not valid JSON, or does not match the extraction schema.
+
+    Raised at the input boundary so the CLI can report a clear message instead of a traceback.
+    """
+
+
 @dataclass
 class ExtractedMember:
     """One structural steel member as read from the model.
@@ -92,4 +99,39 @@ class ExtractedModel:
 
     @classmethod
     def load(cls, path: str | Path) -> ExtractedModel:
-        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+        """Load and validate an extraction file, raising :class:`ExtractionError` on bad input."""
+        p = Path(path)
+        try:
+            text = p.read_text(encoding="utf-8")
+        except FileNotFoundError as e:
+            raise ExtractionError(f"extraction file not found: {p}") from e
+        except OSError as e:
+            raise ExtractionError(f"could not read {p}: {e}") from e
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ExtractionError(f"{p} is not valid JSON: {e}") from e
+        if not isinstance(raw, dict):
+            raise ExtractionError(
+                f"{p}: expected a JSON object at the top level, got {type(raw).__name__}"
+            )
+        members = raw.get("members", [])
+        if not isinstance(members, list):
+            raise ExtractionError(f"{p}: 'members' must be a list, got {type(members).__name__}")
+        for i, m in enumerate(members):
+            if not isinstance(m, dict):
+                raise ExtractionError(f"{p}: members[{i}] must be an object, got {type(m).__name__}")
+            if "id" not in m:
+                raise ExtractionError(f"{p}: members[{i}] is missing the required 'id' field")
+            for fld in ("length_mm",):
+                if fld in m and not isinstance(m[fld], (int, float)):
+                    raise ExtractionError(
+                        f"{p}: members[{i}] ({m['id']}).{fld} must be a number, "
+                        f"got {type(m[fld]).__name__}"
+                    )
+            spans = m.get("spans_mm")
+            if spans is not None and (
+                not isinstance(spans, list) or any(not isinstance(s, (int, float)) for s in spans)
+            ):
+                raise ExtractionError(f"{p}: members[{i}] ({m['id']}).spans_mm must be a list of numbers")
+        return cls.from_dict(raw)
