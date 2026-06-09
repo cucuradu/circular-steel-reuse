@@ -1,7 +1,10 @@
 """Command-line entry point: donor.json + demand.json -> matching report (HTML + console summary).
 
-    uv run steelreuse --donor src/steelreuse/data/samples/donor.json \
-        --demand src/steelreuse/data/samples/demand.json --out reports/report.html
+    # try it instantly on the bundled sample models:
+    steelreuse --demo
+
+    # run on your own extracted models:
+    steelreuse --donor donor.json --demand demand.json --out reports/report.html
 """
 
 from __future__ import annotations
@@ -10,10 +13,12 @@ import argparse
 import os
 from pathlib import Path
 
+from . import __version__
 from .core.loads import AreaLoadModel
 from .llm.providers import select_provider
 from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
+from .resources import sample_path
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -31,8 +36,11 @@ def load_dotenv(path: str = ".env") -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Circular structural steel-reuse matcher")
-    ap.add_argument("--donor", required=True, help="donor (supply) extraction JSON")
-    ap.add_argument("--demand", required=True, help="new-design (demand) extraction JSON")
+    ap.add_argument("--version", action="version", version=f"steelreuse {__version__}")
+    ap.add_argument("--demo", action="store_true",
+                    help="run on the bundled sample donor/demand models (no --donor/--demand needed)")
+    ap.add_argument("--donor", help="donor (supply) extraction JSON")
+    ap.add_argument("--demand", help="new-design (demand) extraction JSON")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
     ap.add_argument("--knockdown", type=float, default=1.0, help="reclaimed f_y knockdown (<=1.0)")
     # Area-based load model (default). Floor pressures + tributary geometry + EN 1990 ULS factors.
@@ -74,6 +82,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--column-axial", type=float, default=None, help="[legacy] flat column axial (kN)")
     args = ap.parse_args(argv)
 
+    # Resolve the input models: --demo uses the bundled samples, otherwise both paths are required.
+    if args.demo:
+        donor, demand = str(sample_path("donor.json")), str(sample_path("demand.json"))
+        if args.out == "reports/report.html":
+            args.out = "reports/demo_report.html"
+    elif args.donor and args.demand:
+        donor, demand = args.donor, args.demand
+    else:
+        ap.error("provide --donor and --demand (or use --demo to run the bundled sample models)")
+
     load_dotenv()  # pick up GEMINI_API_KEY etc. from a .env in the working directory
 
     if args.beam_udl is not None or args.column_axial is not None:
@@ -89,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
             notional_phi=args.phi,
         )
     res = run_pipeline(
-        args.donor, args.demand, loads=loads, knockdown=args.knockdown,
+        donor, demand, loads=loads, knockdown=args.knockdown,
         steel_only_demand=not args.all_demand, tributary_from_geometry=args.trib_from_geometry,
         allow_cutting=args.cut, frame_analysis=args.frame_analysis, second_order=args.pdelta,
         wind_kpa=args.wind, seismic_cs=args.seismic,

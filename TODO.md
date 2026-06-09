@@ -1,4 +1,8 @@
-# Your step-by-step checklist
+# Author's personal setup checklist
+
+> **Note:** this is the project author's own environment checklist, not user documentation. To *use*
+> the tool, see the **Quickstart** in [README.md](README.md); to *develop* it, see **Setup
+> (development)** there.
 
 The things **you** (the human) need to do, in order. Code tasks are tracked separately — this is
 only the stuff I can't do for you (install software, build Revit models, get API keys, verify

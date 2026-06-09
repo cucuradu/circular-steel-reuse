@@ -12,6 +12,30 @@ embodied-CO₂ saved. A pyRevit + Python + AI project focused on circular-econom
 📖 **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — the EN 1993-1-1 clause→code mapping, every
 assumption, and the validation basis. **[FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md)** — backlog.
 
+## Quickstart
+
+Requires **Python ≥ 3.11** (developed and tested on Windows). Install it as an isolated command-line
+tool with [pipx](https://pipx.pypa.io/):
+
+```powershell
+pipx install "steelreuse[analysis,fea,opt,report,llm] @ git+https://github.com/cucuradu/circular-steel-reuse.git"
+
+steelreuse --demo        # run the bundled sample models -> reports/demo_report.html
+steelreuse --version
+```
+
+`--demo` needs no input files — sample donor/demand models ship inside the package. Then run it on
+your own extracted models:
+
+```powershell
+steelreuse --donor donor.json --demand demand.json --out reports/report.html
+```
+
+> Don't have `pipx`? `python -m pip install --user pipx; python -m pipx ensurepath` (then reopen the
+> terminal). Plain `pip install` works too — see [Setup](#setup). An optional Gemini API key (in a
+> `.env` as `GEMINI_API_KEY=...`) adds an AI-written narrative; without it the report uses a
+> deterministic summary.
+
 ## How it works (pipeline)
 
 ```
@@ -47,17 +71,17 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
 | 7 | Real LTB (χ_LT), IFC extractor, Streamlit dashboard, trained-model artifacts | ✅ |
 | 7+ | Cutting-stock (1 member → many cuts, `--cut`) ✅ · **Global frame analysis** (`--frame-analysis`: gravity load path + EN 5.3.2 sway EHF + `--wind` + EN 1998 `--seismic` lateral force + P-Δ via PyNite) ✅ · SAP2000 backend, modal-spectrum seismic, multi-objective ⬜ | ◑ partial |
 
-Entry points:
+Entry points (once installed, the `steelreuse` command is on your PATH):
 
 ```powershell
-# full matching pipeline -> HTML report (uses Gemini narrative if GEMINI_API_KEY in .env)
-uv run steelreuse --donor src/steelreuse/data/samples/donor.json --demand src/steelreuse/data/samples/demand.json --out reports/report.html
+steelreuse --demo                                  # bundled sample models -> reports/demo_report.html
+steelreuse --donor donor.json --demand demand.json --out reports/report.html
 
-uv run streamlit run app.py            # interactive dashboard
-uv run python -m steelreuse.ml.train   # regenerate synthetic dataset + train the surrogate
+streamlit run app.py                               # interactive dashboard (needs the [ui] extra)
+python -m steelreuse.ml.train                      # regenerate synthetic dataset + train the surrogate
 
 # pre-demolition inventory from ANY extracted model (works even when sections don't map):
-uv run python -m steelreuse.inventory donor.json --out reports/inventory.html
+python -m steelreuse.inventory donor.json --out reports/inventory.html
 ```
 
 Revit-free ingestion: `steelreuse.ifc_extract.extract_ifc(path)` reads an IFC model (IfcOpenShell)
@@ -75,18 +99,25 @@ src/steelreuse/
 tests/                          # pytest (section mapping, later EC3 checks)
 ```
 
-## Setup
+## Setup (development)
 
-> 👉 New here? Follow **[TODO.md](TODO.md)** — the step-by-step checklist of what *you* need to do
-> (install Revit/pyRevit, build sample models, run the extractor, get API keys).
-
-Requires Python ≥ 3.11. Using [uv](https://docs.astral.sh/uv/):
+To work on the code (rather than just use the CLI), clone and install editable with all extras:
 
 ```powershell
-uv venv
-uv pip install -e ".[analysis,fea,ml,opt,report,llm,ui,bim,dev]"
-uv run pytest
+git clone https://github.com/cucuradu/circular-steel-reuse.git
+cd circular-steel-reuse
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[analysis,fea,ml,opt,report,llm,ui,bim,dev]"
+pytest          # 130 tests
+ruff check .
 ```
 
+`uv` works too if your machine allows it; if unsigned binaries are blocked (Windows Application
+Control / WDAC / Smart App Control), see **[docs/UNBLOCK_UV.md](docs/UNBLOCK_UV.md)** for how to
+diagnose and unblock it, or just use the `pip` commands above.
+
 The pyRevit extractor (`extractor/pyrevit_extract.py`) runs inside Revit and needs no system Python.
-The rest of the pipeline runs in this CPython environment against the exported JSON.
+The rest of the pipeline runs in this CPython environment against the exported JSON. The author's
+personal setup checklist (installing Revit/pyRevit, building test models, getting API keys) lives in
+[TODO.md](TODO.md).
