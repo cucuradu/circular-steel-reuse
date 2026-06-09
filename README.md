@@ -9,8 +9,10 @@ embodied-CO₂ saved. A pyRevit + Python + AI project focused on circular-econom
 > and its results are **decision-support, not code-certified**. Reused steel still requires physical
 > verification (coupon testing, corrosion/fatigue survey) and connection design by an engineer.
 
-📖 **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — the EN 1993-1-1 clause→code mapping, every
-assumption, and the validation basis. **[FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md)** — backlog.
+📖 **[docs/METHODOLOGY.md](docs/METHODOLOGY.md)** — the EN 1993-1-1 clause→code mapping and every
+assumption · **[docs/VALIDATION.md](docs/VALIDATION.md)** — hand-calc / section-table validation ·
+**[docs/CASE_STUDY.md](docs/CASE_STUDY.md)** — a real 1000-member building run ·
+**[FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md)** — backlog.
 
 ## Quickstart
 
@@ -79,6 +81,9 @@ steelreuse --donor donor.json --demand demand.json --out reports/report.html
 
 streamlit run app.py                               # interactive dashboard (needs the [ui] extra)
 python -m steelreuse.ml.train                      # regenerate synthetic dataset + train the surrogate
+
+# sanity-check an extraction (counts by role, mapped/unknown, coords) vs an expected/Revit count:
+steelreuse-validate donor.json --expect 1016       # or: --schedule revit_framing.csv
 
 # pre-demolition inventory from ANY extracted model (works even when sections don't map):
 python -m steelreuse.inventory donor.json --out reports/inventory.html

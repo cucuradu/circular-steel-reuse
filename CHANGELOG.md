@@ -27,6 +27,12 @@ tool (CI, license, releases).
   **release** workflow that builds the wheel/sdist and the thesis PDF.
 - `THESIS_PRO.md` (canonical thesis) and `build_thesis_pdf.py` (Markdown → HTML → PDF with inline SVG
   figures).
+- `steelreuse --demo` / `--version`; graceful CLI error handling (`--debug` for tracebacks) and
+  input validation at the boundary (`ExtractionError`).
+- `steelreuse-validate` (a.k.a. `python -m steelreuse.validate_extraction`): sanity-check an
+  extraction's member count/sections/coordinates against an expected count or a Revit schedule CSV.
+- `docs/VALIDATION.md` (hand-calc / section-table validation, guarded by `tests/test_validation.py`),
+  `docs/CASE_STUDY.md` (a real ~1000-member building run), and `docs/UNBLOCK_UV.md`.
 
 ### Changed
 - Avoided-new baseline is now **standard-aware** (EU vs US): the lightest-adequate new section is
