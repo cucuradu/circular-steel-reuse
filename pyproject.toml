@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "steelreuse"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Circular Structural Reuse Matcher — match reclaimed steel members to new designs under Eurocode (EN 1993-1-1)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -30,6 +30,9 @@ llm = ["google-genai>=0.3"]
 ui = ["streamlit>=1.33", "plotly>=5.20"]
 bim = ["ifcopenshell>=0.7"]            # optional IFC extraction path
 dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[tool.hatch.version]
+path = "src/steelreuse/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/steelreuse"]

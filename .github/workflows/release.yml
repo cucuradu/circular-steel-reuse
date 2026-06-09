@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build wheel + sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Build thesis PDF
+        continue-on-error: true
+        run: |
+          python -m pip install markdown
+          python build_thesis_pdf.py
+
+      - name: Collect release assets
+        shell: pwsh
+        run: |
+          $assets = @(Get-ChildItem dist/*.whl, dist/*.tar.gz -ErrorAction SilentlyContinue)
+          if (Test-Path THESIS_PRO.pdf) { $assets += Get-Item THESIS_PRO.pdf }
+          $assets | ForEach-Object { $_.FullName } | Out-File assets.txt -Encoding utf8
+          Get-Content assets.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $assets = Get-Content assets.txt | Where-Object { $_ }
+          gh release create ${{ github.ref_name }} @assets --generate-notes --title ${{ github.ref_name }}
