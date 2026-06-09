@@ -2081,7 +2081,6 @@ wheels = [
 
 [[package]]
 name = "steelreuse"
-version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
@@ -2141,7 +2140,7 @@ requires-dist = [
     { name = "streamlit", marker = "extra == 'ui'", specifier = ">=1.33" },
     { name = "xgboost", marker = "extra == 'ml'", specifier = ">=2.0" },
 ]
-provides-extras = ["analysis", "fea", "sap2000", "ml", "opt", "report", "llm", "ui", "bim", "dev"]
+provides-extras = ["analysis", "bim", "dev", "fea", "llm", "ml", "opt", "report", "sap2000", "ui"]
 
 [[package]]
 name = "streamlit"
