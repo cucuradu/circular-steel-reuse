@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from .sections import FY_BY_GRADE, SectionProps
+from .sections import FY_BY_GRADE, SectionProps, nominal_fy
 
 E_STEEL = 210_000.0  # N/mm^2
 G_STEEL = 80_769.0   # N/mm^2 (E / (2(1+nu)), nu=0.3)
@@ -145,12 +145,25 @@ def chi_LT(sec: SectionProps, fy: float, L: float, section_class: int, C1: float
 
 
 def _buckling_alpha(sec: SectionProps, axis: str) -> float:
-    """Imperfection factor alpha from the buckling curve, Tables 6.1/6.2 (rolled I/H, t_f <= 40 mm)."""
-    # curve -> alpha
+    """Imperfection factor alpha from the buckling curve, EN 1993-1-1 Tables 6.1/6.2 (rolled I/H).
+
+    Table 6.2 selects the curve from h/b *and the flange thickness* t_f — thicker flanges shift to a
+    less favourable (higher-alpha) curve. The earlier version assumed t_f <= 40 mm and was therefore
+    slightly non-conservative for jumbo sections (some heavy AISC W-shapes have t_f > 40 mm):
+      * t_f > 100 mm                  -> curve d on both axes;
+      * h/b > 1.2, t_f <= 40 mm       -> y: a, z: b;
+      * h/b > 1.2, 40 < t_f <= 100 mm -> y: b, z: c;
+      * h/b <= 1.2, t_f <= 100 mm     -> y: b, z: c.
+    """
     a = {"a": 0.21, "b": 0.34, "c": 0.49, "d": 0.76}
-    if sec.h / sec.b > 1.2:
-        curve = "a" if axis == "y" else "b"
-    else:
+    if sec.tf > 100.0:
+        curve = "d"
+    elif sec.h / sec.b > 1.2:
+        if sec.tf <= 40.0:
+            curve = "a" if axis == "y" else "b"
+        else:  # 40 < t_f <= 100
+            curve = "b" if axis == "y" else "c"
+    else:  # h/b <= 1.2, t_f <= 100
         curve = "b" if axis == "y" else "c"
     return a[curve]
 
@@ -225,11 +238,17 @@ def check_member(
     knockdown: float = 1.0,
 ) -> MemberCheck:
     """Run all applicable EN 1993-1-1 checks. ``knockdown`` (<=1) reduces f_y for reclaimed steel."""
-    fy_nom = FY_BY_GRADE.get(grade.upper(), 235.0) if grade else 235.0
+    # Thickness-dependent nominal f_y (EN 1993-1-1 Table 3.1): the flange t_f governs a rolled I/H.
+    fy_nom = nominal_fy(grade, sec.tf)
     fy = fy_nom * knockdown
     warnings: list[str] = []
     if knockdown < 1.0:
         warnings.append(f"reclaimed knockdown applied: f_y {fy_nom:.0f} -> {fy:.0f} N/mm^2")
+    if sec.tf > 40.0:
+        msg = f"heavy section (t_f={sec.tf:.0f} mm > 40 mm): EN Table 6.2 buckling curve shifted"
+        if fy_nom < (FY_BY_GRADE.get(grade.upper(), 235.0) if grade else 235.0):
+            msg += f"; f_y reduced to {fy_nom:.0f} N/mm^2 (Table 3.1)"
+        warnings.append(msg)
 
     section_class = classify(sec, fy, demand.N_Ed, demand.My_Ed)
     if section_class == 4:

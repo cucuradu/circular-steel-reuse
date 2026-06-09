@@ -30,9 +30,15 @@ def build_report_context(res: PipelineResult) -> dict:
             "utilization": a.utilization, "status": a.status,
             "offcut_mm": a.offcut_mm, "co2_saved_kg": a.co2_saved_kg,
             "chi_lt": a.chi_lt, "chi_lt_if_free": a.chi_lt_if_free,
+            "governing": a.governing_combination,
         }
         for a in m.assignments
     ]
+    # How many reuses are governed by a non-gravity combination (e.g. the sway-imperfection case),
+    # so the report can note that the load-combination envelope, not just gravity, sized the member.
+    n_imperfection_governed = sum(
+        1 for a in m.assignments if a.governing_combination != "ULS gravity"
+    )
     # Beams that pass only because the slab restrains the compression flange: chi_LT would drop below
     # 0.85 if unrestrained. Surfacing this makes the LTB check visible and flags construction-stage risk.
     ltb_restraint_reliant = sum(
@@ -66,6 +72,9 @@ def build_report_context(res: PipelineResult) -> dict:
         "solver_status": m.solver_status,
         "assignments": assignments,
         "ltb_restraint_reliant": ltb_restraint_reliant,
+        "n_imperfection_governed": n_imperfection_governed,
+        "cut_donors": len(m.donor_leftover_mm),
+        "reusable_remainder_m": round(m.total_donor_leftover_mm / 1000.0, 1),
         "disclaimer": SCOPE_DISCLAIMER,
     }
     return ctx
@@ -165,14 +174,22 @@ _TEMPLATE = """<!doctype html>
 </div>
 <h2>Assignments</h2>
 <table><tr><th>Demand slot</th><th>Reclaimed member</th><th>Section</th><th>Utilization</th>
-<th>Status</th><th>&chi;<sub>LT</sub></th><th>Off-cut (mm)</th><th>CO2e saved (kg)</th></tr>
+<th>Gov. load case</th><th>Status</th><th>&chi;<sub>LT</sub></th><th>Off-cut (mm)</th>
+<th>CO2e saved (kg)</th></tr>
 {% for a in ctx.assignments %}<tr>
  <td>{{ a.slot }}</td><td>{{ a.supply }}</td><td>{{ a.section }}</td>
  <td>{{ '%.2f'|format(a.utilization) }}</td>
+ <td>{{ a.governing }}</td>
  <td class="{{ 'review' if a.status=='REVIEW' else '' }}">{{ a.status }}</td>
  <td>{% if a.chi_lt is none %}—{% else %}{{ '%.2f'|format(a.chi_lt) }}{% if a.chi_lt == 1.0 and a.chi_lt_if_free is not none and a.chi_lt_if_free < 0.85 %} <span class="review" title="would be {{ '%.2f'|format(a.chi_lt_if_free) }} if the flange were unrestrained">⚠</span>{% endif %}{% endif %}</td>
  <td>{{ a.offcut_mm }}</td><td>{{ a.co2_saved_kg }}</td></tr>{% endfor %}
 </table>
+{% if ctx.n_imperfection_governed %}<div class="warn">⚠ {{ ctx.n_imperfection_governed }} reused
+ member(s) are governed by a load combination other than plain gravity (e.g. the EN 1993-1-1 §5.3.2
+ sway-imperfection case) — the member is sized by the worst case across the combination envelope.</div>{% endif %}
+{% if ctx.cut_donors %}<div class="warn">✂ Cutting-stock: {{ ctx.cut_donors }} donor(s) were each cut
+ into several pieces to fill multiple slots, leaving {{ ctx.reusable_remainder_m }} m of reusable
+ remainder returned to stock.</div>{% endif %}
 {% if ctx.ltb_restraint_reliant %}<div class="warn">⚠ {{ ctx.ltb_restraint_reliant }} reused beam(s)
  pass bending only because the floor slab restrains the compression flange (&chi;<sub>LT</sub> would
  fall below 0.85 if unrestrained) — confirm the restraint, especially at the construction stage before

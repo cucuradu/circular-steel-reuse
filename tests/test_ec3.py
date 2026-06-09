@@ -154,3 +154,60 @@ def test_interaction_nm_is_ltb_aware(cat):
     assert ir.detail["chi_LT"] == 1.0
     assert iu.detail["chi_LT"] < 1.0          # ~0.45 for IPE300, L=6 m
     assert iu.utilization > ir.utilization    # LTB lowers M_b_Rd -> higher combined utilization
+
+
+# ---------------------------------------------------------------------------
+# #6 heavy sections (t_f > 40 mm): EN Table 3.1 reduced f_y + Table 6.2 curve shift
+# ---------------------------------------------------------------------------
+
+def test_nominal_fy_thickness_bands():
+    from steelreuse.core.sections import nominal_fy
+    # EN 10025 grades band with thickness (Table 3.1): t<=40 nominal, 40<t<=80 reduced.
+    assert nominal_fy("S355", 30) == 355.0
+    assert nominal_fy("S355", 60) == 335.0
+    assert nominal_fy("S275", 50) == 255.0
+    assert nominal_fy("S235", 41) == 215.0
+    # ASTM grades carry a single specified minimum F_y — no EN thickness banding.
+    assert nominal_fy("A992", 10) == pytest.approx(345.0)
+    assert nominal_fy("A992", 60) == pytest.approx(345.0)
+
+
+def test_heavy_flange_shifts_buckling_curve(cat):
+    import dataclasses
+
+    from steelreuse.core.ec3_checks import _buckling_alpha
+    base = cat["IPE300"]                         # h/b = 2.0 > 1.2
+    thin = dataclasses.replace(base, tf=10.0)
+    heavy = dataclasses.replace(base, tf=60.0)   # 40 < t_f <= 100
+    jumbo = dataclasses.replace(base, tf=120.0)  # t_f > 100
+    assert _buckling_alpha(thin, "y") == pytest.approx(0.21)    # curve a
+    assert _buckling_alpha(thin, "z") == pytest.approx(0.34)    # curve b
+    assert _buckling_alpha(heavy, "y") == pytest.approx(0.34)   # shifted a -> b
+    assert _buckling_alpha(heavy, "z") == pytest.approx(0.49)   # shifted b -> c
+    assert _buckling_alpha(jumbo, "y") == pytest.approx(0.76)   # curve d
+    assert _buckling_alpha(jumbo, "z") == pytest.approx(0.76)
+
+
+def test_heavy_flange_lowers_buckling_resistance(cat):
+    import dataclasses
+    base = cat["IPE300"]
+    thin = dataclasses.replace(base, tf=10.0)
+    heavy = dataclasses.replace(base, tf=60.0)   # only the curve changes (same I, A) -> lower chi
+    _, chi_thin = N_b_Rd(thin, 355, L=4000, k=1.0, axis="y")
+    _, chi_heavy = N_b_Rd(heavy, 355, L=4000, k=1.0, axis="y")
+    assert chi_heavy < chi_thin                  # more conservative for the jumbo flange
+
+
+def test_check_member_flags_heavy_section_and_reduces_en_fy(cat):
+    import dataclasses
+    heavy = dataclasses.replace(cat["IPE300"], tf=60.0)   # synthetic jumbo flange (>40 mm)
+    res = check_member(heavy, "S355", MemberDemand(N_Ed=100e3, L=4000))
+    assert res.fy == pytest.approx(335.0)                  # Table 3.1 reduced f_y for 40<t<=80
+    assert any("heavy section" in w for w in res.warnings)
+    assert any("f_y reduced" in w for w in res.warnings)
+    # An ASTM W-shape with the same heavy flange gets the curve shift + warning but NO f_y reduction.
+    us = check_member(dataclasses.replace(cat["IPE300"], tf=60.0, standard="US"), "A992",
+                      MemberDemand(N_Ed=100e3, L=4000))
+    assert us.fy == pytest.approx(345.0)
+    assert any("heavy section" in w for w in us.warnings)
+    assert not any("f_y reduced" in w for w in us.warnings)

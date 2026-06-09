@@ -51,6 +51,29 @@ FY_BY_GRADE = {
     "A53": 240.0,        # 35 ksi  -- pipe
 }
 
+# Reduced nominal f_y for 40 mm < t <= 80 mm element thickness (EN 1993-1-1 Table 3.1, EN 10025).
+# Only the European (EN 10025) grades band with thickness; ASTM grades carry a single specified
+# minimum F_y and are intentionally absent here (see :func:`nominal_fy`). Values: S235/S275/S355 from
+# EN 10025-2; S420/S460 from EN 10025-3 (N/NL, representative 40-63 mm value, conservative).
+_FY_OVER_40 = {"S235": 215.0, "S275": 255.0, "S355": 335.0, "S420": 390.0, "S460": 430.0}
+
+
+def nominal_fy(grade: str | None, thickness_mm: float) -> float:
+    """Thickness-dependent nominal yield strength f_y (N/mm^2), EN 1993-1-1 Table 3.1.
+
+    European (EN 10025) grades lose yield strength in thicker elements: the ``t <= 40 mm`` value
+    (``FY_BY_GRADE``) applies up to 40 mm and a reduced value for ``40 < t <= 80 mm``. Beyond 80 mm we
+    stay conservatively at that reduced value (the rolled range is essentially exhausted; the caller
+    flags such jumbo sections). **ASTM** grades (A992, A36, A500, ...) carry a single specified minimum
+    F_y with no EN thickness banding and are returned unchanged. The governing element thickness for a
+    rolled I/H section is the flange ``t_f``.
+    """
+    g = (grade or "").upper()
+    base = FY_BY_GRADE.get(g, 235.0)
+    if thickness_mm > 40.0 and g in _FY_OVER_40:
+        return _FY_OVER_40[g]
+    return base
+
 
 @dataclass(frozen=True)
 class SectionProps:

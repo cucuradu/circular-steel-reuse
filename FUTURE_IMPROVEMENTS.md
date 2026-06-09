@@ -8,6 +8,55 @@ Severity: 🔴 blocks credibility / wrong result · 🟠 important methodology g
 
 ---
 
+## ✅ Global frame analysis (`--frame-analysis`, `core/frame.py`) — NEW
+
+The headline methodology gap was that member forces were **synthesised in isolation** (every beam a
+pin-roller `wL²/8` span, every column bare axial), with no connected structure. There is now an opt-in
+**global frame solve** (PyNiteFEA): the demand model is assembled by snapping coincident endpoints into
+shared nodes and solved as a **simple braced frame** (pinned beams, continuous columns, fixed bases), and
+the resulting `MemberDemand` feeds the *same* EN 1993 check + matcher. Floor load goes on the beams; each
+**column axial then comes from the real load path** (multi-storey accumulation; interior columns collect
+from both sides) — this supersedes the tributary-area/floor-count estimate of Tier-2 #1. Validated against
+the closed-form simply-supported result and hand statics (`tests/test_frame.py`); falls back to the
+analytic path per member where geometry is missing.
+
+**Lateral / sway — DONE (EN 5.3.2 EHF + P-Δ).** With `--phi`, the global sway imperfection is applied as
+**equivalent horizontal forces** `H_i = φ·N_Ed` at each column top (from the gravity column axials), in
+each lateral direction, and the frame is solved **2nd-order (P-Δ)**. The lateral load is carried by the
+model's vertical bracing (pin-ended axial `brace` members) or, absent bracing, the fixed column bases; the
+member force envelope spans gravity + the sway cases and the matcher reports the governing one. `--pdelta`
+forces 2nd-order without a sway case. Replaces the member-level notional moment when frame analysis is on.
+
+**Wind — DONE.** `--wind q` (kN/m², the user's EN 1991-1-4 net pressure) applies horizontal **storey
+forces** `q·width_perp·h_trib` (building plan extent perpendicular to the wind × storey tributary height)
+lumped onto each level's column tops, as a **wind-leading** combination `γ_G·G + γ_Q·W + γ_Q·ψ₀·Q`
+(`ψ₀ = 0.7`) carrying the sway imperfection. Needs a 3-D model (planar frames have no façade → skipped with
+a warning). `wind_node_forces` is unit-tested against hand arithmetic on a 3-D box.
+
+**Multi-span members — DONE.** `expand_spans` ([core/frame.py](src/steelreuse/core/frame.py)) splits a
+continuous beam (`spans_mm = [s₁, s₂,…]`) into one sub-element per span at its interior supports
+(interpolated along the member axis so the interior nodes land on the columns below). Each bay is then
+checked over its own length and its reaction routed into the correct interior column (previously the whole
+load dumped at the two far ends, leaving interior columns unloaded); the pipeline makes one slot per span.
+
+**Seismic — DONE (lateral force method).** `--seismic Cs` ([core/frame.py](src/steelreuse/core/frame.py)
+`seismic_node_forces`) applies the EN 1998-1 §4.3.3.2 lateral force method: seismic weight per level
+`W_i = Σ(g_k+ψ₂·q_k)·trib·L`, base shear `F_b = Cs·ΣW_i`, inverted-triangular distribution
+`F_i = F_b·(W_i·z_i)/Σ(W_j·z_j)` lumped on the level's column tops, as a `G + ψ₂·Q + E` situation (unit
+factors). `Cs = Sd(T₁)·λ/g` is a user input.
+
+**Residuals (the obvious next increments):**
+- **Modal/response-spectrum seismic:** the current seismic is the simplified lateral force method with a
+  user base-shear coefficient — no modal spectrum, accidental torsion, or `q`-factor/site spectrum.
+- **Biaxial columns:** a lateral case can bend a column about both axes, but the EN check is uniaxial
+  (N + M_y), so the worst single-axis moment is used — full biaxial N+M_y+M_z is a documented limitation.
+- **Effective lengths** still `k = 1.0` (the solve gives forces, not buckling lengths); a sway/non-sway
+  classification from the frame is a future refinement.
+- **IFC path** still writes no coordinates, so frame analysis only runs on the pyRevit/coordinate-bearing
+  models (ties into Tier-2 #1's IFC residual below).
+
+---
+
 ## Tier 2 — Structural credibility (the thesis core)
 
 ### 🟡 1. Column loads — per-column tributary/floors (MOSTLY DONE), residuals below
@@ -34,13 +83,26 @@ interior tributaries differ (9/18/36 m² on a 6 m grid).
 - **Overhang**: the half-bay edge rule assumes the slab edge sits at the perimeter columns (no
   cantilever); a real overhang would add load.
 
-### 🟠 2. Demand forces are *assumed*, not analyzed
-The feasibility gate checks reclaimed members against a synthesized single ULS gravity case on simply-
-supported spans — no lateral system, no load combinations, no pattern/notional/wind/seismic. Correct
-for *pre-feasibility*, but it is **the** headline limitation and must be stated as such.
+### ✅ 2. Demand forces — load-combination envelope (DONE; residual: wind/seismic + real frame analysis)
+**Was:** the feasibility gate checked each member against a *single* synthesized ULS gravity case, so
+"no load combinations" was the headline limitation.
 
-Fix sketch: add a small **load-combination envelope** (e.g. 1.35G+1.5Q, 1.0G+1.5Q, and a notional
-horizontal) and take the worst per slot; document the gravity-only scope prominently in the report.
+**Done:** members are now verified against an explicit **load-combination envelope**
+(`AreaLoadModel.combination_loads` → `pipeline.build_slots` → `match._feasible_cell`). Each `DemandSlot`
+carries a list of `(name, MemberDemand)`; the matcher checks **every** combination, reports the
+**governing** (worst-utilisation) one (`Assignment.governing_combination`, shown as a "Gov. load case"
+report column), and a reuse — *and* the avoided-new baseline (`_passes_all`) — passes only if it passes
+all of them. The default envelope is the gravity case (`γ_G g_k + γ_Q q_k`, EN 6.10) plus, for columns,
+an opt-in **EN 1993-1-1 §5.3.2 global sway imperfection** (`--phi`, e.g. `0.005 = 1/200`) applied as a
+notional column moment `M_y,Ed = N_Ed·φ·L`, which engages the N+M interaction. `φ = 0` (default) ⇒
+gravity only, so default results are byte-identical; with realistic multi-floor columns, `--phi 0.005`
+demonstrably flips the governing case and can force a heavier section/baseline. Documented in
+[METHODOLOGY §4/§7/§9/§12](docs/METHODOLOGY.md).
+
+**Residual (still open):** the envelope ships only gravity + the notional-sway case — **wind, seismic,
+pattern and uplift (`1.0G+1.5Q`) combinations** are not yet populated (they plug in as extra entries),
+and the sway case is a **member-level** notional moment, not a real **frame analysis** (no sway/2nd-order
+solve, no lateral system). Flipping `--phi` on by default is a one-line change if wanted.
 
 ### ✅ 3. Avoided-new baseline leaks across standards (EU↔US) — DONE
 `SectionProps` now carries a `standard` ("EU"/"US"); `baseline_new_mass_kg`
@@ -75,13 +137,20 @@ sample model, 4 reused beams are flagged (χ_LT 0.45–0.71 if unrestrained).
 Residual: a full **construction-stage load case** (reduced load, no slab) as a second check, rather than
 the current informational flag.
 
-### 🟡 6. Heavy-section edge cases (t_f > 40 mm)
-Flexural-buckling curve selection (`_buckling_alpha`) and the `FY_BY_GRADE` table both assume
-t_f ≤ 40 mm. Very heavy W-shapes in the AISC catalog have t_f > 40 mm → slightly non-conservative
-curves and an overstated f_y.
+### ✅ 6. Heavy-section edge cases (t_f > 40 mm) — DONE
+**Was:** `_buckling_alpha` and the `FY_BY_GRADE` table both assumed `t_f ≤ 40 mm`, so the 88 AISC
+W-shapes with `t_f > 40 mm` got slightly non-conservative buckling curves and (for EN grades) an
+overstated `f_y`.
 
-Fix sketch: add the t > 40 mm buckling-curve shift and the reduced nominal f_y bands (EN 1993-1-1
-Table 3.1 / 6.2), keyed off `sec.tf`; or flag/exclude those rows with a warning.
+**Done:**
+- `_buckling_alpha` ([core/ec3_checks.py](src/steelreuse/core/ec3_checks.py)) now selects the EN 1993-1-1
+  **Table 6.2** curve from `h/b` *and* `t_f`: `40 < t_f ≤ 100 mm` shifts y→b / z→c, and `t_f > 100 mm`
+  → curve d both axes.
+- `nominal_fy(grade, t_f)` ([core/sections.py](src/steelreuse/core/sections.py)) applies the **Table 3.1**
+  thickness bands for EN 10025 grades (e.g. S355 → 335 N/mm² for `40 < t ≤ 80 mm`); ASTM grades carry a
+  single specified minimum `F_y` and are unchanged. `check_member` uses it (keyed off the flange `t_f`)
+  and flags heavy sections + the `f_y` reduction in the member warnings.
+- Tested in [tests/test_ec3.py](tests/test_ec3.py) (bands, curve shift, lower χ, EN-vs-ASTM warning).
 
 ---
 
@@ -107,11 +176,14 @@ SLS), with an assumptions register and the hand-calc validation basis. **Residua
 **end-to-end validation against one published worked example** (currently the validation is the
 per-check hand calcs encoded in the tests, not a single textbook frame run start-to-finish).
 
-### 🟡 9. Optimizer / reporting refinements
-- **Off-cut as pure waste**: the objective penalizes off-cut but a long donor cut to a short slot
-  leaves reusable remainder; the cutting-stock extension (1 donor → many cuts) would model this and
-  remove the bias against long stock. (Was Tier 1's deliberate "soft preference" choice; cutting-stock
-  is the real fix.)
+### 9. Optimizer / reporting refinements
+- ✅ **Off-cut / cutting-stock — DONE (optional mode).** `match(..., allow_cutting=True)` / CLI `--cut`
+  ([match/optimize.py](src/steelreuse/match/optimize.py)) lets one donor be cut into several pieces for
+  several slots, bounded by `Σ(required_len + cut tolerance) ≤ donor length` (both the MILP and the
+  greedy fallback respect the cap). The off-cut penalty is dropped in this mode (the remainder is
+  genuinely reusable — the real fix for the long-stock bias), and each cut donor's leftover is reported
+  as reusable remainder (`MatchResult.donor_leftover_mm`, surfaced in the report + CLI). The default
+  stays one-piece-per-donor (conservative). Tested in [tests/test_match.py](tests/test_match.py).
 - **N+M interaction** is a simplified linear sum (no 6.3.3 k-factors). Conservative for k ≤ 1 / C1 = 1,
   but label it clearly or implement the full 6.3.3 form.
 - **No shear–moment (6.2.8) interaction** and **no biaxial bending (Mz)** — fine for gravity UDL

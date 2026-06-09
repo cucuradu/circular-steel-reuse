@@ -43,6 +43,7 @@ class AreaLoadModel:
     column_tributary_area_m2: float = 9.0  # default floor area per column, per level
     column_floors: float = 1.0             # default floors a column accumulates
     column_eccentricity_mm: float = 0.0    # notional moment lever for columns (0 = pure axial)
+    notional_phi: float = 0.0              # EN 5.3.2 global sway imperfection (0 = off; EN value 1/200)
     flange_restrained: bool = True         # a floor slab restrains the beam's compression flange
     tributary_overrides: dict[str, float] = field(default_factory=dict)         # beam id -> width (m)
     column_area_overrides: dict[str, float] = field(default_factory=dict)       # col id -> area (m^2)
@@ -84,6 +85,40 @@ class AreaLoadModel:
             udl_Npmm=self.beam_udl_Npmm(trib),
             w_service_Npmm=self.characteristic_area_kpa() * width,
         )
+
+    def combination_loads(self, member) -> list[tuple[str, Load]]:
+        """The ULS load-combination envelope for a member: a list of (name, :class:`Load`).
+
+        Replaces the implicit single load case with an explicit envelope the matcher checks the
+        member against, reporting the **governing** combination (worst utilisation). A member — and
+        the avoided-new baseline — passes only if it passes *every* combination, the way an engineer
+        verifies a member against all design situations.
+
+        Combinations:
+          * ``ULS gravity (EN 6.10)`` — ``gamma_G g_k + gamma_Q q_k``, always present (the workhorse).
+          * ``ULS gravity + EN 5.3.2 imperfection`` — only for columns and only when
+            ``notional_phi > 0``: a global (sway) imperfection ``phi`` (EN 1993-1-1 5.3.2, EN value
+            ``phi_0 = 1/200``) is applied as an equivalent notional column moment over the column
+            length, ``M_y,Ed = N_Ed (e_ecc + phi*L)``. This is a **member-level proxy** for the global
+            imperfection (it engages the N+M interaction); it is *not* a frame analysis, so it is kept
+            opt-in and documented as such (METHODOLOGY 4). Beams are unaffected at member level.
+
+        Adding further design situations (uplift ``1.0 G + 1.5 Q``, wind, seismic) is a matter of
+        appending more entries here.
+        """
+        base = self.loads_for(member)
+        # Names are kept free of clause numbers so they never trip the report's invented-number guard;
+        # the EN clause references live in this docstring and docs/METHODOLOGY.md.
+        combos = [("ULS gravity", base)]
+        if member.role == "column" and self.notional_phi > 0 and (member.length_mm or 0) > 0:
+            e_phi = self.notional_phi * member.length_mm
+            notional = Load(
+                axial_N=base.axial_N,
+                axial_moment_Nmm=base.axial_N * (self.column_eccentricity_mm + e_phi),
+                w_service_Npmm=base.w_service_Npmm,
+            )
+            combos.append(("ULS gravity + sway imperfection", notional))
+        return combos
 
 
 # ---------------------------------------------------------------------------

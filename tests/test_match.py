@@ -181,6 +181,43 @@ def test_assignment_carries_chi_lt_for_the_report(cat):
     assert a.chi_lt_if_free is not None and 0.0 < a.chi_lt_if_free <= 1.0
 
 
+def test_envelope_reports_governing_combination(cat):
+    # #2 load-combination envelope: a column slot carrying two combinations (pure-axial gravity and a
+    # gravity+notional-moment sway case) must be checked against both, with the worse one reported as
+    # governing. Both pass here, but the sway case has the higher utilisation.
+    grav = MemberDemand(N_Ed=300e3, L=4000)
+    sway = MemberDemand(N_Ed=300e3, My_Ed=40e6, L=4000)
+    supply = [SupplyItem(id="s", section="HEB300", grade="S355", length_mm=4500)]
+    enveloped = DemandSlot(
+        id="C", member_id="c", role="column", required_length_mm=4000, demand=grav,
+        demands=[("ULS gravity", grav), ("ULS gravity + sway imperfection", sway)],
+    )
+    a = match(supply, [enveloped], cat).assignments[0]
+    assert a.governing_combination == "ULS gravity + sway imperfection"
+
+    grav_only = DemandSlot(id="C", member_id="c", role="column", required_length_mm=4000, demand=grav)
+    b = match(supply, [grav_only], cat).assignments[0]
+    assert b.governing_combination == "ULS gravity"
+    assert a.utilization > b.utilization  # the sway-imperfection case is the worse, governing one
+
+
+def test_baseline_requires_passing_every_combination(cat):
+    # The avoided-new baseline must be the lightest section that passes the *whole* envelope, not just
+    # gravity: adding a sway-imperfection moment forces a heavier (moment-capable) baseline section.
+    grav = MemberDemand(N_Ed=200e3, L=4000)
+    sway = MemberDemand(N_Ed=200e3, My_Ed=120e6, L=4000)
+    grav_only = DemandSlot(id="g", member_id="c", role="column", required_length_mm=4000,
+                           demand=grav, grade="S355")
+    enveloped = DemandSlot(
+        id="e", member_id="c", role="column", required_length_mm=4000, demand=grav, grade="S355",
+        demands=[("ULS gravity", grav), ("ULS gravity + sway imperfection", sway)],
+    )
+    base_grav = baseline_new_mass_kg(grav_only, cat, "S355")
+    base_env = baseline_new_mass_kg(enveloped, cat, "S355")
+    assert base_grav is not None and base_env is not None
+    assert base_env > base_grav
+
+
 def test_baseline_stays_within_slot_standard(cat):
     # EU<->US leak: a US slot's avoided-new baseline must be the lightest adequate W-shape, not a
     # coincidentally-lighter IPE. Two sections with identical IPE300 geometry (so both pass the same
@@ -199,3 +236,43 @@ def test_baseline_stays_within_slot_standard(cat):
     # Without the standard filter both would pick EU_LIGHT (10 kg/m); with it each stays in its own.
     assert baseline_new_mass_kg(eu_slot, mini) == pytest.approx(10.0 * 4.0)   # 40 kg
     assert baseline_new_mass_kg(us_slot, mini) == pytest.approx(30.0 * 4.0)   # 120 kg
+
+
+def test_cutting_stock_one_donor_fills_multiple_slots(cat):
+    # #4 cutting-stock: the default one-piece model REJECTS a 9 m donor in a 4 m slot — the 5 m off-cut
+    # penalty makes it net-negative (exactly the long-stock bias cutting-stock removes). Cutting-stock
+    # instead cuts the donor into two 4 m pieces, fills both slots, and reports its reusable remainder.
+    s1 = _beam_slot(4000, 8.0, "A")
+    s2 = _beam_slot(4000, 8.0, "B")
+    supply = [SupplyItem(id="long", section="IPE360", grade="S275", length_mm=9000)]
+
+    default = match(supply, [s1, s2], cat)
+    assert default.n_reused == 0                          # long stock rejected by the off-cut penalty
+
+    cut = match(supply, [s1, s2], cat, allow_cutting=True)
+    assert cut.n_reused == 2                              # one donor cut into two pieces
+    assert {a.supply_id for a in cut.assignments} == {"long"}
+    # leftover = 9000 - 2*(4000 + 50 cut tolerance) = 900 mm
+    assert cut.donor_leftover_mm["long"] == pytest.approx(900.0, abs=1.0)
+    assert cut.total_co2_saved_kg > default.total_co2_saved_kg
+
+
+def test_cutting_stock_respects_donor_length(cat):
+    # Three 4 m slots but a 9 m donor only yields two pieces (3*(4000+50) = 12150 mm > 9000 mm).
+    slots = [_beam_slot(4000, 8.0, f"S{i}") for i in range(3)]
+    supply = [SupplyItem(id="long", section="IPE360", grade="S275", length_mm=9000)]
+    res = match(supply, slots, cat, allow_cutting=True)
+    assert res.n_reused == 2
+    assert len(res.unmatched_slots) == 1
+
+
+def test_cutting_stock_greedy_packs_by_length():
+    # The greedy fallback must also respect per-donor length capacity in cutting mode.
+    from steelreuse.match.optimize import _Cell, _solve_greedy
+    cells = [
+        _Cell(si=0, sj=j, utilization=0.3, status="OK", offcut_mm=0.0,
+              co2_saved_kg=10.0 - j, score=10.0 - j, used_len_mm=4000.0)
+        for j in range(3)
+    ]
+    chosen = _solve_greedy(cells, n_supply=1, n_slots=3, caps=[9000.0])
+    assert len(chosen) == 2     # only two 4050-mm pieces fit a 9000-mm donor

@@ -77,6 +77,15 @@ pre-sizing, with explicit EN 1990 partial factors rather than a single magic num
   per-member fallback to the configured default where geometry is missing.
 - **Notional column moment** (opt-in `--col-ecc`): `M_y,Ed = N_Ed · e`, carried into the column demand so
   the N+M interaction engages. Default `e = 0` (pure axial — real frame moments are not modelled).
+- **Load-combination envelope** (`combination_loads`): each member is verified against a *list* of ULS
+  combinations and the **governing** (worst-utilisation) one is reported; a member — and the avoided-new
+  baseline — passes only if it passes *every* combination, the way an engineer checks all design
+  situations. The default envelope is the gravity case (`γ_G g_k + γ_Q q_k`, EN 6.10) plus, for columns,
+  an opt-in **EN 1993-1-1 §5.3.2 global (sway) imperfection** (`--phi`, e.g. `0.005 = 1/200`) applied as
+  a notional column moment `M_y,Ed = N_Ed·φ·L` so the N+M interaction engages. `φ = 0` (default) ⇒
+  gravity only, so default results are unchanged. Adding further design situations (uplift `1.0G+1.5Q`,
+  wind, seismic) is a matter of appending entries to the envelope. This is a **member-level** envelope,
+  not a global frame analysis (see §12).
 - **Continuous beams** are split at supports into `spans_mm` upstream (by the extractor); each span is
   checked as simply supported (conservative for both moment envelope and deflection).
 
@@ -85,10 +94,78 @@ results `M = wL²/8`, `V = wL/2`. An optional `PyNiteBackend` builds and solves 
 must agree with the analytic backend for a determinate span (enforced by a test). Columns get a single
 axial demand over the full length (buckling length = member length).
 
+### 4.1 Global frame analysis  (`core/frame.py`, opt-in `--frame-analysis`)
+
+Instead of synthesising each member's forces in isolation, the whole demand structure can be assembled
+into **one connected model and solved** (PyNiteFEA), so the action effects that feed the EN 1993 check
+come from a real analysis. The output is the *same* `MemberDemand` per member/combination consumed by
+the matcher — only the **source** of the forces changes — so the analytic path remains the always-available
+default and fallback.
+
+- **Topology** (`snap_nodes`, pure Python): member endpoints (`start_xyz`/`end_xyz`) within a tolerance
+  (50 mm default) are snapped into shared nodes so beams and columns connect. Members without usable
+  coordinates are reported and **fall back to the per-member analytic load** (a robust hybrid for messy
+  real models); if no connectable geometry exists at all, the whole run falls back.
+- **Idealisation — simple braced frame** (the project default): beam-to-column connections are **pinned**
+  (both bending rotations released at each end → beams stay simply-supported, recovering `wL²/8`),
+  columns are **continuous**, and column bases are **fixed** so the lateral load (§4.1 sway case) is
+  carried by the column bases where the model has no explicit vertical bracing, or by the **braces**
+  (modelled as pin-ended axial members) where it does. Torsion is kept connected at joints for stability.
+- **Loads & load path**: the floor pressure (§4) is applied as a UDL on the **beams only**, split into
+  permanent (`DL`) and imposed (`LL`) load *cases*; the ULS/SLS *combinations* apply the EN 1990 factors
+  (`γ_G·DL + γ_Q·LL`). **Columns carry no applied load** — each column's axial comes from the solved load
+  path, so a multi-storey stack accumulates the floors above it and an interior column correctly collects
+  from the beams on both sides. This **supersedes** the `estimate_column_loads` tributary-area/floor-count
+  estimate (§4) whenever frame analysis is on.
+- **Lateral — global sway imperfection** (`--phi`, EN 1993-1-1 §5.3.2): rather than the member-level
+  notional moment of §4, the sway imperfection is applied as **equivalent horizontal forces**
+  `H_i = φ·N_Ed` at each column top (computed from the gravity column axials), in each lateral direction,
+  giving a real frame lateral case `γ_G·DL + γ_Q·LL + H`. The model is then solved with a **2nd-order
+  (P-Δ)** analysis so sway amplification is captured. Each member's force envelope spans gravity + the
+  sway cases and the matcher reports the governing one. `φ = 0` (default) ⇒ gravity only. `--pdelta`
+  forces the 2nd-order solve without a sway case.
+- **Lateral — wind** (`--wind q`, kN/m²): a net façade pressure `q` (the user's EN 1991-1-4 value) becomes
+  **horizontal storey forces** `q · width_perp · h_trib` per level — `width_perp` the building plan extent
+  perpendicular to the wind, `h_trib` half the storey above + half below — lumped onto each level's column
+  tops (rigid-diaphragm). The combination is **wind-leading** (EN 1990 6.10: `γ_G·G + γ_Q·W + γ_Q·ψ₀·Q`,
+  `ψ₀ = 0.7` imposed) and carries the sway imperfection where present. Needs a **3-D** model (a planar
+  frame has no perpendicular façade → wind is skipped in that direction with a warning).
+- **Lateral — seismic** (`--seismic Cs`, EN 1998-1 **lateral force method** §4.3.3.2): the seismic weight
+  of each level `W_i = Σ(g_k + ψ₂·q_k)·trib·L` (its beams) gives a base shear `F_b = Cs·ΣW_i`, distributed
+  up the height as `F_i = F_b·(W_i·z_i)/Σ(W_j·z_j)` (inverted-triangular first mode) and lumped on each
+  level's column tops. `Cs = Sd(T₁)·λ/g` is a **user input** (design spectral acceleration as a fraction of
+  g) — the full EN 1998 site/soil/`q` spectrum is out of scope. The seismic situation uses unit factors
+  (`G + ψ₂·Q + E`, `ψ₂ = 0.3`, EN 1990 6.4.3.4).
+- **Conventions** (verified against PyNite 2.4.1): global `−Z` (downward) load on a horizontal beam gives
+  bending as local **My** and shear as local **Fz**; member axial is **compression-positive**, matching
+  `MemberDemand.N_Ed`. Section stiffness uses the mapped catalog `A, I_y, I_z` and an open-section St-Venant
+  `J ≈ ⅓·Σ b_i t_i³`; unmapped members use a generic stiff section (forces in the determinate parts of a
+  simple braced frame don't depend on stiffness).
+- **Robustness**: any solver failure (residual instability, missing extra) is caught and the run falls
+  back to the analytic loads with a warning, never a crash (CLAUDE.md rule 4).
+
+**Residuals (still open):** lateral cases (sway / wind / seismic) are applied in `+X`/`+Y` (worst-magnitude
+for a regular doubly-symmetric frame); the seismic action is the simplified **lateral force method** with a
+user base-shear coefficient, not a modal response-spectrum analysis (no torsion/accidental eccentricity);
+column **biaxial** bending is reduced to the worst single-axis moment checked against the bending resistance
+(the EN check is uniaxial N+M_y); effective lengths remain `k = 1.0` (the solve gives forces, not buckling
+lengths). See `FUTURE_IMPROVEMENTS.md`.
+
+**Continuous multi-span members** are handled: `expand_spans` splits a beam carrying `spans_mm = [s₁, s₂,…]`
+into one sub-element per span at its interior supports (interpolated along the member axis so the interior
+nodes land on the columns below), so each span is checked over its own length **and** each bay's reaction
+is routed into the correct interior column. The pipeline then makes one slot per span (id `{member}#k`).
+
 ## 5. EN 1993-1-1 member checks  (`core/ec3_checks.py`)
 
 Constants: `E = 210 000 N/mm²`, `G = 80 769 N/mm²`, `γ_M0 = γ_M1 = 1.0`. Sign convention: `N_Ed`
 compression-positive (negative = tension). Material factor `ε = √(235/f_y)` (Table 5.2).
+
+**Thickness-dependent yield (Table 3.1).** The nominal `f_y` is taken from `nominal_fy(grade, t_f)`:
+EN 10025 grades lose strength in thick elements (e.g. S355 → 335 N/mm² for `40 < t ≤ 80 mm`), keyed off
+the flange thickness `t_f` (the governing element of a rolled I/H). ASTM grades (A992, A36, …) carry a
+single specified minimum `F_y` with no thickness banding. Sections with `t_f > 40 mm` (88 of the AISC
+W-shapes) are flagged in the member warnings.
 
 ### 5.1 Cross-section classification (Table 5.2)
 - Flange outstand `c = (b − t_w − 2r)/2`, ratio `c/t_f` vs limits `9ε / 10ε / 14ε` → class 1/2/3, else 4.
@@ -107,8 +184,10 @@ compression-positive (negative = tension). Material factor `ε = √(235/f_y)` (
 
 ### 5.3 Flexural buckling (6.3.1)
 `N_cr = π²E·I/L_cr²`, `L_cr = k·L`, `λ̄ = √(A·f_y/N_cr)`. Reduction `χ = 1/(φ + √(φ² − λ̄²))` with
-`φ = 0.5(1 + α(λ̄ − 0.2) + λ̄²)`, `χ = 1` for `λ̄ ≤ 0.2`. Buckling curves (Table 6.2, rolled I, t_f ≤ 40
-mm): `h/b > 1.2` → y-axis curve a (α 0.21), z-axis b (0.34); else y→b, z→c (0.49). Compression members
+`φ = 0.5(1 + α(λ̄ − 0.2) + λ̄²)`, `χ = 1` for `λ̄ ≤ 0.2`. Buckling curves (Table 6.2, rolled I) are
+selected from `h/b` **and the flange thickness** `t_f`: for `h/b > 1.2`, `t_f ≤ 40 mm` → y curve a
+(α 0.21) / z curve b (0.34), but `40 < t_f ≤ 100 mm` shifts to y curve b / z curve c (0.49); for
+`h/b ≤ 1.2` (`t_f ≤ 100`) → y b / z c; and `t_f > 100 mm` → curve d (0.76) both axes. Compression members
 are governed by the **weaker axis** (`min(N_b,Rd,y, N_b,Rd,z)`); `k_y = k_z = 1.0` (pinned, conservative)
 unless set.
 
@@ -147,7 +226,8 @@ per mapped member, mass, volume, new-build embodied carbon, reuse process carbon
 
 1. **Sparse feasibility mask.** A (supply, slot) pair is admissible only if the reclaimed member is long
    enough (`length ≥ required + 50 mm` cut tolerance) **and** passes the exact EN check for that slot's
-   forces. Most pairs are infeasible and never enter the model — this tames the MILP size.
+   forces in **every** load combination of the envelope (§4); the governing combination is recorded and
+   reported. Most pairs are infeasible and never enter the model — this tames the MILP size.
 2. **Avoided-new baseline (per slot).** The honest CO₂ basis is the **lightest catalog section that
    passes the slot's exact check**, restricted to the **slot's own design standard** (a US slot's
    baseline is a W-shape, not a coincidentally-lighter IPE). Using this rather than the donor's mass
@@ -161,6 +241,13 @@ per mapped member, mass, volume, new-build embodied carbon, reuse process carbon
    escalates to a **greedy fallback** that takes highest-score net-positive pairs first (it never books a
    net-negative match, mirroring the MILP). Reclaimed **supply is not standard-restricted** — reusing a
    donor across standards is legitimate.
+5. **Cutting-stock (optional, `allow_cutting` / `--cut`).** Instead of one piece per donor, a donor may
+   be cut into several pieces for several slots, bounded by its length:
+   `Σ_j (required_len_j + 50 mm cut tolerance)·x_ij ≤ length_i`. The off-cut penalty is dropped (the
+   remainder is genuinely reusable, so the bias against long stock disappears — this is the real fix for
+   the off-cut-as-waste limitation); the objective books each filled slot's avoided-new saving, and each
+   cut donor's leftover is reported as reusable remainder (`MatchResult.donor_leftover_mm`). The greedy
+   fallback packs donors first-fit by descending score under the same length cap.
 
 ## 8. Reporting & the LLM guardrail  (`llm/`)
 
@@ -176,8 +263,11 @@ never given a calculator (CLAUDE.md rule 1).
 | Permanent / imposed load | 3.5 / 3.0 kN/m² | `--dead/--live` | neutral (set to project) |
 | Partial factors γ_G / γ_Q | 1.35 / 1.5 | `--gamma-g/--gamma-q` | EN 1990 STR |
 | Beam tributary width | 3.0 m or geometry | `--trib-width/--trib-from-geometry` | edge = full bay (cons.) |
-| Column area / floors | 9 m² / 1 or geometry | `--col-trib-area/--col-floors` | floors=1 **under-loads** lower columns |
+| Column area / floors | 9 m² / 1 or geometry | `--col-trib-area/--col-floors` | floors=1 **under-loads** lower columns (superseded by `--frame-analysis`) |
+| Column axial source | per-member tributary | `--frame-analysis` (load path) | frame solve removes the tributary/floor estimate |
+| Frame idealisation | simple braced (pinned beams, continuous columns, fixed base) | `core/frame.py` | gravity + EN 5.3.2 sway (EHF) + P-Δ; wind/seismic not yet |
 | Column moment | 0 (pure axial) | `--col-ecc` | real frame moments not modelled |
+| Global sway imperfection φ | 0 (off); EN value 1/200 | `--phi` | member-level notional moment, or **frame EHF + P-Δ** with `--frame-analysis` |
 | Effective length k | 1.0 | — | pinned (conservative) |
 | LTB C₁ | 1.0 (uniform) | — | conservative |
 | Compression-flange restraint | restrained (slab) | load model | **non-conservative if slab absent** |
@@ -193,12 +283,41 @@ with span; deflection `δ ≈ 9.62 mm (w=10 N/mm, L=6 m)`. Knockdown scales util
 
 **Matcher (`tests/test_match.py`).** Known-answer feasibility, one-use-each constraints, the avoided-new
 basis (a giant donor in a small slot books the baseline, not its own mass), standard-restricted baseline,
-degenerate-geometry safety, and the greedy net-positive guard.
+degenerate-geometry safety, the greedy net-positive guard, the load-combination envelope (governing case
++ baseline passing every combination), and **cutting-stock** (one donor cut to fill several slots, length
+capacity respected by both the MILP and the greedy fallback, leftover reported).
 
 **Catalog integrity (`tests/test_sections.py`).** For all 305 rows: `mass ≈ 0.785·A`,
 `W_el,y ≈ I_y/(h/2)`, `i = √(I/A)`, `W_el,z ≈ I_z/(b/2)`, `W_pl ≥ W_el` (worst real deviation ≈ 1.5 %).
 
-**Whole suite:** 94 tests, ruff clean.
+**Load-combination envelope (`tests/test_match.py`, `tests/test_loads.py`).** The matcher checks every
+combination and reports the governing one; the avoided-new baseline must pass the whole envelope (a
+sway-imperfection moment forces a heavier baseline than gravity alone); `combination_loads` adds the
+EN 5.3.2 case for columns only when `φ > 0`.
+
+**Heavy sections (`tests/test_ec3.py`).** `nominal_fy` thickness bands (EN grades reduce for `t > 40 mm`,
+ASTM unchanged); `t_f > 40/100 mm` shifts the buckling curve (lower χ), and `check_member` flags the
+heavy section and the EN `f_y` reduction.
+
+**Frame analysis (`tests/test_frame.py`).** Topology snapping (shared endpoints collapse to one node,
+tolerance behaviour, members without geometry skipped); the solve **reproduces the closed-form
+simply-supported result** a one-bay portal must give (`M = wL²/8`, `V = wL/2`, agreeing with
+`AnalyticBackend`); and column axial **accumulates down a multi-storey stack** (lower lift = 2× the upper),
+both compared against hand statics. End-to-end: `run_pipeline(frame_analysis=True)` on a portal reuses
+stock, and a coordinate-free model falls back to the analytic path without error. (Worked check on a
+2-bay × 2-storey frame: interior column 332 kN vs corner 166 kN, all matching `p·trib·span/2` by hand.)
+**Lateral:** with `φ > 0` the solve adds a sway (EHF) combination per direction and a P-Δ pass — a braced
+bay carries the notional sway as **brace axial** and the sway case changes the brace force vs. gravity
+alone; `φ = 0` leaves a single gravity combination (default unchanged). **Wind:** `wind_node_forces` lumps
+`q·width·h_trib` onto a level's column tops (exact arithmetic check on a 3-D box), returns nothing for a
+planar frame, and `wind_kpa > 0` adds the wind combinations + changes the column axial vs. gravity.
+**Continuous members:** `expand_spans` splits a 2-span beam into `B#0`/`B#1` at the right midpoint, and in
+the solve the **interior column carries both spans' reactions** (≈ 2× an end column) while each span keeps
+its own `wL²/8`; `run_pipeline` then yields one slot per span. **Seismic:** `seismic_node_forces` on a
+2-storey box gives a base shear `Cs·ΣW` distributed inverted-triangular (roof force = 2× the floor force),
+and `seismic_cs > 0` adds the `seismic X/Y` design situations.
+
+**Whole suite:** 127 tests, ruff clean.
 
 ## 11. ML modules (exploratory, not in the certified path)
 
@@ -219,7 +338,11 @@ deliberate future decision, logged in `FUTURE_IMPROVEMENTS.md` #7 — not a defa
 
 ## 12. Out of scope (explicit non-claims)
 
-Connection design and capacity; global/sway frame analysis and load combinations beyond a single ULS
-gravity case; lateral (wind/seismic) and pattern loading; biaxial bending and the shear–moment (6.2.8)
-interaction; fatigue, corrosion and weldability of aged steel; effective-section (class 4) design;
-cutting one donor into several slots (cutting-stock). See `FUTURE_IMPROVEMENTS.md` for the backlog.
+Connection design and capacity; **modal/response-spectrum** seismic analysis (the frame analysis of §4.1
+models gravity, the EN 5.3.2 sway imperfection, wind, and a **simplified EN 1998 lateral force** seismic
+case with a 2nd-order P-Δ solve, but not a modal spectrum, accidental torsion, or pattern combinations —
+the `combos` parameter is the hook); column **biaxial** bending (reduced to the worst single-axis moment)
+and the shear–moment (6.2.8) interaction; fatigue, corrosion and weldability of aged steel;
+effective-section (class 4) design. (Cutting one donor into several slots is available as the optional
+cutting-stock mode, §7 point 5; per-member forces from a global solve — with sway, wind, seismic and P-Δ —
+via `--frame-analysis` `--phi` `--wind` `--seismic`, §4.1.) See `FUTURE_IMPROVEMENTS.md` for the backlog.

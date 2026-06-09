@@ -25,8 +25,11 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
                     └─────────────────────────────────────┘
 ```
 
-- **Forces** come from a pluggable backend: `PyNiteFEA` (default, license-free, CI-friendly),
-  SAP2000 OAPI (optional, higher fidelity), or SAP2000 table-export scrape (fallback).
+- **Forces**: by default each member is checked against closed-form per-member loads (a floor-area
+  pressure × tributary width, EN 1990 factors). With `--frame-analysis` the whole demand structure is
+  instead assembled and solved as one **simple-braced frame** in PyNiteFEA (license-free) — beams stay
+  simply-supported but column axials then come from the **real load path** (multi-storey accumulation,
+  interior vs. corner). Members without usable geometry fall back to the per-member path automatically.
 - **The LLM does no arithmetic** — every number is computed in Python and injected into the report;
   the model only writes the surrounding prose.
 
@@ -42,7 +45,7 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
 | 5 | MILP matching (the flagship) | ✅ |
 | 6 | Report (Jinja2 HTML) + provider-agnostic LLM narrative | ✅ (Gemini verified live; Ollama optional) |
 | 7 | Real LTB (χ_LT), IFC extractor, Streamlit dashboard, trained-model artifacts | ✅ |
-| 7+ | Cutting-stock (1 member → many cuts), SAP2000 backend, multi-objective | ⬜ optional |
+| 7+ | Cutting-stock (1 member → many cuts, `--cut`) ✅ · **Global frame analysis** (`--frame-analysis`: gravity load path + EN 5.3.2 sway EHF + `--wind` + EN 1998 `--seismic` lateral force + P-Δ via PyNite) ✅ · SAP2000 backend, modal-spectrum seismic, multi-objective ⬜ | ◑ partial |
 
 Entry points:
 

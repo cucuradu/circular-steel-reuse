@@ -107,3 +107,28 @@ def test_default_column_load_is_pure_axial_no_moment():
     col = ExtractedMember(id="c", role="column", length_mm=4000)
     load = AreaLoadModel().loads_for(col)
     assert load.axial_N == pytest.approx(83025.0) and load.axial_moment_Nmm == 0.0
+
+
+def test_combination_loads_gravity_only_by_default():
+    # phi = 0 (default): the envelope is a single gravity combination for both beams and columns,
+    # so the matcher behaves exactly as before (no numeric change).
+    m = AreaLoadModel()
+    col = ExtractedMember(id="c", role="column", length_mm=4000)
+    beam = ExtractedMember(id="b", role="beam", spans_mm=[6000])
+    assert [name for name, _ in m.combination_loads(col)] == ["ULS gravity"]
+    assert [name for name, _ in m.combination_loads(beam)] == ["ULS gravity"]
+
+
+def test_combination_loads_adds_sway_imperfection_for_columns():
+    # phi > 0 adds an EN 5.3.2 sway-imperfection combination for columns: same axial, plus a notional
+    # moment M = N * phi * L. Beams are unaffected at member level (still one combination).
+    m = AreaLoadModel(notional_phi=0.005)  # 1/200
+    col = ExtractedMember(id="c", role="column", length_mm=4000)
+    combos = m.combination_loads(col)
+    assert [name for name, _ in combos] == ["ULS gravity", "ULS gravity + sway imperfection"]
+    grav, sway = combos[0][1], combos[1][1]
+    assert sway.axial_N == pytest.approx(grav.axial_N)
+    assert sway.axial_moment_Nmm == pytest.approx(grav.axial_N * 0.005 * 4000)
+
+    beam = ExtractedMember(id="b", role="beam", spans_mm=[6000])
+    assert len(m.combination_loads(beam)) == 1

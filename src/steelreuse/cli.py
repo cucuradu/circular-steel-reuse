@@ -45,10 +45,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--col-floors", type=float, default=1.0, help="floors a column accumulates")
     ap.add_argument("--col-ecc", type=float, default=0.0,
                     help="notional column moment eccentricity (mm); 0 = pure axial")
+    ap.add_argument("--phi", type=float, default=0.0,
+                    help="EN 1993-1-1 5.3.2 global sway imperfection for the load-combination "
+                         "envelope (e.g. 0.005 = 1/200); 0 = gravity only")
     ap.add_argument("--trib-from-geometry", action="store_true",
                     help="estimate per-beam width AND per-column tributary area/floors from geometry")
     ap.add_argument("--all-demand", action="store_true",
                     help="also slot non-steel demand (concrete, joists); default is steel members only")
+    ap.add_argument("--cut", action="store_true",
+                    help="cutting-stock: allow one donor to be cut into several pieces for several "
+                         "slots (default: one piece per donor)")
+    ap.add_argument("--frame-analysis", action="store_true",
+                    help="derive member forces from a global frame solve (PyNite) instead of "
+                         "per-member closed forms; column axials then come from the real load path. "
+                         "With --phi, the sway imperfection is applied as frame equivalent horizontal "
+                         "forces (EN 5.3.2) + a 2nd-order P-Delta solve")
+    ap.add_argument("--pdelta", action="store_true",
+                    help="force a 2nd-order (P-Delta) frame solve even without --phi "
+                         "(only with --frame-analysis)")
+    ap.add_argument("--wind", type=float, default=0.0,
+                    help="net horizontal wind pressure (kN/m^2, EN 1991-1-4 input) applied as frame "
+                         "storey forces (only with --frame-analysis; needs a 3-D model)")
+    ap.add_argument("--seismic", type=float, default=0.0,
+                    help="EN 1998-1 base-shear coefficient Cs = Sd(T1)*lambda/g; applies the lateral "
+                         "force method as frame storey forces (only with --frame-analysis)")
     # Legacy flat model: if either is given, override the area model with one UDL / one axial.
     ap.add_argument("--beam-udl", type=float, default=None, help="[legacy] flat beam UDL (kN/m == N/mm)")
     ap.add_argument("--column-axial", type=float, default=None, help="[legacy] flat column axial (kN)")
@@ -66,10 +86,13 @@ def main(argv: list[str] | None = None) -> int:
             dead_kpa=args.dead, live_kpa=args.live, gamma_g=args.gamma_g, gamma_q=args.gamma_q,
             beam_tributary_width_m=args.trib_width, column_tributary_area_m2=args.col_trib_area,
             column_floors=args.col_floors, column_eccentricity_mm=args.col_ecc,
+            notional_phi=args.phi,
         )
     res = run_pipeline(
         args.donor, args.demand, loads=loads, knockdown=args.knockdown,
         steel_only_demand=not args.all_demand, tributary_from_geometry=args.trib_from_geometry,
+        allow_cutting=args.cut, frame_analysis=args.frame_analysis, second_order=args.pdelta,
+        wind_kpa=args.wind, seismic_cs=args.seismic,
     )
 
     ctx = build_report_context(res)
@@ -82,13 +105,29 @@ def main(argv: list[str] | None = None) -> int:
 
     if isinstance(loads, AreaLoadModel):
         trib = "geometry-estimated" if args.trib_from_geometry else f"{args.trib_width:g} m"
+        combos = f"gravity + sway imperfection (phi={args.phi:g})" if args.phi > 0 else "gravity only"
         print(f"Loads: area-based, {args.dead:g}+{args.live:g} kN/m^2 (G+Q), "
               f"ULS {args.gamma_g:g}G+{args.gamma_q:g}Q, tributary {trib}; "
+              f"combinations: {combos}; "
               f"demand={'steel only' if not args.all_demand else 'all members'}")
+    if res.frame is not None:
+        if res.frame.ok:
+            extra = (f", {len(res.frame.skipped_member_ids)} fell back to analytic"
+                     if res.frame.skipped_member_ids else "")
+            notes = f" [{'; '.join(res.frame.warnings)}]" if res.frame.warnings else ""
+            print(f"Forces: frame analysis (PyNite) — {res.frame.node_count} nodes, "
+                  f"{res.frame.member_count} members{extra}{notes}")
+        else:
+            why = res.frame.warnings[0] if res.frame.warnings else "unavailable"
+            print(f"Forces: analytic (frame analysis not applied — {why})")
     print(f"Mapping: {res.validation.summary()}")
-    print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}")
+    print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
+          f"{' (cutting-stock)' if args.cut else ''}")
     print(f"CO2e saved by matches: {res.match.total_co2_saved_kg:.1f} kg "
           f"(full donor stock potential: {res.passport.total_saved_kgco2e:.1f} kg)")
+    if args.cut and res.match.donor_leftover_mm:
+        print(f"Cut donors: {len(res.match.donor_leftover_mm)} | reusable remainder "
+              f"{res.match.total_donor_leftover_mm / 1000.0:.1f} m")
     if res.match.unmatched_slots:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
     print(f"Narrative source: {source}")

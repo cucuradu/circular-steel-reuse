@@ -4,9 +4,11 @@ Pipeline:
   1. Build a **sparse feasibility mask** — a (supply, slot) pair is allowed only if the reclaimed
      member is long enough AND passes the exact EN 1993 check for that slot's forces. Most pairs are
      infeasible and never enter the model (this is what tames the MILP size, flaw #7).
-  2. Solve a **MILP** (PuLP/CBC): binary x_ij, each slot <= 1 supply, each supply used <= 1,
-     maximizing CO2 saved minus an off-cut penalty minus a per-reuse connection-refabrication penalty
-     (flaw #1 — connections are never treated as free).
+  2. Solve a **MILP** (PuLP/CBC): binary x_ij, each slot <= 1 supply, maximizing CO2 saved minus an
+     off-cut penalty minus a per-reuse connection-refabrication penalty (flaw #1 — connections are
+     never treated as free). Each supply is used at most once by default; with ``allow_cutting`` the
+     **cutting-stock** model instead bounds each donor by its length so it can be cut into several
+     pieces for several slots.
   3. If the solver is unavailable/stalls, fall back to a greedy assignment.
 
 All numbers are computed here so they can be injected verbatim into the report; the LLM never
@@ -41,9 +43,18 @@ class DemandSlot:
     member_id: str
     role: str
     required_length_mm: float
-    demand: MemberDemand
+    demand: MemberDemand               # primary (gravity) combination — kept for back-compat
     grade: str | None = None         # design grade of the new member (for the avoided-new baseline)
     design_section: str | None = None  # canonical section the new design specified, if known
+    # The full ULS load-combination envelope: (name, demand) per design situation. When unset, the
+    # slot behaves as a single gravity combination (``demand``). The matcher checks the member against
+    # every combination and reports the governing (worst-utilisation) one; a reuse passes only if it
+    # passes them all.
+    demands: list[tuple[str, MemberDemand]] | None = None
+
+    @property
+    def combinations(self) -> list[tuple[str, MemberDemand]]:
+        return self.demands if self.demands else [("ULS gravity", self.demand)]
 
 
 @dataclass
@@ -58,6 +69,7 @@ class Assignment:
     score: float
     chi_lt: float | None = None       # LTB reduction used (1.0 if restrained, None if no bending)
     chi_lt_if_free: float | None = None  # what chi_LT would be if the flange were unrestrained
+    governing_combination: str = "ULS gravity"  # load combination that drove the utilisation
 
 
 @dataclass
@@ -67,6 +79,9 @@ class MatchResult:
     unused_supply: list[str]
     solver_status: str
     weights: dict = field(default_factory=dict)
+    # Cutting-stock mode only: leftover length (mm) of each donor that was cut, after all its pieces
+    # (empty in the default one-piece-per-donor mode, where the off-cut is the per-assignment value).
+    donor_leftover_mm: dict[str, float] = field(default_factory=dict)
 
     @property
     def total_co2_saved_kg(self) -> float:
@@ -75,6 +90,11 @@ class MatchResult:
     @property
     def total_offcut_mm(self) -> float:
         return sum(a.offcut_mm for a in self.assignments)
+
+    @property
+    def total_donor_leftover_mm(self) -> float:
+        """Total reusable remainder across cut donors (cutting-stock mode)."""
+        return sum(self.donor_leftover_mm.values())
 
     @property
     def n_reused(self) -> int:
@@ -94,12 +114,18 @@ class _Cell:
     score: float
     chi_lt: float | None = None
     chi_lt_if_free: float | None = None
+    governing_combination: str = "ULS gravity"
+    used_len_mm: float = 0.0   # length this piece consumes from the donor (for the cutting-stock cap)
 
 
-def _passes(sec: SectionProps, grade: str, demand: MemberDemand, knockdown: float = 1.0) -> bool:
-    """The single feasibility bar reused by both supply and the avoided-new baseline."""
-    res = check_member(sec, grade, demand, knockdown)
-    return res.status != "FAIL" and res.utilization <= 1.0
+def _passes_all(sec: SectionProps, grade: str, slot: DemandSlot, knockdown: float = 1.0) -> bool:
+    """Feasibility bar across the whole load-combination envelope: the section must pass *every*
+    combination. Reused by both the supply check and the avoided-new baseline."""
+    for _name, demand in slot.combinations:
+        res = check_member(sec, grade, demand, knockdown)
+        if res.status == "FAIL" or res.utilization > 1.0:
+            return False
+    return True
 
 
 def _degenerate(slot: DemandSlot) -> bool:
@@ -107,9 +133,11 @@ def _degenerate(slot: DemandSlot) -> bool:
     checks. Such slots are dropped (and surface as unmatched) rather than crashing the run."""
     if slot.required_length_mm <= 0:
         return True
-    d = slot.demand
-    needs_buckling_len = d.N_Ed > 0 or (abs(d.My_Ed) > 0 and not d.compression_flange_restrained)
-    return needs_buckling_len and d.L <= 0
+    for _name, d in slot.combinations:
+        needs_buckling_len = d.N_Ed > 0 or (abs(d.My_Ed) > 0 and not d.compression_flange_restrained)
+        if needs_buckling_len and d.L <= 0:
+            return True
+    return False
 
 
 def _slot_standard(slot: DemandSlot, catalog: dict[str, SectionProps]) -> str | None:
@@ -154,7 +182,7 @@ def baseline_new_mass_kg(
     for sec in catalog.values():
         if target_std is not None and sec.standard != target_std:
             continue
-        if _passes(sec, grade, slot.demand):
+        if _passes_all(sec, grade, slot):
             mass = sec.mass_kgm * slot.required_length_mm / 1000.0
             if best is None or mass < best:
                 best = mass
@@ -171,6 +199,7 @@ def _feasible_cell(
     w_offcut: float,
     connection_penalty_kg: float,
     baseline_mass_kg: float | None,
+    allow_cutting: bool = False,
 ) -> _Cell | None:
     """Return an economics cell if the pair is feasible, else ``None``."""
     # Skip degenerate geometry (garbage rows) before any EN check that could divide by zero; such
@@ -182,9 +211,15 @@ def _feasible_cell(
     sec = catalog.get(supply.section)
     if sec is None:
         return None
-    res = check_member(sec, supply.grade or "S235", slot.demand, supply.knockdown)
-    if res.status == "FAIL" or res.utilization > 1.0:
-        return None
+    # Verify the reclaimed member against every load combination; the governing (worst-utilisation)
+    # one is what we report. A single failing combination makes the pair infeasible.
+    res = governing_name = None
+    for name, demand in slot.combinations:
+        r = check_member(sec, supply.grade or "S235", demand, supply.knockdown)
+        if r.status == "FAIL" or r.utilization > 1.0:
+            return None
+        if res is None or r.utilization > res.utilization:
+            res, governing_name = r, name
 
     used_len = slot.required_length_mm
     offcut_mm = supply.length_mm - used_len
@@ -198,16 +233,22 @@ def _feasible_cell(
     # headline "CO2 saved" matches the basis the optimiser actually used (no silent over-count).
     avoided_new = (baseline_mass_kg if baseline_mass_kg is not None else mass_used) * factor.a1a3
     co2_saved = avoided_new - mass_used * factor.reuse_process - connection_penalty_kg
-    # The off-cut term is a *soft preference* only: the remainder is cut off and returns to stock, it
-    # is not emitted, so it steers the optimiser away from wasting long stock but is deliberately not
-    # booked into co2_saved.
-    score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg
+    if allow_cutting:
+        # Cutting-stock: one donor can serve several slots, so the remainder is genuinely reusable
+        # (tracked per donor after the solve, not per piece). Don't penalise off-cut here — that bias
+        # against long stock is exactly what cutting-stock removes (FUTURE_IMPROVEMENTS #9).
+        cell_offcut, score = 0.0, co2_saved
+    else:
+        # One-piece-per-donor: the remainder is cut off and returns to stock (not emitted), so the
+        # off-cut is a *soft preference* that steers away from wasting long stock — not booked CO2.
+        cell_offcut = offcut_mm
+        score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg
     # Surface the LTB factor for the report: chi_LT used, and what it would be if unrestrained.
     bending = next((c for c in res.checks if c.name == "bending_y"), None)
     chi_lt = bending.detail.get("chi_LT") if bending else None
     chi_lt_if_free = bending.detail.get("chi_LT_if_unrestrained", chi_lt) if bending else None
-    return _Cell(si, sj, res.utilization, res.status, offcut_mm, co2_saved, score,
-                 chi_lt, chi_lt_if_free)
+    return _Cell(si, sj, res.utilization, res.status, cell_offcut, co2_saved, score,
+                 chi_lt, chi_lt_if_free, governing_name or "ULS gravity", used_len_mm=used_len)
 
 
 def match(
@@ -219,10 +260,19 @@ def match(
     connection_penalty_kg: float = 5.0,
     time_limit_s: float = 30.0,
     new_build_grade: str = "S355",
+    allow_cutting: bool = False,
 ) -> MatchResult:
-    """Optimal supply->slot assignment maximizing net CO2 saved (with greedy fallback)."""
+    """Optimal supply->slot assignment maximizing net CO2 saved (with greedy fallback).
+
+    ``allow_cutting`` switches on the **cutting-stock** model: one donor may be cut into several pieces
+    to fill several slots, bounded by its length (``sum(required_len + cut tolerance) <= donor length``)
+    instead of the default one-piece-per-donor rule. This removes the bias against long stock and books
+    each filled slot's avoided-new saving; the leftover of each cut donor is reported as reusable
+    remainder (``MatchResult.donor_leftover_mm``).
+    """
     factor = (factors or load_factors())["steel"]
-    weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg}
+    weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg,
+               "allow_cutting": allow_cutting}
 
     # Avoided-new baseline per slot (lightest adequate section), computed once — see A1.
     baselines = [baseline_new_mass_kg(slot, catalog, new_build_grade) for slot in slots]
@@ -231,7 +281,7 @@ def match(
     for i, sup in enumerate(supply):
         for j, slot in enumerate(slots):
             cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
-                                  connection_penalty_kg, baselines[j])
+                                  connection_penalty_kg, baselines[j], allow_cutting)
             if cell is not None:
                 cells.append(cell)
 
@@ -239,12 +289,15 @@ def match(
         return MatchResult([], [s.id for s in slots], [s.id for s in supply], "no_feasible_pairs",
                            weights)
 
+    caps = [s.length_mm for s in supply] if allow_cutting else None
     try:
-        chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s)
+        chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s, caps)
         if not _is_optimal(status):  # timeout / "Not Solved" -> don't trust a partial MILP result
-            chosen, status = _solve_greedy(cells, len(supply), len(slots)), f"greedy_fallback ({status})"
+            chosen, status = _solve_greedy(cells, len(supply), len(slots), caps), \
+                f"greedy_fallback ({status})"
     except Exception:  # pragma: no cover - solver edge cases -> graceful fallback
-        chosen, status = _solve_greedy(cells, len(supply), len(slots)), "greedy_fallback (solver error)"
+        chosen, status = _solve_greedy(cells, len(supply), len(slots), caps), \
+            "greedy_fallback (solver error)"
 
     assignments = [
         Assignment(
@@ -253,17 +306,28 @@ def match(
             offcut_mm=round(c.offcut_mm, 1), co2_saved_kg=round(c.co2_saved_kg, 2),
             score=round(c.score, 2),
             chi_lt=c.chi_lt, chi_lt_if_free=c.chi_lt_if_free,
+            governing_combination=c.governing_combination,
         )
         for c in chosen
     ]
     used_supply = {a.supply_id for a in assignments}
     filled_slots = {a.slot_id for a in assignments}
+    # Cutting-stock: report each cut donor's leftover length (its length minus the pieces taken, each
+    # piece consuming required_len + the cut tolerance).
+    leftover: dict[str, float] = {}
+    if allow_cutting:
+        consumed: dict[int, float] = {}
+        for c in chosen:
+            consumed[c.si] = consumed.get(c.si, 0.0) + c.used_len_mm + CUT_TOLERANCE_MM
+        for i, used in consumed.items():
+            leftover[supply[i].id] = round(max(supply[i].length_mm - used, 0.0), 1)
     return MatchResult(
         assignments=assignments,
         unmatched_slots=[s.id for s in slots if s.id not in filled_slots],
         unused_supply=[s.id for s in supply if s.id not in used_supply],
         solver_status=status,
         weights=weights,
+        donor_leftover_mm=leftover,
     )
 
 
@@ -273,7 +337,8 @@ def _is_optimal(status: str) -> bool:
     return status == "Optimal"
 
 
-def _solve_milp(cells, n_supply, n_slots, time_limit_s) -> tuple[list[_Cell], str]:
+def _solve_milp(cells, n_supply, n_slots, time_limit_s,
+                caps: list[float] | None = None) -> tuple[list[_Cell], str]:
     prob = pulp.LpProblem("reuse_matching", pulp.LpMaximize)
     x = {(c.si, c.sj): pulp.LpVariable(f"x_{c.si}_{c.sj}", cat="Binary") for c in cells}
     prob += pulp.lpSum(c.score * x[(c.si, c.sj)] for c in cells)
@@ -282,10 +347,16 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s) -> tuple[list[_Cell], st
         terms = [x[(c.si, c.sj)] for c in cells if c.sj == j]
         if terms:
             prob += pulp.lpSum(terms) <= 1
-    for i in range(n_supply):  # each supply used at most once
-        terms = [x[(c.si, c.sj)] for c in cells if c.si == i]
-        if terms:
-            prob += pulp.lpSum(terms) <= 1
+    for i in range(n_supply):
+        cells_i = [c for c in cells if c.si == i]
+        if not cells_i:
+            continue
+        if caps is None:  # default: each supply used at most once
+            prob += pulp.lpSum(x[(c.si, c.sj)] for c in cells_i) <= 1
+        else:  # cutting-stock: total length cut from this donor must fit its length
+            prob += pulp.lpSum(
+                (c.used_len_mm + CUT_TOLERANCE_MM) * x[(c.si, c.sj)] for c in cells_i
+            ) <= caps[i]
 
     prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=time_limit_s))
     status = pulp.LpStatus[prob.status]
@@ -293,20 +364,31 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s) -> tuple[list[_Cell], st
     return chosen, status
 
 
-def _solve_greedy(cells, n_supply, n_slots) -> list[_Cell]:
-    """Take highest-score feasible pairs first, respecting one-use-each constraints.
+def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> list[_Cell]:
+    """Take highest-score feasible pairs first, respecting the use constraints.
 
     Only net-positive pairs are taken: the MILP leaves a negative-score x_ij at 0, so the greedy
     fallback must match that — never book a reuse whose net benefit is negative just to fill a slot.
-    Cells are sorted by descending score, so the first non-positive one ends the scan.
+    Cells are sorted by descending score, so the first non-positive one ends the scan. Each slot is
+    filled once; a donor is either used once (default) or packed up to its length (cutting-stock).
     """
-    used_s, used_j, chosen = set(), set(), []
+    used_j, chosen = set(), []
+    remaining = list(caps) if caps is not None else None  # per-donor remaining length (cutting mode)
+    used_s: set[int] = set()
     for c in sorted(cells, key=lambda c: c.score, reverse=True):
         if c.score <= 0:
             break
-        if c.si in used_s or c.sj in used_j:
+        if c.sj in used_j:
             continue
+        if remaining is None:
+            if c.si in used_s:
+                continue
+        else:
+            need = c.used_len_mm + CUT_TOLERANCE_MM
+            if remaining[c.si] < need:
+                continue
+            remaining[c.si] -= need
         chosen.append(c)
-        used_s.add(c.si)
         used_j.add(c.sj)
+        used_s.add(c.si)
     return chosen
