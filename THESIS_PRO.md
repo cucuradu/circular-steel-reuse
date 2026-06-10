@@ -596,15 +596,17 @@ the whole pipeline with every stage asserted against the hand chain); the worked
 self‑derived, so a cross‑check against an independently *published* design example remains a
 worthwhile addition.
 
-**Priority roadmap.** (1) ~~extend the connection screen toward capacity~~ **done** (§9.1.1 — standard
-fin‑plate shear screen; bespoke connection design remains out of scope); (2) ~~full 6.3.3 and biaxial
-interaction~~ **done** (§6.5); (3) ~~construction‑stage
-(bare‑steel) case~~ **done** (§5.3, opt‑in `--construction`);
-(4) calibrate the audit condition→knockdown factors against test data; (5) formal schedule‑count
-validation + re‑extraction with measured dimensions; (6) a complete combination set (pattern, uplift)
-and modal seismic; (7) ~~shear–moment (6.2.8) interaction~~ **done** (§6.5); (8) IFC coordinate export; (9) effective‑length
-inference; (10) shape‑aware checks for channels/angles/round tube and the small European sizes;
-(11) multi‑objective optimisation; (12) an independently published validation benchmark.
+**Priority roadmap.** Four items of the original register are now implemented and described in the
+body: connection‑screen shear capacity (§9.1.1), the full 6.3.3 biaxial interaction (§6.5), the
+construction‑stage case (§5.3) and the shear–moment interaction (§6.2). What remains, in priority
+order: (1) calibrate the audit condition→knockdown factors against test data; (2) formal
+schedule‑count validation plus re‑extraction with measured dimensions; (3) a complete combination set
+(pattern loading, uplift/load reversal) and modal seismic; (4) IFC coordinate export;
+(5) effective‑length inference; (6) shape‑aware checks for channels/angles/round tube and the small
+European sizes; (7) multi‑objective optimisation; (8) an independently published validation benchmark.
+The full all‑fronts idea register (BIM round‑trip, review‑queue UX, property‑based testing, transport
+emissions, statistical f_y from coupon results per EN 1990 Annex D, …) lives in the repository's
+`FUTURE_IMPROVEMENTS.md`.
 
 ---
 

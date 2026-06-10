@@ -25,6 +25,11 @@
       CPython 3.12 has a Revit-2026 bug ("input string '3.12.3' was not in a correct format"). The
       extractor is stdlib-only and works fine on IronPython 3.
 
+> **Engineering ideas live elsewhere:** the full all-fronts backlog (checks, actions, frame,
+> matching, carbon, BIM round-trip, app/UX, software quality, validation, PDA) is in
+> [FUTURE_IMPROVEMENTS.md → "Ideas backlog — 2026-06-10 brainstorm"](FUTURE_IMPROVEMENTS.md).
+> The items below are the only ones blocked on a human + Revit.
+
 ## 2. Re-extract with the dimension-capturing extractor + validate member count
 
 - [ ] **Re-run SteelReuse → Extract** on both models (the extractor now also captures measured section

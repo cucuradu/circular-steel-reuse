@@ -299,6 +299,132 @@ flow into the result, not the survey itself. The condition→knockdown factors a
 
 ---
 
+## Ideas backlog — 2026-06-10 brainstorm (all fronts)
+
+A curated, all-sides idea sweep recorded before the next re-extraction. ★ marks the ten items judged
+best value-for-effort. Nothing here is committed work; promote an item by moving it into a Tier above
+with an owner and a fix sketch.
+
+### I-1. Structural checks (depth)
+- ★ **Effective length from the frame.** Compute `α_cr` (amplified-sway ratio or a PyNite buckling
+  solve) → non-sway classification per EN 1993-1-1 5.2.1(3) (`α_cr ≥ 10`), auto-decide when 2nd-order
+  is mandatory, and support a per-member `k` override (JSON field + CSV) instead of blanket `k = 1.0`.
+- **C_m from the moment shape.** The frame solve knows each member's end-moment ratio ψ → Annex B
+  Table B.3 `C_m` instead of the conservative 1.0; the same data yields **C₁** for `M_cr` (sharper LTB).
+- **Class 4 effective-section properties** (EN 1993-1-5 §4) so slender sections get a number, not
+  just REVIEW.
+- **Net-section at existing bolt holes** (`0.9·A_net·f_u/γ_M2`): reclaimed members arrive with holes.
+  Add a per-end hole register to the PDA schema; deduct in tension/bending. Genuinely reuse-specific.
+- **Corrosion section loss**: PDA field "measured thickness loss (%)" → scale `t/A/W/I` per member
+  before checking (today condition only knocks down f_y, which is not the right physics for section loss).
+- **Web bearing/buckling at new support points** (EN 1993-1-5 §6): a reused beam is re-supported at
+  new locations; flag where stiffeners would be needed.
+- **Floor-vibration screen**: `f₁ ≈ 18/√δ_perm`; flag floors below ~4 Hz. Cheap and very professional.
+
+### I-2. Actions & combinations
+- ★ **Load reversal / wind-uplift case** (`1.0·G + 1.5·W`): hogging puts the **bottom** flange in
+  compression where no slab restrains it — the one remaining non-conservative blind spot of the
+  restrained-flange default. Needs the wind path + a reversed-restraint LTB check.
+- **Pattern live load** for continuous beams in the frame path (alternate-span DL/LL cases).
+- **ψ-factors by occupancy category** (EN 1990 Table A1.1) instead of the fixed 0.7/0.3.
+- **Snow** (EN 1991-1-3) for roof members (detectable: highest-level beams).
+- **Flip `φ = 1/200` ON by default** — imperfections always exist; one line, honest default
+  (documented byte-identical escape hatch: `--phi 0`).
+
+### I-3. Frame analysis
+- ★ **Member rotation capture** (Revit *Cross-Section Rotation* parameter) → correct local→section
+  axis mapping, closing the biaxial orientation residual (METHODOLOGY §9 register row).
+- **Modal analysis → T₁ → EN 1998 design spectrum → derive Cs** in-tool (today Cs is a user input).
+- **Moment-frame / semi-rigid option**: capture per-end releases from Revit instead of assuming all
+  beams pinned; opens portal-frame donors/demands.
+- **Rigid-diaphragm constraint** per floor (better lateral force distribution than equal lumping).
+- **Mechanism auto-repair** for irregular multi-piece BIM (existing residual): per-piece solves,
+  detection of under-constrained pieces, user-guided support assignment.
+
+### I-4. Matching & optimisation
+- ★ **Multi-objective**: CO₂ + cost (€/t reclaimed vs new + refabrication) + transport. Weighted-sum
+  in the existing MILP first; pymoo NSGA-II for a Pareto front later (optional extra exists).
+- ★ **A4 transport emissions**: donor-site and new-site locations → t·km × mode factor, added to the
+  passport and the optimiser's net figure. The most-asked LCA question.
+- **Donor splicing** (two donors → one long slot; the converse of cutting-stock, with a splice
+  penalty + connection screen on the joint).
+- **Same-section grouping preference**: soft objective term rewarding repeated sections across slots
+  (constructability / fewer connection types).
+- **Residual-stock export**: unmatched donors → a CSV directly loadable as the *next* project's
+  supply — circularity chaining, a strong thesis narrative.
+- **Match robustness badge**: rerun the match at ±10 % loads; per-assignment stability indicator
+  (stable / flips) so a marginal pairing is visible.
+
+### I-5. Carbon & LCA
+- **EN 15978/15804 module labelling**: present A1-A3, A4, D explicitly and state the avoided-burden
+  (module D) convention; selectable datasets (ICE / Ökobaudat / product EPDs) with an uncertainty
+  band propagated to the headline figure.
+- **Report visuals**: per-assignment carbon "payback" bar and a whole-project waterfall
+  (potential → screened → matched → net).
+
+### I-6. Data & BIM round-trip
+- ★ **Write-back to Revit**: a pyRevit **"Apply Matches"** button that colours reused members and
+  sets `ReusedFrom` / provenance / passport-ID parameters in the new model. The killer
+  thesis-defence demo, and it makes the tool feel like a product.
+- **IFC coordinate export** (placement transforms) so the IFC path can run frame analysis.
+- **Capture releases + rotation + grade** from Revit (feeds I-3 items directly).
+- **Extractor emits the schedule CSV itself** → `steelreuse-validate --schedule` runs with zero
+  manual steps (automates the Phase-1 completeness check forever).
+- **IFC property-set export** of the material passport (ISO 20887 / Madaster-friendly fields).
+- **`schema_version`** in the extraction JSON + a migration warning path.
+
+### I-7. App & report UX
+- ★ **Fuzzy-match review queue** in Streamlit: list quarantined names with their candidates,
+  approve/reject buttons → writes the override CSV. Closes the only human loop that today lives in
+  a bare CSV.
+- **3-D model viewer** (plotly line segments from the coordinates we already carry) coloured
+  reused / new / unknown — instant comprehension of the result.
+- **Per-assignment calc sheet**: expandable full trace — every combination, every check, the
+  numbers and the clause references. What a reviewing engineer actually wants to see.
+- **Scenario compare**: run ±cutting / ±construction / ±connection-screen side by side in the app
+  with a deltas table.
+- **CSV/Excel export** of assignments + passport; an **engineer sign-off page** in the report
+  (what was checked, what was not, what to verify manually before fabrication).
+
+### I-8. Software quality & distribution
+- ★ **Property-based tests** (`hypothesis`): encode invariants — a strictly bigger section never
+  *increases* utilisation; knockdown scales f_y linearly; `χ ≤ 1`; the governing combination's
+  utilisation ≥ every individual combination's. Catches bug classes example-based tests cannot.
+- ★ **Catalog-wide differential validation**: sweep all 711 sections against independently
+  recomputed resistances and spot-check published beam-load tables — today's hand anchors cover a
+  handful of sections.
+- **Golden-file regression**: a full-pipeline output snapshot on the bundled samples (byte-stable
+  results guard against silent numeric drift).
+- **mypy (strict) on `core/`** + a coverage threshold in CI; add **ubuntu** to the CI matrix and a
+  wheel-install smoke job (`pip install dist/*.whl && steelreuse --demo`).
+- ★ **Zenodo DOI + `CITATION.cff`** cut together with v0.2.0 — citable software in the thesis
+  bibliography; optionally PyPI + a small mkdocs site for METHODOLOGY/VALIDATION.
+- **Performance**: profile the 1000-member case; `lru_cache` the check hot path (section, fy,
+  rounded demand) if the matcher matrix ever gets slow.
+
+### I-9. Validation & academic credibility
+- ★ **Reproduce an independently published worked example** (SCI P362 / Access Steel beam-column)
+  as a test — external authority beyond our own hand algebra (thesis roadmap #12).
+- **Cross-software benchmark**: the validated 2-bay frame solved in SAP2000 via the OAPI scaffold →
+  force comparison table in thesis §11.
+- **EU showcase case study** (IPE/HE building) alongside the US one — exercises the EU catalog and
+  the EN grades end to end.
+- **Thesis sensitivity study**: CO₂ saved vs knockdown / condition mix / γ-factors (tornado chart) —
+  the question examiners reliably ask.
+- **EN 1990 Annex D statistical f_y**: when coupon results exist (n tests, V_x known/unknown),
+  derive the characteristic value statistically instead of applying a flat knockdown. Thesis-grade
+  rigour and a natural PDA extension.
+
+### I-10. Pre-demolition audit & material passport
+- ★ **Literature-calibrated condition→knockdown factors** (SCI P427 protocol, prEN reuse drafts),
+  with a citation per factor in METHODOLOGY §3.1 — today's values are representative defaults.
+- **Damage/hole register** per member → net-section deduction (I-1) and sharper recoverable length.
+- **Passport ID / QR per member** in the report — traceability from deconstruction through
+  fabrication to the new frame.
+- **Prior-use class** field (crane girder / dynamic loading history → fatigue screening flag).
+
+---
+
 ## Done in Tier 1 (for reference)
 - 🔴 Catalog/carbon CSVs moved into the package (`src/steelreuse/data/`) so an installed wheel finds
   them (was `parents[3]`, outside the wheel). Verified the wheel now bundles them.
