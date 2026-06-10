@@ -388,6 +388,19 @@ tops. **Wind** (`--wind q`, a user EN 1991‑1‑4 net pressure) is applied as s
 over the height in the inverted‑triangular first mode, with the base‑shear coefficient supplied by the
 user. The P‑Δ pass captures sway amplification.
 
+Whenever the sway imperfection runs, the frame's **sway stiffness is classified** per EN 1993‑1‑1
+§5.2.1(4)B: `α_cr = (H_Ed/V_Ed)·(h/δ_H,Ed)` per storey from the EHF drifts, minimum over storeys and
+directions. This verifies the buckling‑length convention the checker uses — `k = 1.0` system lengths
+are the §5.2.2 route (second‑order analysis with global imperfections), legitimate only when the frame
+is not grossly sway‑sensitive. `α_cr ≥ 10` is reported as non‑sway; below 10 the (already engaged)
+P‑Δ solve is doing real work; below 3 the tool warns that global stability needs a dedicated
+verification. On the §12 case study this classification immediately exposed a modelling truth:
+the bare steel skeleton (pinned beams, no bracing members — the real building's lateral system is
+non‑steel and therefore outside the model) returns `α_cr ≈ 0.2`, i.e. the model has essentially no
+lateral system of its own, and the tool says so rather than pretending otherwise. Engineers can also
+override the factors per member (`ky`/`kz` in the extraction JSON) where their own classification of
+end restraint differs.
+
 ## 7.4 Continuous members and robustness
 
 Continuous beams are split at interior supports so each span is checked over its own length and its
@@ -551,7 +564,10 @@ results are decision support, to be confirmed by a qualified engineer.
 conservative upper bound — no moment‑shape refinement) and member rotation about its own axis assumed
 at the default orientation. 🟡 Shear–moment interaction (6.2.8) treats peak `M` and `V` as coincident
 (conservative for distributed loading).
-🟠 Effective lengths are fixed at `k = 1.0`. 🟠 Class 4 sections are flagged, not designed.
+🟡 Effective lengths default to `k = 1.0` system lengths — the §5.2.2 second‑order‑plus‑imperfections
+route, whose validity the frame solve now verifies via `α_cr` (§7.3) and which the engineer can
+override per member (`ky`/`kz`); inferring `k` from buckling modes remains future work.
+🟠 Class 4 sections are flagged, not designed.
 🟡 LTB uses `C₁ = 1.0` and geometry‑approximated `I_t`/`I_w` (conservative); the slab‑restraint assumption
 is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning
 and the opt‑in construction‑stage case. 🟡 The construction‑stage (bare‑steel) case is opt‑in
@@ -566,10 +582,10 @@ assumes no overhang. 🟡 Geometry‑based load estimation is opt‑in.
 
 **Frame analysis.**
 🟠 Seismic is the simplified lateral‑force method with a user base‑shear coefficient — no modal
-response‑spectrum, accidental torsion or behaviour‑factor spectrum. 🟠 `k = 1.0` as above (the solve
-gives forces, not buckling lengths); biaxial column moments are now carried per axis into the 6.3.3
-check. 🟡 Lateral actions are applied along the X and Y axes only. 🟠 Frame analysis requires coordinates,
-which the IFC path does not yet export.
+response‑spectrum, accidental torsion or behaviour‑factor spectrum. 🟡 `k = 1.0` system lengths as
+above, now `α_cr`‑verified (§7.3) and overridable per member; biaxial column moments are carried per
+axis into the 6.3.3 check. 🟡 Lateral actions are applied along the X and Y axes only. 🟠 Frame analysis
+requires coordinates, which the IFC path does not yet export.
 
 **Data and catalogue.**
 🟡 The pyRevit extractor has been run on the live building three times; the latest extraction carries
@@ -605,7 +621,8 @@ construction‑stage case (§5.3) and the shear–moment interaction (§6.2). Wh
 order: (1) calibrate the audit condition→knockdown factors against test data; (2) the demand‑side
 schedule cross‑check in Revit (the donor side is verified: 942 + 74 match exactly); (3) a complete combination set
 (pattern loading, uplift/load reversal) and modal seismic; (4) IFC coordinate export;
-(5) effective‑length inference; (6) shape‑aware checks for channels/angles/round tube and the small
+(5) effective‑length inference from buckling modes (the `α_cr` classification + per‑member override
+are done, §7.3); (6) shape‑aware checks for channels/angles/round tube and the small
 European sizes; (7) multi‑objective optimisation; (8) an independently published validation benchmark.
 The full all‑fronts idea register (BIM round‑trip, review‑queue UX, property‑based testing, transport
 emissions, statistical f_y from coupon results per EN 1990 Annex D, …) lives in the repository's

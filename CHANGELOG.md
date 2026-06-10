@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Sway-stiffness classification (α_cr) + per-member effective-length override**: whenever the EHF
+  sway imperfection runs, the frame computes EN 1993-1-1 5.2.1(4)B `α_cr = (H/V)·(h/δ)` per storey
+  and direction from the sway drifts (`FrameResult.alpha_cr`); `α_cr ≥ 10` is reported as non-sway
+  (the checker's `k = 1.0` system-length route is thereby *verified*, EN 5.2.2), `< 10` warns
+  sway-sensitive, `< 3` demands a dedicated global-stability verification. New optional `ky`/`kz`
+  fields on demand members override the buckling-length factors per member through both the analytic
+  and frame paths. On the real case study the bare steel skeleton returns α_cr ≈ 0.2, correctly
+  exposing that the model carries no lateral system of its own.
 - **Shear–moment interaction (cl. 6.2.8)** (`core/ec3_checks.py`): above `0.5·V_pl,Rd` the bending
   check uses the ρ-reduced resistance — eq. (6.30) for rolled I/H, the conservative `(1−ρ)·M_c,Rd`
   for hollow sections — with peak M and V treated as coincident (conservative for a UDL span).

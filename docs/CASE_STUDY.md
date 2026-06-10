@@ -49,6 +49,13 @@ Narrative source: deterministic
 - **Connection screen on a real model:** with the screen in annotate mode, 8 assignments are flagged
   for connection review (standard fin-plate capacity vs the slot's worst shear, plus the geometric
   rules) — surfaced in the report's Connection column without gating any match.
+- **Sway classification exposes the missing lateral system:** running with `--phi 0.005` adds the EHF
+  sway cases and the EN 5.2.1(4)B check returns **α_cr ≈ 0.2 — strongly sway-sensitive**. That is the
+  *correct* finding, not a defect: the steel skeleton is pinned-beam gravity framing, and the real
+  building's lateral system (cores/walls/diaphragm) is non-steel and therefore outside the extraction.
+  The tool warns to verify global stability by a dedicated analysis instead of silently treating the
+  bare skeleton as laterally adequate. (Under the sway cases 46 of 181 slots reuse, ≈ 54.7 t CO₂e —
+  four marginal gravity matches correctly drop.)
 - **Matching:** the new design resolves to **181 steel slots** (after steel-only filtering, multi-span
   splitting at columns, and merging each continuous girder into a single reused member); **50 are
   filled by reclaimed members** that pass every EN 1993-1-1 load combination. Fewer but *larger* slots

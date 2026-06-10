@@ -113,6 +113,9 @@ class FrameResult:
     skipped_member_ids: list[str]     # fell back to the analytic path
     warnings: list[str] = field(default_factory=list)
     ok: bool = True                   # False if the solve failed and everything fell back
+    # EN 1993-1-1 5.2.1(4)B sway-stiffness factor per lateral direction (computed when the sway
+    # imperfection runs): alpha_cr >= 10 -> non-sway, the k = 1.0 system-length route is justified.
+    alpha_cr: dict[str, float] = field(default_factory=dict)
     # Reuse slots grouped per ORIGINAL member id (one physical member or one inter-column span). The
     # pipeline consumes this; ``demands_by_member`` above keeps the raw per-solved-segment physics view.
     slots_by_member: dict[str, list[FrameSlot]] = field(default_factory=dict)
@@ -160,7 +163,7 @@ def _expand_spans_tracked(members) -> tuple[list, set[tuple[str, str]]]:
             out.append(ExtractedMember(
                 id=sid, role="beam", section=m.section, material_grade=m.material_grade,
                 raw_section=m.raw_section, start_xyz=p0, end_xyz=p1,
-                spans_mm=[span], length_mm=span))
+                spans_mm=[span], length_mm=span, ky=m.ky, kz=m.kz))
             if k > 0:
                 interior_ends.add((sid, "i"))   # start continues the previous span
             if k < n - 1:
@@ -225,7 +228,7 @@ def split_columns_at_framing(members, snap_tol_mm: float = 50.0) -> list:
                 id=f"{m.id}@{k}", role="column", section=m.section,
                 material_grade=m.material_grade, raw_section=m.raw_section,
                 start_xyz=[cx, cy, za], end_xyz=[cx, cy, zb],
-                spans_mm=[zb - za], length_mm=zb - za))
+                spans_mm=[zb - za], length_mm=zb - za, ky=m.ky, kz=m.kz))
     return out
 
 
@@ -340,6 +343,60 @@ def _stabilize_topology(topo: Topology) -> list[str]:
 # ---------------------------------------------------------------------------
 # Wind storey forces
 # ---------------------------------------------------------------------------
+
+def sway_alpha_cr(storeys: list[tuple[float, float, float, float]]) -> float | None:
+    """EN 1993-1-1 eq. (5.2): alpha_cr = (H_Ed/V_Ed)*(h/delta_H), minimum over storeys.
+
+    ``storeys`` carries one tuple per storey: (h_mm, H_N, V_N, drift_mm) — storey height, the total
+    horizontal force applied at/above the storey top, the vertical load carried through the storey,
+    and the inter-storey drift under those horizontal forces. Storeys with no vertical load or no
+    measurable drift (rigid, e.g. fully braced in that direction) are skipped; returns ``None`` when
+    nothing is assessable.
+    """
+    values = [(H / V) * (h / d) for h, H, V, d in storeys if V > 0.0 and d > 1e-9 and H > 0.0]
+    return min(values) if values else None
+
+
+def _compute_alpha_cr(fm, topo: Topology, members_by_id, nhf_forces: dict[str, float],
+                      grav_name: str, direction: str, acr_combo: str, level_tol: float) -> float | None:
+    """Sway-stiffness alpha_cr for one lateral direction from the solved frame.
+
+    Per storey (consecutive node levels): H = sum of the EHF applied at/above the storey top;
+    V = sum of the gravity column axials passing through the storey; drift = difference of the
+    mean level displacement (DX/DY) under the lateral-only combination ``acr_combo``.
+    """
+    nodes = list(topo.nodes.values())
+    levels = _cluster_levels([n.z for n in nodes], level_tol)
+    if len(levels) < 2:
+        return None
+    disp_attr = "DX" if direction == "FX" else "DY"
+
+    def level_nodes(z):
+        return [n for n in nodes if abs(n.z - z) <= level_tol]
+
+    def mean_disp(z):
+        ds = [getattr(fm.nodes[n.name], disp_attr).get(acr_combo, 0.0) for n in level_nodes(z)]
+        return sum(ds) / len(ds) if ds else 0.0
+
+    storeys: list[tuple[float, float, float, float]] = []
+    for z_lo, z_hi in zip(levels, levels[1:], strict=False):
+        h = z_hi - z_lo
+        if h <= level_tol:
+            continue
+        H = sum(f for nid, f in nhf_forces.items() if topo.nodes[nid].z >= z_hi - level_tol)
+        mid_z = (z_lo + z_hi) / 2.0
+        V = 0.0
+        for mid, (i, j) in topo.member_nodes.items():
+            if members_by_id[mid].role != "column":
+                continue
+            lo = min(topo.nodes[i].z, topo.nodes[j].z)
+            hi = max(topo.nodes[i].z, topo.nodes[j].z)
+            if lo <= mid_z <= hi:
+                V += max(_governing_axial(fm.members[mid], grav_name), 0.0)
+        drift = abs(mean_disp(z_hi) - mean_disp(z_lo))
+        storeys.append((h, H, V, drift))
+    return sway_alpha_cr(storeys)
+
 
 def _cluster_levels(z_values, tol: float) -> list[float]:
     """Cluster elevations into storey levels; returns a representative z per level (sorted)."""
@@ -571,7 +628,8 @@ def _build_slots_by_member(
                     My_Ed=max(d.My_Ed for d in ds),
                     Mz_Ed=max(d.Mz_Ed for d in ds),
                     Vz_Ed=max(d.Vz_Ed for d in ds),
-                    L=length, compression_flange_restrained=restrained, w_service=w_serv,
+                    L=length, ky=ds[0].ky, kz=ds[0].kz,
+                    compression_flange_restrained=restrained, w_service=w_serv,
                 )))
             slots.append(FrameSlot(f"{orig}#{gi}", orig, role, length, envelope))
         slots_by_member[orig] = slots
@@ -685,6 +743,7 @@ def analyze_frame(
         warnings.append(f"pruned {len(pruned_free)} member(s) with a free/unsupported end "
                         "(fell back to analytic)")
     nhf_cases: dict[str, str] = {}     # lateral dir -> sway load-case name (for the wind combos)
+    nhf_forces: dict[str, dict[str, float]] = {}   # lateral dir -> {node: EHF} (for alpha_cr)
 
     # EN 1993-1-1 5.3.2 global sway imperfection as **equivalent horizontal forces** (the frame-level
     # treatment, replacing the member-level notional moment): H_i = phi * N_Ed,col applied at each column
@@ -703,19 +762,24 @@ def analyze_frame(
                 return _fallback(f"frame pre-solve failed ({exc}) — using analytic loads")
             for d in options.lateral_dirs:
                 case = f"NHF_{d}"
-                applied = False
+                applied: dict[str, float] = {}        # node -> EHF (for the alpha_cr storey shears)
                 for mid, (i, j) in columns:
                     n = _governing_axial(fm.members[mid], grav_name)
                     if n > 0.0:                       # compression columns shed a notional sway force
                         top = i if topo.nodes[i].z >= topo.nodes[j].z else j
-                        fm.add_node_load(top, d, options.notional_phi * n, case=case)
-                        applied = True
+                        force = options.notional_phi * n
+                        fm.add_node_load(top, d, force, case=case)
+                        applied[top] = applied.get(top, 0.0) + force
                 if applied:
                     nhf_cases[d] = case
+                    nhf_forces[d] = applied
                     sway = (f"ULS gravity + sway {d[-1]}",
                             {"DL": gamma_g, "LL": gamma_q, case: 1.0})
                     fm.add_load_combo(sway[0], dict(sway[1]))
                     uls_combos.append(sway)
+                    # Lateral-only combination, used solely to read the sway drifts for alpha_cr
+                    # (EN 5.2.1(4)B). Not a design situation -> NOT appended to uls_combos.
+                    fm.add_load_combo(f"_acr_{d}", {case: 1.0})
             if nhf_cases:
                 warnings.append(f"applied EN 5.3.2 sway imperfection (EHF) in {len(nhf_cases)} direction(s)")
 
@@ -771,6 +835,31 @@ def analyze_frame(
     if second_order:
         warnings.append("2nd-order (P-Delta) solve")
 
+    # Sway-stiffness classification, EN 1993-1-1 5.2.1(4)B: alpha_cr = (H/V)*(h/delta) per storey,
+    # from the EHF drifts. This *verifies* the k = 1.0 system-length route the checker uses
+    # (5.2.2: 2nd-order analysis + global imperfections): alpha_cr >= 10 -> non-sway, k = 1.0 sound;
+    # below 10 the P-Delta solve (already engaged whenever phi > 0) is doing real work; below 3 the
+    # frame is so sway-sensitive that a dedicated global stability verification is warranted.
+    alpha_cr: dict[str, float] = {}
+    if nhf_forces:
+        grav_name = uls_combos[0][0]
+        for d, forces in nhf_forces.items():
+            a = _compute_alpha_cr(fm, topo, members_by_id, forces, grav_name, d,
+                                  f"_acr_{d}", options.level_tol_mm)
+            if a is not None:
+                alpha_cr[d] = a
+        if alpha_cr:
+            worst = min(alpha_cr.values())
+            if worst >= 10.0:
+                warnings.append(f"sway check: alpha_cr = {worst:.1f} >= 10 (non-sway; "
+                                "k = 1.0 system lengths justified)")
+            elif worst >= 3.0:
+                warnings.append(f"sway-sensitive frame: alpha_cr = {worst:.1f} < 10 — "
+                                "2nd-order effects significant (P-Delta solve engaged)")
+            else:
+                warnings.append(f"STRONGLY sway-sensitive frame: alpha_cr = {worst:.1f} < 3 — "
+                                "verify global stability by a dedicated analysis")
+
     flange_restrained = bool(getattr(loads, "beam_flange_restrained", True))
     demands_by_member: dict[str, list[tuple[str, MemberDemand]]] = {}
     for mid, (i, j) in topo.member_nodes.items():
@@ -786,6 +875,8 @@ def analyze_frame(
                 loads, "tributary_overrides", None) else None
             width = loads.beam_tributary_width_m if trib is None else trib
             w_serv = loads.characteristic_area_kpa() * width or None
+        ky = getattr(m, "ky", None) or 1.0         # per-member buckling-length overrides (default 1.0)
+        kz = getattr(m, "kz", None) or 1.0
         per_combo: list[tuple[str, MemberDemand]] = []
         for name, _ in uls_combos:                 # SLS drives only the deflection check, not slots
             per_combo.append((name, MemberDemand(
@@ -793,7 +884,8 @@ def analyze_frame(
                 My_Ed=_envelope_moment(mem, "My", name),
                 Mz_Ed=_envelope_moment(mem, "Mz", name),
                 Vz_Ed=_governing_shear(mem, name),
-                L=length, compression_flange_restrained=restrained, w_service=w_serv,
+                L=length, ky=ky, kz=kz,
+                compression_flange_restrained=restrained, w_service=w_serv,
             )))
         demands_by_member[mid] = per_combo
 
@@ -819,4 +911,5 @@ def analyze_frame(
         warnings=warnings,
         ok=True,
         slots_by_member=slots_by_member,
+        alpha_cr=alpha_cr,
     )

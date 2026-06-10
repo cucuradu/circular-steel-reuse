@@ -51,6 +51,13 @@ class ExtractedMember:
     end_xyz: list[float] | None = None
     notes: str = ""
 
+    # Buckling-length factors (demand side, optional). The default everywhere is k = 1.0 — the
+    # EN 1993-1-1 5.2.2 route of 2nd-order analysis with global imperfections + system lengths, whose
+    # validity the frame solve now verifies via alpha_cr. An engineer who has classified a member's
+    # end restraint differently can override per member here.
+    ky: float | None = None        # buckling-length factor about the major axis
+    kz: float | None = None        # about the minor axis
+
     # Measured section dimensions read from the BIM type (all optional). When present they let the
     # mapping layer confirm a fuzzy/unknown type *name* against the catalog by physical dimensions
     # (see ``steelreuse.core.sections.resolve_members``, method ``geometry``).
@@ -144,7 +151,7 @@ class ExtractedModel:
             if "id" not in m:
                 raise ExtractionError(f"{p}: members[{i}] is missing the required 'id' field")
             for fld in ("length_mm", "knockdown", "recoverable_length_mm",
-                        "h_mm", "b_mm", "tf_mm", "tw_mm"):
+                        "h_mm", "b_mm", "tf_mm", "tw_mm", "ky", "kz"):
                 if fld in m and m[fld] is not None and not isinstance(m[fld], (int, float)):
                     raise ExtractionError(
                         f"{p}: members[{i}] ({m['id']}).{fld} must be a number, "

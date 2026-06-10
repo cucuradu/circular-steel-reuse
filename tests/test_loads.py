@@ -172,3 +172,15 @@ def test_construction_stage_adds_unrestrained_beam_entry_to_slots():
     slots_off = build_slots(demand, AreaLoadModel())
     assert [n for n, _ in next(
         s for s in slots_off if s.member_id == "b1").combinations] == ["ULS gravity"]
+
+
+def test_per_member_k_override_in_the_analytic_path():
+    from steelreuse.pipeline import build_slots
+    from steelreuse.schema import ExtractedModel
+
+    demand = ExtractedModel(kind="demand", members=[
+        ExtractedMember(id="c1", role="column", section="HEB200", raw_section="HEB200",
+                        material_grade="S275", length_mm=4000, kz=2.0),
+    ])
+    slot = build_slots(demand, AreaLoadModel())[0]
+    assert slot.demand.kz == 2.0 and slot.demand.ky == 1.0

@@ -163,7 +163,8 @@ def build_slots(
         # every slot carries the full envelope the matcher verifies it against.
         per_combo = [
             (name, member_demands(
-                m, load, backend, compression_flange_restrained=loads.beam_flange_restrained))
+                m, load, backend, ky=m.ky or 1.0, kz=m.kz or 1.0,
+                compression_flange_restrained=loads.beam_flange_restrained))
             for name, load in loads.combination_loads(m)
         ]
         spans = m.spans_mm or ([m.length_mm] if m.length_mm else [0.0])

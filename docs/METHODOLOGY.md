@@ -173,6 +173,16 @@ default and fallback.
   (P-Δ)** analysis so sway amplification is captured. Each member's force envelope spans gravity + the
   sway cases and the matcher reports the governing one. `φ = 0` (default) ⇒ gravity only. `--pdelta`
   forces the 2nd-order solve without a sway case.
+- **Sway-stiffness classification (α_cr)**: whenever the EHF run, the frame computes EN 1993-1-1
+  **5.2.1(4)B** `α_cr = (H_Ed/V_Ed)·(h/δ_H,Ed)` per storey and direction from the EHF drifts
+  (`sway_alpha_cr`/`_compute_alpha_cr`, surfaced as `FrameResult.alpha_cr` + a console warning). This
+  *verifies* the checker's `k = 1.0` system-length convention — the EN 5.2.2 route of 2nd-order
+  analysis with global imperfections: `α_cr ≥ 10` → non-sway, the route is sound; `< 10` →
+  sway-sensitive (the P-Δ solve, already engaged whenever `φ > 0`, is doing real work); `< 3` →
+  strongly sway-sensitive, verify global stability by a dedicated analysis. Per-member `ky`/`kz`
+  overrides in the extraction JSON take precedence where an engineer has classified end restraint
+  themselves. On the case-study building the bare steel skeleton returns α_cr ≈ 0.2 — the model
+  genuinely contains no lateral system (the real one is non-steel), and the tool says so.
 - **Lateral — wind** (`--wind q`, kN/m²): a net façade pressure `q` (the user's EN 1991-1-4 value) becomes
   **horizontal storey forces** `q · width_perp · h_trib` per level — `width_perp` the building plan extent
   perpendicular to the wind, `h_trib` half the storey above + half below — lumped onto each level's column
@@ -374,7 +384,7 @@ never given a calculator (CLAUDE.md rule 1).
 | Frame idealisation | simple braced (pinned beams, continuous columns, fixed base) | `core/frame.py` | gravity + EN 5.3.2 sway (EHF) + P-Δ; wind/seismic not yet |
 | Column moment | 0 (pure axial) | `--col-ecc` | real frame moments not modelled |
 | Global sway imperfection φ | 0 (off); EN value 1/200 | `--phi` | member-level notional moment, or **frame EHF + P-Δ** with `--frame-analysis` |
-| Effective length k | 1.0 | — | pinned (conservative) |
+| Effective length k | 1.0 (system length) | per-member `ky`/`kz` in the JSON | EN 5.2.2 route (2nd-order + imperfections); validity **verified via α_cr** under `--phi` |
 | LTB C₁ | 1.0 (uniform) | — | conservative |
 | 6.3.3 C_m factors | 1.0 (uniform moment) | — | Table B.3 upper bound (conservative) |
 | Member axis rotation | default orientation | — | local→section axis mapping assumed |

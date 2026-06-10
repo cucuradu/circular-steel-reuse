@@ -485,3 +485,52 @@ def test_sway_cases_feed_both_moment_axes_to_the_checker():
     sway = [col["ULS gravity + sway X"], col["ULS gravity + sway Y"]]
     assert any(d.My_Ed > 1e3 for d in sway)       # N*mm; in-plane bending present
     assert any(d.Mz_Ed > 1e3 for d in sway)       # out-of-plane bending no longer discarded
+
+
+# ---------------------------------------------------------------------------
+# Sway-stiffness classification (alpha_cr, EN 1993-1-1 5.2.1(4)B)
+# ---------------------------------------------------------------------------
+
+def test_sway_alpha_cr_hand_arithmetic():
+    from steelreuse.core.frame import sway_alpha_cr
+    # one storey: h=3000, H=10 kN, V=1000 kN, drift=1.5 mm -> (10/1000)*(3000/1.5) = 20
+    assert sway_alpha_cr([(3000, 10e3, 1000e3, 1.5)]) == pytest.approx(20.0)
+    # minimum over storeys governs
+    assert sway_alpha_cr([(3000, 10e3, 1000e3, 1.5),
+                          (3000, 10e3, 500e3, 4.0)]) == pytest.approx(15.0)
+    # unassessable storeys (no drift / no vertical load / no H) are skipped; empty -> None
+    assert sway_alpha_cr([(3000, 10e3, 1000e3, 0.0)]) is None
+    assert sway_alpha_cr([(3000, 10e3, 0.0, 1.5)]) is None
+    assert sway_alpha_cr([]) is None
+
+
+def test_alpha_cr_flags_a_floppy_portal_and_rewards_bracing():
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    # Floppy: two slender 6 m IPE160 cantilever-ish columns (pinned-top beams), fixed bases only.
+    floppy = [
+        _col("c1", 0, 0, 0, 6000, section="IPE160"), _col("c2", 6000, 0, 0, 6000, section="IPE160"),
+        _beam("bm", 0, 6000, 6000),
+    ]
+    res_f = analyze_frame(floppy, AreaLoadModel(), cat, options=FrameOptions(notional_phi=1 / 200))
+    assert res_f.ok and res_f.alpha_cr                       # computed in at least one direction
+    assert all(a > 0 for a in res_f.alpha_cr.values())
+    assert min(res_f.alpha_cr.values()) < 10.0               # slender portal is sway-sensitive
+    assert any("sway-sensitive" in w.lower() for w in res_f.warnings)
+
+    # Same bay with a vertical brace: the braced direction must be far stiffer.
+    res_b = analyze_frame(_braced_bay(), AreaLoadModel(), cat,
+                          options=FrameOptions(notional_phi=1 / 200))
+    assert res_b.ok and res_b.alpha_cr
+    assert max(res_b.alpha_cr.values()) > min(res_f.alpha_cr.values())
+
+
+def test_per_member_k_override_reaches_the_frame_demands():
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    members = [_col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000)]
+    members[0].kz = 2.0                                       # engineer's judgment: sway about z
+    res = analyze_frame(members, AreaLoadModel(), cat)
+    d = res.demands_by_member["c1"][0][1]
+    assert d.kz == 2.0 and d.ky == 1.0
+    assert res.demands_by_member["c2"][0][1].kz == 1.0        # untouched member keeps the default

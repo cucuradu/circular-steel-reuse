@@ -63,8 +63,15 @@ irregular pieces that form a near-mechanism; the tool correctly falls back rathe
   (eq. 6.61/6.62, Annex B Method 2 factors, `C_m = 1.0` conservative) plus a minor-axis bending check —
   see METHODOLOGY §5.5. Residual: member rotation about its own axis isn't captured from the BIM, so
   the local→section axis mapping assumes the default orientation.
-- **Effective lengths** still `k = 1.0` (the solve gives forces, not buckling lengths); a sway/non-sway
-  classification from the frame is a future refinement.
+- ✅ **Effective lengths — α_cr-verified `k = 1.0` + per-member override (DONE).** Whenever the sway
+  imperfection runs, the frame computes the EN 1993-1-1 **5.2.1(4)B sway-stiffness factor**
+  `α_cr = (H/V)·(h/δ)` per storey/direction from the EHF drifts (`FrameResult.alpha_cr`):
+  `α_cr ≥ 10` → non-sway, the `k = 1.0` system-length route (5.2.2, 2nd-order + imperfections) is
+  justified and said so; `< 10` → sway-sensitive warning (P-Δ already engaged); `< 3` → strong warning
+  to verify global stability separately. Engineers can override `ky`/`kz` per member in the extraction
+  JSON (flows through analytic + frame paths and sub-members). On the real case study the bare steel
+  skeleton returns α_cr ≈ 0.2 — correctly exposing that the model contains no lateral system (the
+  building's real one is non-steel). *Residual:* inferring `k` from actual buckling modes.
 - **IFC path** still writes no coordinates, so frame analysis only runs on the pyRevit/coordinate-bearing
   models (ties into Tier-2 #1's IFC residual below).
 
