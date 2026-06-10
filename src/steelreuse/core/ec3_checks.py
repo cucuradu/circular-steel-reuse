@@ -407,6 +407,30 @@ def check_member(
         vrd = V_c_Rd(sec, fy)
         checks.append(CheckResult("shear_z", abs(demand.Vz_Ed) / vrd, {"V_c_Rd": vrd}))
 
+    # Shear-moment interaction, cl. 6.2.8: above half the plastic shear resistance, bending must use
+    # a reduced yield (1 - rho) on the shear area, rho = (2 V_Ed/V_pl,Rd - 1)^2. Peaks of M and V are
+    # coincident here (conservative for a UDL span, where they occur at different points). Rolled
+    # I/H use eq. (6.30) (modulus reduced by rho*A_w^2/(4 t_w)); hollow sections take the plainly
+    # conservative (1 - rho) on the whole bending resistance.
+    if abs(demand.My_Ed) > 0 and abs(demand.Vz_Ed) > 0.5 * V_c_Rd(sec, fy):
+        vrd = V_c_Rd(sec, fy)
+        rho = (2.0 * abs(demand.Vz_Ed) / vrd - 1.0) ** 2
+        mc = M_c_Rd(sec, fy, section_class)
+        if sec.is_hollow:
+            m_v = (1.0 - rho) * mc
+        else:
+            Wy = sec.Wpl_y if section_class <= 2 else sec.Wel_y
+            Aw = (sec.h - 2.0 * sec.tf) * sec.tw
+            m_v = min(mc, (Wy - rho * Aw**2 / (4.0 * sec.tw)) * fy / GAMMA_M0)
+        checks.append(CheckResult(
+            "bending_shear_MV", abs(demand.My_Ed) / m_v,
+            {"method": "cl. 6.2.8, eq. (6.30)", "rho": round(rho, 4), "M_y_V_Rd": m_v},
+        ))
+        warnings.append(
+            f"high shear (V_Ed > 0.5 V_pl,Rd): bending resistance reduced per cl. 6.2.8 "
+            f"(rho={rho:.2f})"
+        )
+
     # Combined compression + bending: member buckling interaction, EN 1993-1-1 6.3.3 eq. (6.61)/(6.62)
     # with Annex B (Method 2) interaction factors. All C_m = 1.0 (uniform equivalent moment, the
     # Table B.3 upper bound -> conservative for any real moment shape). LTB-aware: chi_LT multiplies

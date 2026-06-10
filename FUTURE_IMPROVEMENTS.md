@@ -259,8 +259,9 @@ example (e.g. an SCI/Access-Steel worked beam+column) would add external authori
   demand), LTB-aware exactly as the code equations prescribe. Hand-validated in `tests/test_ec3.py`
   (IPE300 chain in the test comments). Minor-axis-only bending and the no-axial biaxial cross-section
   sum are separate checks.
-- **No shear–moment (6.2.8) interaction** — fine for gravity UDL (M and V peaks are at different
-  points) but document.
+- ✅ **Shear–moment (6.2.8) interaction — DONE.** Above `0.5·V_pl,Rd` the bending check now uses the
+  ρ-reduced resistance (eq. 6.30 for rolled I/H, `(1−ρ)·M_c,Rd` for tubes), with peak `M` and `V`
+  treated as coincident (conservative for a UDL span). Hand-verified IPE300 chain in `tests/test_ec3.py`.
 - **Single k_y = k_z = 1.0** effective length for all columns — pinned-pinned assumption; expose per
   member or infer from end fixity.
 

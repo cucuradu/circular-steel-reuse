@@ -312,7 +312,11 @@ marked for review, and are flagged, as effective‑section design is out of scop
 ## 6.2 Cross‑section resistances
 
 Tension and compression resistances are `A f_y/γ_M0`; bending resistance is `W_pl f_y` (class 1–2) or
-`W_el f_y` (class 3); shear resistance is `A_v (f_y/√3)/γ_M0`, with `A_v` the web shear area.
+`W_el f_y` (class 3); shear resistance is `A_v (f_y/√3)/γ_M0`, with `A_v` the web shear area. Where the
+shear demand exceeds half the plastic shear resistance, the **shear–moment interaction of clause
+6.2.8** applies: bending is re‑verified with the `ρ`‑reduced resistance (`ρ = (2V_Ed/V_pl,Rd − 1)²`,
+eq. 6.30 for rolled sections), treating peak `M` and `V` as coincident — conservative for distributed
+loading, where they occur at different points along the span.
 
 ## 6.3 Flexural buckling (6.3.1)
 
@@ -545,7 +549,8 @@ results are decision support, to be confirmed by a qualified engineer.
 **Member verification.**
 🟡 Combined N+M is the full 6.3.3 (Annex B Method 2) biaxial interaction, but with `C_m = 1.0` (the
 conservative upper bound — no moment‑shape refinement) and member rotation about its own axis assumed
-at the default orientation. 🟠 No shear–moment (6.2.8) interaction.
+at the default orientation. 🟡 Shear–moment interaction (6.2.8) treats peak `M` and `V` as coincident
+(conservative for distributed loading).
 🟠 Effective lengths are fixed at `k = 1.0`. 🟠 Class 4 sections are flagged, not designed.
 🟡 LTB uses `C₁ = 1.0` and geometry‑approximated `I_t`/`I_w` (conservative); the slab‑restraint assumption
 is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning
@@ -597,7 +602,7 @@ interaction~~ **done** (§6.5); (3) ~~construction‑stage
 (bare‑steel) case~~ **done** (§5.3, opt‑in `--construction`);
 (4) calibrate the audit condition→knockdown factors against test data; (5) formal schedule‑count
 validation + re‑extraction with measured dimensions; (6) a complete combination set (pattern, uplift)
-and modal seismic; (7) shear–moment (6.2.8) interaction; (8) IFC coordinate export; (9) effective‑length
+and modal seismic; (7) ~~shear–moment (6.2.8) interaction~~ **done** (§6.5); (8) IFC coordinate export; (9) effective‑length
 inference; (10) shape‑aware checks for channels/angles/round tube and the small European sizes;
 (11) multi‑objective optimisation; (12) an independently published validation benchmark.
 

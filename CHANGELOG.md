@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Shear–moment interaction (cl. 6.2.8)** (`core/ec3_checks.py`): above `0.5·V_pl,Rd` the bending
+  check uses the ρ-reduced resistance — eq. (6.30) for rolled I/H, the conservative `(1−ρ)·M_c,Rd`
+  for hollow sections — with peak M and V treated as coincident (conservative for a UDL span).
+  Hand-verified (IPE300 S275, V_Ed = 300 kN → ρ = 0.223, M_y,V,Rd = 164.2 kNm).
 - **Connection capacity screen** (`standard_shear_capacity` in `core/connections.py`): every
   open-section donor gets a lower-bound *standard fin-plate* shear resistance (single row of M20 8.8
   bolts in a 10 mm S275 plate; rows from the clear web depth; per bolt the EN 1993-1-8 Table 3.4

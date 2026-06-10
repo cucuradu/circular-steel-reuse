@@ -284,6 +284,13 @@ Minor-axis bending alone is checked as `M_z,Ed/M_z,Rd` (no LTB about z); biaxial
 axial uses the always-conservative linear cross-section sum of cl. 6.2.1(7) (the 6.2.9 α/β exponents
 would only relax it).
 
+### 5.5a Shear–moment interaction (cl. 6.2.8)
+When `V_Ed > 0.5·V_pl,Rd`, bending resistance is reduced with `ρ = (2·V_Ed/V_pl,Rd − 1)²`: rolled I/H
+use eq. (6.30) (`M_y,V,Rd = (W_pl,y − ρ·A_w²/(4·t_w))·f_y/γ_M0`, capped at `M_c,Rd`), hollow sections
+the plainly conservative `(1 − ρ)·M_c,Rd`. Peak `M` and `V` are treated as coincident — conservative
+for a UDL span, where they occur at different points. Hand-verified: IPE300 S275 with `V_Ed = 300 kN`
+→ `ρ = 0.223`, `M_y,V,Rd = 164.2 kNm` (vs 172.7).
+
 ### 5.6 Deflection (SLS, optional)
 Simply-supported UDL `δ = 5·w·L⁴/(384·E·I_y)` against limit `L/250` (default), using the
 **characteristic** (unfactored) service load.
@@ -456,7 +463,7 @@ deliberate future decision, logged in `FUTURE_IMPROVEMENTS.md` #7 — not a defa
 Connection design and capacity; **modal/response-spectrum** seismic analysis (the frame analysis of §4.1
 models gravity, the EN 5.3.2 sway imperfection, wind, and a **simplified EN 1998 lateral force** seismic
 case with a 2nd-order P-Δ solve, but not a modal spectrum, accidental torsion, or pattern combinations —
-the `combos` parameter is the hook); the shear–moment (6.2.8) interaction; member rotation about its own
+the `combos` parameter is the hook); member rotation about its own
 axis (the biaxial check of §5.5 assumes the default local→section axis orientation);
 fatigue, corrosion and weldability of aged steel;
 effective-section (class 4) design. (Cutting one donor into several slots is available as the optional

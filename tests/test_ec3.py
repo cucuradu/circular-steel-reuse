@@ -276,3 +276,29 @@ def test_interaction_633_less_conservative_than_old_linear_sum(cat):
     nb_z, _ = N_b_Rd(sec, 275, d.L, d.kz, "z")
     old_linear = d.N_Ed / nb_z + d.My_Ed / 172.7e6
     assert inter.utilization < old_linear
+
+
+# ---------------------------------------------------------------------------
+# Shear-moment interaction (cl. 6.2.8)
+# ---------------------------------------------------------------------------
+#
+# Hand chain (IPE300 S275, restrained, My = 150 kNm, Vz = 300 kN):
+#   V_pl,Rd = 2567*275/sqrt(3) = 407.6 kN -> 0.5*V_pl = 203.8 < 300 -> 6.2.8 engages
+#   rho     = (2*300/407.6 - 1)^2 = 0.2230
+#   A_w     = (300 - 2*10.7)*7.1 = 1978.1 mm^2
+#   M_y,V,Rd = (628e3 - 0.2230*1978.1^2/(4*7.1))*275 = 164.2 kNm  (vs M_c,Rd 172.7)
+#   util    = 150/164.2 = 0.913 > unreduced 150/172.7 = 0.869
+
+def test_shear_moment_interaction_engages_above_half_vpl(cat):
+    sec = cat["IPE300"]
+    res = check_member(sec, "S275", MemberDemand(
+        My_Ed=150e6, Vz_Ed=300e3, L=2000, compression_flange_restrained=True))
+    mv = next(c for c in res.checks if c.name == "bending_shear_MV")
+    assert mv.detail["rho"] == pytest.approx(0.2230, abs=2e-3)
+    assert mv.detail["M_y_V_Rd"] == pytest.approx(164.2e6, rel=2e-3)
+    assert mv.utilization == pytest.approx(150e6 / 164.2e6, rel=2e-3)
+    assert any("6.2.8" in w for w in res.warnings)
+    # below the 0.5 V_pl threshold the check (and warning) stay silent
+    low = check_member(sec, "S275", MemberDemand(
+        My_Ed=150e6, Vz_Ed=100e3, L=2000, compression_flange_restrained=True))
+    assert not any(c.name == "bending_shear_MV" for c in low.checks)
