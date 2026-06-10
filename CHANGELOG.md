@@ -104,8 +104,9 @@ tool (CI, license, releases).
 
 ### Notes
 - ML modules remain an **exploratory side-study**, not wired into the certified path.
-- The pyRevit extractor has not yet been validated against a real Revit model (tracked for a later
-  release); columns in the bundled test extractions lack plan coordinates.
+- The pyRevit extractor has been run against real Revit models (`pyrevit_extension/donortest3.json` /
+  `demandtest3.json`, 74/74 and 54/54 columns with plan coordinates); see
+  [docs/CASE_STUDY.md](docs/CASE_STUDY.md).
 
 ## [0.1.0]
 

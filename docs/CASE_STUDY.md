@@ -11,11 +11,13 @@ The models (`pyrevit_extension/donor_test2.json`, `demand_test2.json`) are US/AI
 | Donor (supply, building to deconstruct) | 1016 | 74 | 942 |
 | Demand (new design) | 270 | 54 | 216 |
 
-Reproduce (the `…test3` models were re-extracted with the current extractor, so every column carries
-its plan coordinates — 74/74 donor, 54/54 demand):
+Reproduce (the `…test_4` models are the current canonical extraction — every member carries
+coordinates, 74/74 + 54/54 columns included, **and the measured section dimensions** `h/b/t_f/t_w`
+captured by the dimension-aware extractor; three independent extractions of the same building —
+test2, test3, test_4 — agree on 1016/270 members with identical role splits):
 
 ```powershell
-steelreuse --donor pyrevit_extension/donortest3.json --demand pyrevit_extension/demandtest3.json --frame-analysis --out reports/case_study.html
+steelreuse --donor pyrevit_extension/donor_test_4.json --demand pyrevit_extension/demand_test_4.json --frame-analysis --out reports/case_study.html
 ```
 
 ## Result (default area-load model, steel-only demand, frame analysis on)
@@ -38,6 +40,13 @@ Narrative source: deterministic
   and sizeless L-angles, all intentionally out of scope (joists aren't rolled members; mono-symmetric
   shapes need their own checks; see [FUTURE_IMPROVEMENTS.md](../FUTURE_IMPROVEMENTS.md)). 0 fuzzy
   matches — nothing entered the analysis on a guessed identity.
+- **Geometry confirmation behaves honestly on real data:** 465 donor members carry all four measured
+  dimensions. Every W-shape among them already maps by name; the 31 dimension-carrying members that
+  do *not* map are **L-angles and C-channels**, and the unique-match rule correctly refuses to force
+  them onto any W-row — zero false confirmations on ~500 dimension-carrying members.
+- **Connection screen on a real model:** with the screen in annotate mode, 8 assignments are flagged
+  for connection review (standard fin-plate capacity vs the slot's worst shear, plus the geometric
+  rules) — surfaced in the report's Connection column without gating any match.
 - **Matching:** the new design resolves to **181 steel slots** (after steel-only filtering, multi-span
   splitting at columns, and merging each continuous girder into a single reused member); **50 are
   filled by reclaimed members** that pass every EN 1993-1-1 load combination. Fewer but *larger* slots
