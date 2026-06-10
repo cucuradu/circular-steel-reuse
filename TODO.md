@@ -37,10 +37,11 @@
       (465 + 181 members carry all four). Counts agree with test2/test3 (1016 / 270, same role
       splits); frame analysis engages (274 nodes / 492 elements) and reproduces the case-study
       result exactly.
-- [ ] In Revit, create a **Structural Framing + Structural Columns schedule** (count of members) and
-      run `steelreuse-validate <json> --schedule <csv>` (or compare counts by hand) for donor and
-      demand. This is the formal Phase 1 completeness check (three extractions already agree, so
-      this is a formality — but it is the auditable one).
+- [x] **Donor verified 2026-06-10:** Revit schedules confirm **942 Structural Framing + 74
+      Structural Columns = 1016**, matching `donor_test_4.json` exactly. The Phase-1 completeness
+      check is formally passed for the donor.
+- [ ] Same two schedules for the **demand** model when convenient (expected: 216 framing +
+      54 columns = 270; three independent extractions already agree, so this is the last formality).
 
 ## 3. Review the unknown bucket
 

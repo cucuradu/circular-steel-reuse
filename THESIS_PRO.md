@@ -576,8 +576,10 @@ which the IFC path does not yet export.
 full coordinates *and* measured section dimensions, three independent runs agree on the member counts
 (1016 donor / 270 demand, identical role splits), and the dimension‑based auto‑confirmation was
 validated on the real model with zero false confirmations (it correctly refuses the angles and
-channels). *(human task)* The only remaining formality is the member‑count cross‑check against a Revit
-structural schedule (`steelreuse-validate --schedule`). 🟠 The IFC extractor exports
+channels). The donor‑side completeness check is **formally passed**: Revit schedules report
+942 Structural Framing + 74 Structural Columns = 1016, matching the extraction exactly; the demand
+model awaits the same (single remaining formality — three extractions already agree on its 270).
+🟠 The IFC extractor exports
 no coordinates. 🟠 The catalogue omits small European sizes and the mono‑symmetric families (UB/UC,
 channels, angles) plus round tube, which require further shape‑aware checks (rectangular/square HSS are
 now catalogued and checked with hollow‑section rules). 🟡 Fuzzy matches without captured
@@ -600,8 +602,8 @@ worthwhile addition.
 **Priority roadmap.** Four items of the original register are now implemented and described in the
 body: connection‑screen shear capacity (§9.1.1), the full 6.3.3 biaxial interaction (§6.5), the
 construction‑stage case (§5.3) and the shear–moment interaction (§6.2). What remains, in priority
-order: (1) calibrate the audit condition→knockdown factors against test data; (2) the formal
-schedule‑count cross‑check in Revit (the re‑extraction with measured dimensions is done); (3) a complete combination set
+order: (1) calibrate the audit condition→knockdown factors against test data; (2) the demand‑side
+schedule cross‑check in Revit (the donor side is verified: 942 + 74 match exactly); (3) a complete combination set
 (pattern loading, uplift/load reversal) and modal seismic; (4) IFC coordinate export;
 (5) effective‑length inference; (6) shape‑aware checks for channels/angles/round tube and the small
 European sizes; (7) multi‑objective optimisation; (8) an independently published validation benchmark.

@@ -14,7 +14,9 @@ The models (`pyrevit_extension/donor_test2.json`, `demand_test2.json`) are US/AI
 Reproduce (the `…test_4` models are the current canonical extraction — every member carries
 coordinates, 74/74 + 54/54 columns included, **and the measured section dimensions** `h/b/t_f/t_w`
 captured by the dimension-aware extractor; three independent extractions of the same building —
-test2, test3, test_4 — agree on 1016/270 members with identical role splits):
+test2, test3, test_4 — agree on 1016/270 members with identical role splits. The donor count is
+additionally **verified against Revit schedules**: 942 Structural Framing + 74 Structural Columns
+= 1016, an exact match — the Phase-1 completeness check):
 
 ```powershell
 steelreuse --donor pyrevit_extension/donor_test_4.json --demand pyrevit_extension/demand_test_4.json --frame-analysis --out reports/case_study.html
