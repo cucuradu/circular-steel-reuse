@@ -471,3 +471,17 @@ def test_run_pipeline_frame_analysis_falls_back_without_geometry(tmp_path):
     assert res.frame is not None and res.frame.ok is False     # nothing connectable
     assert res.slot_count == 1                                 # analytic per-span slot still made
     assert res.match.n_reused == 1
+
+
+def test_sway_cases_feed_both_moment_axes_to_the_checker():
+    # Columns under the two orthogonal EHF directions bend about both local axes; both must reach
+    # MemberDemand (My_Ed *and* Mz_Ed) instead of being collapsed to one worst-axis magnitude.
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    res = analyze_frame(_braced_bay(), AreaLoadModel(), cat,
+                        options=FrameOptions(notional_phi=1 / 200))
+    assert res.ok
+    col = dict(res.demands_by_member["c1"])
+    sway = [col["ULS gravity + sway X"], col["ULS gravity + sway Y"]]
+    assert any(d.My_Ed > 1e3 for d in sway)       # N*mm; in-plane bending present
+    assert any(d.Mz_Ed > 1e3 for d in sway)       # out-of-plane bending no longer discarded

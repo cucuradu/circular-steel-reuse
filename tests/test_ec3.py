@@ -211,3 +211,68 @@ def test_check_member_flags_heavy_section_and_reduces_en_fy(cat):
     assert us.fy == pytest.approx(345.0)
     assert any("heavy section" in w for w in us.warnings)
     assert not any("f_y reduced" in w for w in us.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Full 6.3.3 beam-column interaction (Annex B Method 2) + biaxial bending
+# ---------------------------------------------------------------------------
+#
+# Hand chain (IPE300 S275, L = 4 m, k = 1, restrained flange, N = 300 kN, My = 40 kNm):
+#   N_Rk    = 5380 * 275 = 1479.5 kN
+#   Ncr_y   = pi^2*210000*8356e4/4000^2 = 10824 kN -> lam_y = 0.3697, curve a -> chi_y = 0.9606
+#   Ncr_z   = pi^2*210000*604e4/4000^2  =   782 kN -> lam_z = 1.3751, curve b -> chi_z = 0.3924
+#   n_y     = 300/(0.9606*1479.5) = 0.2111;  n_z = 300/(0.3924*1479.5) = 0.5168
+#   class 2 (web c/t = 35.01 <= 38*eps = 35.13 in compression) -> plastic moduli
+#   My_Rk   = 628e3*275 = 172.7 kNm
+#   kyy     = 1+(0.3697-0.2)*0.2111 = 1.0358 (cap 1.169 not hit);  kzy = 0.6*kyy = 0.6215
+#   eq 6.61 = 0.2111 + 1.0358*40/172.7 = 0.4510
+#   eq 6.62 = 0.5168 + 0.6215*40/172.7 = 0.6607   <- governs
+# Adding Mz = 10 kNm (Mz_Rk = 125e3*275 = 34.375 kNm, mz = 0.2909):
+#   kzz     = cap 1+1.4*n_z = 1.7235 (lam_z > 1);  kyz = 0.6*kzz = 1.0341
+#   eq 6.61 = 0.4510 + 1.0341*0.2909 = 0.7518
+#   eq 6.62 = 0.6607 + 1.7235*0.2909 = 1.1621     <- FAIL
+
+def test_interaction_633_matches_hand_calc(cat):
+    sec = cat["IPE300"]
+    res = check_member(sec, "S275", MemberDemand(
+        N_Ed=300e3, My_Ed=40e6, L=4000, compression_flange_restrained=True))
+    inter = next(c for c in res.checks if c.name == "interaction_NM")
+    assert inter.detail["eq_6_61"] == pytest.approx(0.4510, abs=2e-3)
+    assert inter.detail["eq_6_62"] == pytest.approx(0.6607, abs=2e-3)
+    assert inter.utilization == pytest.approx(0.6607, abs=2e-3)   # 6.62 governs
+    assert inter.detail["kyy"] == pytest.approx(1.0358, abs=2e-3)
+    assert inter.detail["kzy"] == pytest.approx(0.6215, abs=2e-3)  # 0.6*kyy (not susceptible)
+    assert res.passes
+
+
+def test_interaction_633_biaxial_mz_can_govern_and_fail(cat):
+    sec = cat["IPE300"]
+    res = check_member(sec, "S275", MemberDemand(
+        N_Ed=300e3, My_Ed=40e6, Mz_Ed=10e6, L=4000, compression_flange_restrained=True))
+    inter = next(c for c in res.checks if c.name == "interaction_NM")
+    assert inter.detail["kzz"] == pytest.approx(1.7235, abs=2e-3)  # the 1+1.4*n_z cap (lam_z > 1)
+    assert inter.detail["eq_6_62"] == pytest.approx(1.1621, abs=3e-3)
+    assert not res.passes                                          # 10 kNm minor-axis flips it
+    bz = next(c for c in res.checks if c.name == "bending_z")
+    assert bz.utilization == pytest.approx(10e6 / (125e3 * 275), abs=1e-4)
+
+
+def test_biaxial_bending_without_axial_uses_linear_cross_section_sum(cat):
+    sec = cat["IPE300"]
+    res = check_member(sec, "S275", MemberDemand(
+        My_Ed=80e6, Mz_Ed=15e6, L=5000, compression_flange_restrained=True))
+    bi = next(c for c in res.checks if c.name == "biaxial_M")
+    assert bi.utilization == pytest.approx(80e6 / 172.7e6 + 15e6 / 34.375e6, rel=1e-3)
+
+
+def test_interaction_633_less_conservative_than_old_linear_sum(cat):
+    # The retired check was N/(chi_min*N_Rk) + My/M_Rd; 6.3.3 splits the axes (eq 6.61 uses chi_y,
+    # and kzy < 1 softens the moment term in 6.62), so for a typical restrained beam-column the
+    # governing 6.3.3 utilization must not exceed the old linear figure.
+    sec = cat["IPE300"]
+    d = MemberDemand(N_Ed=300e3, My_Ed=40e6, L=4000, compression_flange_restrained=True)
+    res = check_member(sec, "S275", d)
+    inter = next(c for c in res.checks if c.name == "interaction_NM")
+    nb_z, _ = N_b_Rd(sec, 275, d.L, d.kz, "z")
+    old_linear = d.N_Ed / nb_z + d.My_Ed / 172.7e6
+    assert inter.utilization < old_linear

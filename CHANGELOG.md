@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Full EN 1993-1-1 6.3.3 beam-column interaction, biaxial** (`core/ec3_checks.py`): the simplified
+  linear N+M sum is replaced by equations (6.61)/(6.62) with **Annex B (Method 2)** interaction
+  factors (Tables B.1/B.2, susceptible/not-susceptible `k_zy`, RHS `k_zz` variant; all `C_m = 1.0`,
+  the conservative Table B.3 upper bound). `MemberDemand` gains `Mz_Ed`; minor-axis bending and the
+  no-axial biaxial cross-section sum (cl. 6.2.1(7)) are new checks; the frame path now carries `M_y`
+  and `M_z` per combination instead of one worst-axis magnitude (a lateral case bending a column about
+  both axes is checked about both). Hand-validated against an IPE300 beam-column chain
+  (`tests/test_ec3.py`; governing eq. 6.62 = 0.6607). Default gravity results are unchanged.
 - **Connection feasibility screen** (`core/connections.py`, CLI `--connections`): each (donor, slot)
   pair is compared geometrically against the slot's **design section** — wrong shape family or
   > 50 mm deeper → incompatible; markedly shallower / thinner web / narrower flange → review. Every

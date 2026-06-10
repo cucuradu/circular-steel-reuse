@@ -4,11 +4,10 @@ Everything is in internal units: forces in N, moments in N*mm, lengths in mm, st
 Sign convention: ``N_Ed`` is **compression-positive**; a negative value is treated as tension.
 
 Scope & honesty (see CLAUDE.md):
-  * Implemented: classification, tension, compression+flexural buckling, bending, shear,
-    a *simplified linear* N+M interaction, and an optional deflection (SLS) check.
-  * Lateral-torsional buckling is **flagged, not fully computed** here (needs I_t, I_w): an
-    unrestrained beam in bending is marked ``status = "REVIEW"`` rather than silently passed.
-    Full chi_LT is deferred to the "LTB refinement" phase.
+  * Implemented: classification, tension, compression+flexural buckling, biaxial bending (major axis
+    with chi_LT, minor axis plain), shear, the full EN 1993-1-1 **6.3.3 beam-column interaction**
+    (eq. 6.61/6.62 with Annex B Method 2 factors, C_m = 1.0 -> conservative for any moment shape),
+    and an optional deflection (SLS) check.
   * The reclaimed-steel **knockdown** multiplies f_y (condition/uncertainty proxy), never silently 1.0
     when the caller asks for a reduction.
 """
@@ -123,6 +122,12 @@ def M_c_Rd(sec: SectionProps, fy: float, section_class: int) -> float:
     return W * fy / GAMMA_M0
 
 
+def M_z_Rd(sec: SectionProps, fy: float, section_class: int) -> float:
+    """Minor-axis bending resistance, eq. (6.13)/(6.14). LTB does not apply about the minor axis."""
+    W = sec.Wpl_z if section_class <= 2 else sec.Wel_z
+    return W * fy / GAMMA_M0
+
+
 def V_c_Rd(sec: SectionProps, fy: float) -> float:
     """Plastic shear resistance (web), eq. (6.18)."""
     return sec.Av_z * (fy / math.sqrt(3.0)) / GAMMA_M0
@@ -206,14 +211,68 @@ def _chi(lambda_bar: float, alpha: float) -> float:
     return min(chi, 1.0)
 
 
-def N_b_Rd(sec: SectionProps, fy: float, L: float, k: float, axis: str) -> tuple[float, float]:
-    """Flexural-buckling resistance about ``axis`` ('y'|'z'), eq. (6.47). Returns (N_b_Rd, chi)."""
+def _flexural_params(sec: SectionProps, fy: float, L: float, k: float, axis: str) -> tuple[float, float]:
+    """Relative slenderness and reduction factor about ``axis`` ('y'|'z'): (lambda_bar, chi)."""
     I = sec.Iy if axis == "y" else sec.Iz  # noqa: E741
     Lcr = k * L
     Ncr = math.pi**2 * E_STEEL * I / Lcr**2
     lambda_bar = math.sqrt(sec.A * fy / Ncr)
-    chi = _chi(lambda_bar, _buckling_alpha(sec, axis))
+    return lambda_bar, _chi(lambda_bar, _buckling_alpha(sec, axis))
+
+
+def N_b_Rd(sec: SectionProps, fy: float, L: float, k: float, axis: str) -> tuple[float, float]:
+    """Flexural-buckling resistance about ``axis`` ('y'|'z'), eq. (6.47). Returns (N_b_Rd, chi)."""
+    _, chi = _flexural_params(sec, fy, L, k, axis)
     return chi * sec.A * fy / GAMMA_M1, chi
+
+
+# ---------------------------------------------------------------------------
+# EN 1993-1-1 6.3.3 beam-column interaction, Annex B (Method 2)
+# ---------------------------------------------------------------------------
+
+def annex_b_k_factors(
+    section_class: int,
+    lam_y: float,
+    lam_z: float,
+    n_y: float,
+    n_z: float,
+    hollow: bool,
+    susceptible: bool,
+    Cmy: float = 1.0,
+    Cmz: float = 1.0,
+    CmLT: float = 1.0,
+) -> dict[str, float]:
+    """Interaction factors k_yy, k_yz, k_zy, k_zz per EN 1993-1-1 Annex B (Method 2).
+
+    ``n_y``/``n_z`` are N_Ed/(chi*N_Rk/gamma_M1); ``susceptible`` means susceptible to torsional
+    deformation (an open section without restraint -> Table B.2/B.1 'members susceptible' column).
+    All C_m factors default to 1.0 (uniform equivalent moment) — the upper bound of Table B.3, so
+    conservative for any real moment shape.
+    """
+    if section_class <= 2:  # Table B.1
+        kyy = min(Cmy * (1 + (min(lam_y, 1.0) - 0.2) * n_y), Cmy * (1 + 0.8 * n_y))
+        if hollow:
+            kzz = min(Cmz * (1 + (min(lam_z, 1.0) - 0.2) * n_z), Cmz * (1 + 0.8 * n_z))
+        else:
+            kzz = min(Cmz * (1 + (2 * min(lam_z, 1.0) - 0.6) * n_z), Cmz * (1 + 1.4 * n_z))
+        kyz = 0.6 * kzz
+        if not susceptible:
+            kzy = 0.6 * kyy
+        elif lam_z < 0.4:
+            kzy = min(0.6 + lam_z, 1 - 0.1 * lam_z * n_z / (CmLT - 0.25))
+        else:
+            kzy = max(1 - 0.1 * min(lam_z, 1.0) * n_z / (CmLT - 0.25),
+                      1 - 0.1 * n_z / (CmLT - 0.25))
+    else:  # Table B.2 (class 3; class 4 is approximated with elastic moduli and flagged upstream)
+        kyy = min(Cmy * (1 + 0.6 * min(lam_y, 1.0) * n_y), Cmy * (1 + 0.6 * n_y))
+        kzz = min(Cmz * (1 + 0.6 * min(lam_z, 1.0) * n_z), Cmz * (1 + 0.6 * n_z))
+        kyz = kzz
+        if not susceptible:
+            kzy = 0.8 * kyy
+        else:
+            kzy = max(1 - 0.05 * min(lam_z, 1.0) * n_z / (CmLT - 0.25),
+                      1 - 0.05 * n_z / (CmLT - 0.25))
+    return {"kyy": kyy, "kyz": kyz, "kzy": kzy, "kzz": kzz}
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +284,8 @@ class MemberDemand:
     """Design action effects + buckling/serviceability context for one member or span."""
 
     N_Ed: float = 0.0          # N, compression-positive (negative = tension)
-    My_Ed: float = 0.0         # N*mm
+    My_Ed: float = 0.0         # N*mm, major-axis bending
+    Mz_Ed: float = 0.0         # N*mm, minor-axis bending (from lateral/sway frame cases)
     Vz_Ed: float = 0.0         # N
     L: float = 0.0             # mm, system length for buckling/deflection
     ky: float = 1.0            # buckling length factor about y
@@ -330,28 +390,50 @@ def check_member(
                 )
         checks.append(CheckResult("bending_y", abs(demand.My_Ed) / mrd, detail))
 
+    # Bending (minor axis) — no LTB about z; plastic/elastic modulus per class
+    if abs(demand.Mz_Ed) > 0:
+        mz = M_z_Rd(sec, fy, section_class)
+        checks.append(CheckResult("bending_z", abs(demand.Mz_Ed) / mz, {"M_z_Rd": mz}))
+
+    # Cross-section biaxial bending without axial: conservative linear sum, cl. 6.2.1(7)
+    # (the full 6.2.9 alpha/beta exponents would allow more; linear is always on the safe side)
+    if demand.N_Ed <= 0 and abs(demand.My_Ed) > 0 and abs(demand.Mz_Ed) > 0:
+        u = (abs(demand.My_Ed) / M_c_Rd(sec, fy, section_class)
+             + abs(demand.Mz_Ed) / M_z_Rd(sec, fy, section_class))
+        checks.append(CheckResult("biaxial_M", u, {"method": "linear cross-section sum, cl. 6.2.1(7)"}))
+
     # Shear
     if abs(demand.Vz_Ed) > 0:
         vrd = V_c_Rd(sec, fy)
         checks.append(CheckResult("shear_z", abs(demand.Vz_Ed) / vrd, {"V_c_Rd": vrd}))
 
-    # Combined N + M (simplified conservative linear interaction, cl. 6.2.1(7) / member 6.3.3 approx).
-    # LTB-aware: an unrestrained beam-column uses M_b_Rd (chi_LT-reduced), never the full M_c_Rd, so
-    # the interaction cannot pass a member that lateral-torsional buckling would govern. This stays
-    # conservative relative to the full 6.3.3 form (no favourable k_yy/k_zy factors are applied).
-    if demand.N_Ed > 0 and abs(demand.My_Ed) > 0:
-        nb_y, _ = N_b_Rd(sec, fy, demand.L, demand.ky, "y")
-        nb_z, _ = N_b_Rd(sec, fy, demand.L, demand.kz, "z")
-        mc = M_c_Rd(sec, fy, section_class)
-        if sec.is_hollow or demand.compression_flange_restrained:
-            mrd, ltb = mc, 1.0
-        else:
-            ltb = chi_LT(sec, fy, demand.L, section_class, demand.C1)
-            mrd = ltb * mc
-        u = demand.N_Ed / min(nb_y, nb_z) + abs(demand.My_Ed) / mrd
+    # Combined compression + bending: member buckling interaction, EN 1993-1-1 6.3.3 eq. (6.61)/(6.62)
+    # with Annex B (Method 2) interaction factors. All C_m = 1.0 (uniform equivalent moment, the
+    # Table B.3 upper bound -> conservative for any real moment shape). LTB-aware: chi_LT multiplies
+    # M_y,Rk exactly as in eq. (6.61)/(6.62), so an unrestrained beam-column can never pass on a
+    # moment that lateral-torsional buckling would govern.
+    if demand.N_Ed > 0 and (abs(demand.My_Ed) > 0 or abs(demand.Mz_Ed) > 0):
+        lam_y, x_y = _flexural_params(sec, fy, demand.L, demand.ky, "y")
+        lam_z, x_z = _flexural_params(sec, fy, demand.L, demand.kz, "z")
+        N_Rk = sec.A * fy
+        n_y = demand.N_Ed / (x_y * N_Rk / GAMMA_M1)
+        n_z = demand.N_Ed / (x_z * N_Rk / GAMMA_M1)
+        susceptible = not (sec.is_hollow or demand.compression_flange_restrained)
+        ltb = (chi_LT(sec, fy, demand.L, section_class, demand.C1)
+               if susceptible and abs(demand.My_Ed) > 0 and demand.L > 0 else 1.0)
+        k = annex_b_k_factors(section_class, lam_y, lam_z, n_y, n_z,
+                              hollow=sec.is_hollow, susceptible=susceptible)
+        My_Rk = (sec.Wpl_y if section_class <= 2 else sec.Wel_y) * fy
+        Mz_Rk = (sec.Wpl_z if section_class <= 2 else sec.Wel_z) * fy
+        my_term = abs(demand.My_Ed) / (ltb * My_Rk / GAMMA_M1)
+        mz_term = abs(demand.Mz_Ed) / (Mz_Rk / GAMMA_M1)
+        u_661 = n_y + k["kyy"] * my_term + k["kyz"] * mz_term
+        u_662 = n_z + k["kzy"] * my_term + k["kzz"] * mz_term
         checks.append(CheckResult(
-            "interaction_NM", u,
-            {"method": "linear, LTB-aware (conservative)", "chi_LT": round(ltb, 4)},
+            "interaction_NM", max(u_661, u_662),
+            {"method": "EN 1993-1-1 6.3.3, Annex B Method 2 (Cm=1.0)",
+             "eq_6_61": round(u_661, 4), "eq_6_62": round(u_662, 4),
+             "chi_LT": round(ltb, 4), **{f: round(v, 4) for f, v in k.items()}},
         ))
 
     # Deflection (SLS), simply-supported UDL: delta = 5 w L^4 / (384 E I_y)

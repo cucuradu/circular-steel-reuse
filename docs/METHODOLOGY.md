@@ -187,9 +187,11 @@ default and fallback.
 **Residuals (still open):** lateral cases (sway / wind / seismic) are applied in `+X`/`+Y` (worst-magnitude
 for a regular doubly-symmetric frame); the seismic action is the simplified **lateral force method** with a
 user base-shear coefficient, not a modal response-spectrum analysis (no torsion/accidental eccentricity);
-column **biaxial** bending is reduced to the worst single-axis moment checked against the bending resistance
-(the EN check is uniaxial N+M_y); effective lengths remain `k = 1.0` (the solve gives forces, not buckling
-lengths). See `FUTURE_IMPROVEMENTS.md`.
+effective lengths remain `k = 1.0` (the solve gives forces, not buckling lengths). Column **biaxial**
+bending is now carried through: the per-combo envelope keeps `M_y` and `M_z` separately and the checker
+runs the biaxial 6.3.3 interaction (§5.5); the residual is that member *rotation* about its own axis is
+not captured from the BIM, so the local→section axis mapping assumes the default orientation. See
+`FUTURE_IMPROVEMENTS.md`.
 
 **Continuous multi-span members** are handled: `expand_spans` splits a beam carrying `spans_mm = [s₁, s₂,…]`
 into one sub-element per span at its interior supports (interpolated along the member axis so the interior
@@ -250,11 +252,28 @@ in bending is reduced by `χ_LT` and flagged. `C₁ = 1.0` (uniform moment) is t
 stiffness keeps `λ̄_LT` far below the 0.4 plateau for any practical span, and the open-section
 `I_t`/`I_w` approximations above would be meaningless for a tube.
 
-### 5.5 Combined N + M
-A **simplified linear, LTB-aware** interaction (conservative relative to the full 6.3.3):
-`N_Ed/min(N_b,Rd,y, N_b,Rd,z) + M_y,Ed/M_b,Rd ≤ 1`, where `M_b,Rd = χ_LT·M_c,Rd` so lateral-torsional
-buckling cannot be silently ignored in a beam-column. No favourable `k_yy/k_zy` interaction factors are
-applied (they would only relax the check).
+### 5.5 Combined N + M — full 6.3.3 (Annex B, Method 2), biaxial
+The **full EN 1993-1-1 6.3.3 beam-column interaction**, equations **(6.61)** and **(6.62)**:
+
+```
+N_Ed/(χ_y·N_Rk/γ_M1) + k_yy·M_y,Ed/(χ_LT·M_y,Rk/γ_M1) + k_yz·M_z,Ed/(M_z,Rk/γ_M1) ≤ 1   (6.61)
+N_Ed/(χ_z·N_Rk/γ_M1) + k_zy·M_y,Ed/(χ_LT·M_y,Rk/γ_M1) + k_zz·M_z,Ed/(M_z,Rk/γ_M1) ≤ 1   (6.62)
+```
+
+with the **Annex B (Method 2)** interaction factors (`annex_b_k_factors`): Table B.1 for class 1–2
+(I-section and RHS variants of `k_zz`), Table B.2 for class 3 (class 4 is approximated with elastic
+moduli and flagged), and the susceptible/not-susceptible `k_zy` split — a restrained flange or a hollow
+section is *not susceptible* to torsional deformation (`k_zy = 0.6·k_yy` / `0.8·k_yy`), an unrestrained
+open section uses the `C_mLT` form. All **`C_m = 1.0`** (uniform equivalent moment, the Table B.3 upper
+bound), so the factors are conservative for any real moment shape. `χ_LT` enters exactly as in the code
+equations, so LTB can never be silently ignored in a beam-column. The governing utilization is
+`max(6.61, 6.62)`; both values and all four k-factors are reported in the check detail.
+**Validated against a hand-computed IPE300 beam-column** (`tests/test_ec3.py`, chain in the test
+comments: χ_y = 0.9606, χ_z = 0.3924, k_yy = 1.0358, eq. 6.62 = 0.6607).
+
+Minor-axis bending alone is checked as `M_z,Ed/M_z,Rd` (no LTB about z); biaxial bending **without**
+axial uses the always-conservative linear cross-section sum of cl. 6.2.1(7) (the 6.2.9 α/β exponents
+would only relax it).
 
 ### 5.6 Deflection (SLS, optional)
 Simply-supported UDL `δ = 5·w·L⁴/(384·E·I_y)` against limit `L/250` (default), using the
@@ -335,6 +354,8 @@ never given a calculator (CLAUDE.md rule 1).
 | Global sway imperfection φ | 0 (off); EN value 1/200 | `--phi` | member-level notional moment, or **frame EHF + P-Δ** with `--frame-analysis` |
 | Effective length k | 1.0 | — | pinned (conservative) |
 | LTB C₁ | 1.0 (uniform) | — | conservative |
+| 6.3.3 C_m factors | 1.0 (uniform moment) | — | Table B.3 upper bound (conservative) |
+| Member axis rotation | default orientation | — | local→section axis mapping assumed |
 | Compression-flange restraint | restrained (slab) | load model | **non-conservative if slab absent** |
 | Reclaimed knockdown | 1.0 | `--knockdown` | assumes grade confirmed |
 | Carbon factors | ICE v3 | `factors.csv` | swap for Ökobaudat/Climatiq |
@@ -345,6 +366,9 @@ never given a calculator (CLAUDE.md rule 1).
 0.814`; `N_t,Rd(S275) = 1479.5 kN`; `M_pl,Rd = 147.6 kNm (S235) / 172.7 kNm (S275)`; `V_pl,Rd(S235) =
 348 kN`; flexural buckling `χ_z(L=4 m, S275) = 0.392`; LTB `χ_LT(L=6 m) ≈ 0.45` and monotone-decreasing
 with span; deflection `δ ≈ 9.62 mm (w=10 N/mm, L=6 m)`. Knockdown scales utilisation by `1/k`.
+The **6.3.3 interaction** is hand-validated end to end (IPE300 beam-column, N = 300 kN + M_y = 40 kNm,
+L = 4 m: `χ_y = 0.9606`, `k_yy = 1.0358`, eq. 6.61 = 0.4510, governing eq. 6.62 = **0.6607**; adding
+M_z = 10 kNm flips it to FAIL at 1.162 — full chain in the test comments).
 
 **Matcher (`tests/test_match.py`).** Known-answer feasibility, one-use-each constraints, the avoided-new
 basis (a giant donor in a small slot books the baseline, not its own mass), standard-restricted baseline,
@@ -416,8 +440,9 @@ deliberate future decision, logged in `FUTURE_IMPROVEMENTS.md` #7 — not a defa
 Connection design and capacity; **modal/response-spectrum** seismic analysis (the frame analysis of §4.1
 models gravity, the EN 5.3.2 sway imperfection, wind, and a **simplified EN 1998 lateral force** seismic
 case with a 2nd-order P-Δ solve, but not a modal spectrum, accidental torsion, or pattern combinations —
-the `combos` parameter is the hook); column **biaxial** bending (reduced to the worst single-axis moment)
-and the shear–moment (6.2.8) interaction; fatigue, corrosion and weldability of aged steel;
+the `combos` parameter is the hook); the shear–moment (6.2.8) interaction; member rotation about its own
+axis (the biaxial check of §5.5 assumes the default local→section axis orientation);
+fatigue, corrosion and weldability of aged steel;
 effective-section (class 4) design. (Cutting one donor into several slots is available as the optional
 cutting-stock mode, §7 point 5; per-member forces from a global solve — with sway, wind, seismic and P-Δ —
 via `--frame-analysis` `--phi` `--wind` `--seismic`, §4.1.) See `FUTURE_IMPROVEMENTS.md` for the backlog.

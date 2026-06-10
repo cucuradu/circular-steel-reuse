@@ -58,8 +58,11 @@ irregular pieces that form a near-mechanism; the tool correctly falls back rathe
   e.g. per-piece solves, mechanism detection/repair, or user-guided support assignment.
 - **Modal/response-spectrum seismic:** the current seismic is the simplified lateral force method with a
   user base-shear coefficient — no modal spectrum, accidental torsion, or `q`-factor/site spectrum.
-- **Biaxial columns:** a lateral case can bend a column about both axes, but the EN check is uniaxial
-  (N + M_y), so the worst single-axis moment is used — full biaxial N+M_y+M_z is a documented limitation.
+- ✅ **Biaxial columns — DONE (full 6.3.3).** The per-combo envelope now carries `M_y` and `M_z`
+  separately into `MemberDemand`, and the checker runs the **full EN 1993-1-1 6.3.3 interaction**
+  (eq. 6.61/6.62, Annex B Method 2 factors, `C_m = 1.0` conservative) plus a minor-axis bending check —
+  see METHODOLOGY §5.5. Residual: member rotation about its own axis isn't captured from the BIM, so
+  the local→section axis mapping assumes the default orientation.
 - **Effective lengths** still `k = 1.0` (the solve gives forces, not buckling lengths); a sway/non-sway
   classification from the frame is a future refinement.
 - **IFC path** still writes no coordinates, so frame analysis only runs on the pyRevit/coordinate-bearing
@@ -220,7 +223,7 @@ checker and surrogate can disagree on).
 
 ### ✅ 8. Methodology document — DONE
 [docs/METHODOLOGY.md](docs/METHODOLOGY.md) maps each EN 1993-1-1 clause → code → assumption → validation
-source (classification 5.2, 6.2.x resistances, 6.3.x buckling/LTB, the simplified 6.3.3 interaction,
+source (classification 5.2, 6.2.x resistances, 6.3.x buckling/LTB, the full 6.3.3 interaction,
 SLS), with an assumptions register and the hand-calc validation basis. **The end-to-end worked example
 is now DONE** ([tests/test_worked_example.py](tests/test_worked_example.py) + the "Worked example"
 section of [docs/VALIDATION.md](docs/VALIDATION.md)): one complete bay through `run_pipeline` with every
@@ -236,10 +239,14 @@ example (e.g. an SCI/Access-Steel worked beam+column) would add external authori
   genuinely reusable — the real fix for the long-stock bias), and each cut donor's leftover is reported
   as reusable remainder (`MatchResult.donor_leftover_mm`, surfaced in the report + CLI). The default
   stays one-piece-per-donor (conservative). Tested in [tests/test_match.py](tests/test_match.py).
-- **N+M interaction** is a simplified linear sum (no 6.3.3 k-factors). Conservative for k ≤ 1 / C1 = 1,
-  but label it clearly or implement the full 6.3.3 form.
-- **No shear–moment (6.2.8) interaction** and **no biaxial bending (Mz)** — fine for gravity UDL
-  (M and V peaks are at different points) but document.
+- ✅ **N+M interaction — DONE (full 6.3.3).** The simplified linear sum is replaced by eq. (6.61)/(6.62)
+  with **Annex B (Method 2)** k-factors (Tables B.1/B.2, susceptible/not-susceptible `k_zy`, RHS `k_zz`
+  variant, all `C_m = 1.0` → conservative for any moment shape), **biaxial** (`M_z,Ed` is a first-class
+  demand), LTB-aware exactly as the code equations prescribe. Hand-validated in `tests/test_ec3.py`
+  (IPE300 chain in the test comments). Minor-axis-only bending and the no-axial biaxial cross-section
+  sum are separate checks.
+- **No shear–moment (6.2.8) interaction** — fine for gravity UDL (M and V peaks are at different
+  points) but document.
 - **Single k_y = k_z = 1.0** effective length for all columns — pinned-pinned assumption; expose per
   member or infer from end fixity.
 

@@ -493,15 +493,15 @@ def _governing_axial(member, combo: str) -> float:
     return hi if abs(hi) >= abs(lo) else lo
 
 
-def _governing_moment(member, combo: str) -> float:
-    """Worst single-axis bending moment magnitude (max of |My|, |Mz|) for a combo.
+def _envelope_moment(member, axis: str, combo: str) -> float:
+    """Peak bending-moment magnitude about one local axis ('My'|'Mz') for a combo.
 
-    Gravity loads a beam about one axis only (the other is ~0, so this equals ``My``); a lateral/sway
-    case can add the orthogonal component, so the worst of the two is taken and checked against the
-    member's bending resistance (the EN check is uniaxial — biaxial N+My+Mz is a documented limitation).
-    """
-    return max(abs(member.max_moment("My", combo)), abs(member.min_moment("My", combo)),
-               abs(member.max_moment("Mz", combo)), abs(member.min_moment("Mz", combo)))
+    Local axes follow the section axes (each member is created with its own Iy/Iz), so local ``My``
+    is the section's major axis and ``Mz`` its minor axis. Both are carried separately into
+    :class:`MemberDemand`: gravity loads a beam about ``My`` only, while a lateral/sway case can bend
+    a column about both — the checker's biaxial 6.3.3 interaction now sees the true pair instead of
+    a single worst-axis magnitude checked against major-axis resistance."""
+    return max(abs(member.max_moment(axis, combo)), abs(member.min_moment(axis, combo)))
 
 
 def _governing_shear(member, combo: str) -> float:
@@ -569,6 +569,7 @@ def _build_slots_by_member(
                 envelope.append((name, MemberDemand(
                     N_Ed=max((d.N_Ed for d in ds), key=abs),
                     My_Ed=max(d.My_Ed for d in ds),
+                    Mz_Ed=max(d.Mz_Ed for d in ds),
                     Vz_Ed=max(d.Vz_Ed for d in ds),
                     L=length, compression_flange_restrained=restrained, w_service=w_serv,
                 )))
@@ -789,7 +790,8 @@ def analyze_frame(
         for name, _ in uls_combos:                 # SLS drives only the deflection check, not slots
             per_combo.append((name, MemberDemand(
                 N_Ed=_governing_axial(mem, name),
-                My_Ed=_governing_moment(mem, name),
+                My_Ed=_envelope_moment(mem, "My", name),
+                Mz_Ed=_envelope_moment(mem, "Mz", name),
                 Vz_Ed=_governing_shear(mem, name),
                 L=length, compression_flange_restrained=restrained, w_service=w_serv,
             )))
@@ -800,7 +802,8 @@ def analyze_frame(
     _CAP_N, _CAP_NMM = 1e9, 1e12   # 1e6 kN / 1e6 kNm — far above any real member force
     for combos in demands_by_member.values():
         for _, d in combos:
-            if abs(d.N_Ed) > _CAP_N or abs(d.Vz_Ed) > _CAP_N or abs(d.My_Ed) > _CAP_NMM:
+            if (abs(d.N_Ed) > _CAP_N or abs(d.Vz_Ed) > _CAP_N
+                    or abs(d.My_Ed) > _CAP_NMM or abs(d.Mz_Ed) > _CAP_NMM):
                 return _fallback(
                     "frame solve ill-conditioned (non-physical forces) — using analytic loads")
 

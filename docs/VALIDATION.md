@@ -138,8 +138,15 @@ connection annotations, and the avoided-new basis (the saving is measured agains
 | Worked-example beam util | 0.5633 | 0.5633 | test_worked_example |
 | Worked-example column util | 0.0428 | 0.0428 | test_worked_example |
 | Worked-example CO₂ saved | 452.04 kg | 452.04 | test_worked_example |
+| 6.3.3 eq. (6.62), IPE300 beam-column | 0.6607 | 0.6607 | test_ec3 |
+
+The **full 6.3.3 beam-column interaction** (eq. 6.61/6.62, Annex B Method 2, `C_m = 1.0`) is
+hand-validated in `tests/test_ec3.py`: IPE300 S275, L = 4 m, N = 300 kN, M_y = 40 kNm, restrained
+flange → χ_y = 0.9606, χ_z = 0.3924, k_yy = 1.0358, eq. 6.61 = 0.4510, governing eq. 6.62 = **0.6607**
+(every intermediate is in the test-file comment); a biaxial variant adds M_z = 10 kNm and flips the
+member to FAIL (eq. 6.62 = 1.162), exercising the `k_yz`/`k_zz` terms.
 
 **Residual:** the worked example above is hand-derived (closed-form statics + the published section
-tables of §2–§3) and runs the pipeline start-to-finish. What remains open is corroborating the
-simplified **N+M interaction** against an external textbook beam-column example (our interaction is
-deliberately conservative relative to EN 6.3.3, so an external example would quantify the margin).
+tables of §2–§3) and runs the pipeline start-to-finish. What remains open is corroborating it against
+an independently *published* design example (e.g. an SCI / Access Steel beam-column), which would add
+external authority beyond our own hand algebra.

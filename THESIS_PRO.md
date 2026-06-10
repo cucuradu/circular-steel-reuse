@@ -329,9 +329,17 @@ reliance on the slab (notably at the construction stage).
 
 ## 6.5 Interaction, deflection, knockdown
 
-Combined axial and bending use a simplified, LTB‑aware linear interaction,
-`N_Ed/min(N_b,Rd,y, N_b,Rd,z) + M_y,Ed/(χ_LT M_c,Rd) ≤ 1`, omitting the favourable 6.3.3 interaction
-factors and therefore conservative. The serviceability check limits the simply‑supported deflection
+Combined axial force and bending are verified with the **full clause 6.3.3 beam‑column interaction**,
+equations (6.61) and (6.62), with the Annex B (Method 2) interaction factors: Table B.1 for class 1–2
+(including the RHS variant of `k_zz`), Table B.2 for class 3, and the susceptible/not‑susceptible
+`k_zy` split — a slab‑restrained flange or a hollow section is treated as not susceptible to torsional
+deformation. All equivalent‑moment factors are held at `C_m = 1.0`, the Table B.3 upper bound, so the
+factors remain conservative for any real moment shape; `χ_LT` multiplies `M_y,Rk` exactly as the code
+equations prescribe, so lateral‑torsional buckling can never be bypassed in a beam‑column. The check is
+**biaxial**: minor‑axis moments from lateral or sway frame cases enter through `k_yz`/`k_zz`, a
+minor‑axis‑only moment is checked against `M_z,Rd` (no LTB about z), and biaxial bending without axial
+uses the always‑conservative linear cross‑section sum of cl. 6.2.1(7). The implementation is validated
+against a hand‑computed IPE300 beam‑column chain (§11). The serviceability check limits the simply‑supported deflection
 `δ = 5wL⁴/(384 E I_y)` to `L/250` under the characteristic load. A reclaimed‑steel knockdown (≤ 1.0)
 optionally reduces `f_y` to reflect material uncertainty and is always flagged; the default of 1.0 assumes
 the grade is confirmed by testing. The member status is FAIL (utilisation > 1), REVIEW (class 4) or OK.
@@ -520,9 +528,10 @@ weldability of old steel) remains the engineer's responsibility and out of scope
 results are decision support, to be confirmed by a qualified engineer.
 
 **Member verification.**
-🟠 Combined N+M is a simplified linear interaction (no 6.3.3 factors; conservative). 🟠 No shear–moment
-(6.2.8) interaction. 🟠 Verification is uniaxial (N + M_y); biaxial column moment is reduced to its worse
-axis. 🟠 Effective lengths are fixed at `k = 1.0`. 🟠 Class 4 sections are flagged, not designed.
+🟡 Combined N+M is the full 6.3.3 (Annex B Method 2) biaxial interaction, but with `C_m = 1.0` (the
+conservative upper bound — no moment‑shape refinement) and member rotation about its own axis assumed
+at the default orientation. 🟠 No shear–moment (6.2.8) interaction.
+🟠 Effective lengths are fixed at `k = 1.0`. 🟠 Class 4 sections are flagged, not designed.
 🟡 LTB uses `C₁ = 1.0` and geometry‑approximated `I_t`/`I_w` (conservative); the slab‑restraint assumption
 is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning.
 🟠 No explicit construction‑stage (bare‑steel) load case.
@@ -535,8 +544,9 @@ assumes no overhang. 🟡 Geometry‑based load estimation is opt‑in.
 
 **Frame analysis.**
 🟠 Seismic is the simplified lateral‑force method with a user base‑shear coefficient — no modal
-response‑spectrum, accidental torsion or behaviour‑factor spectrum. 🟠 Biaxial columns and `k = 1.0` as
-above. 🟡 Lateral actions are applied along the X and Y axes only. 🟠 Frame analysis requires coordinates,
+response‑spectrum, accidental torsion or behaviour‑factor spectrum. 🟠 `k = 1.0` as above (the solve
+gives forces, not buckling lengths); biaxial column moments are now carried per axis into the 6.3.3
+check. 🟡 Lateral actions are applied along the X and Y axes only. 🟠 Frame analysis requires coordinates,
 which the IFC path does not yet export.
 
 **Data and catalogue.**
@@ -565,7 +575,7 @@ self‑derived, so a cross‑check against an independently *published* design e
 worthwhile addition.
 
 **Priority roadmap.** (1) extend the connection screen toward capacity (standard end-connection shear
-tables); (2) full 6.3.3 and biaxial interaction; (3) construction‑stage (bare‑steel) case;
+tables); (2) ~~full 6.3.3 and biaxial interaction~~ **done** (§6.5); (3) construction‑stage (bare‑steel) case;
 (4) calibrate the audit condition→knockdown factors against test data; (5) formal schedule‑count
 validation + re‑extraction with measured dimensions; (6) a complete combination set (pattern, uplift)
 and modal seismic; (7) shear–moment (6.2.8) interaction; (8) IFC coordinate export; (9) effective‑length
