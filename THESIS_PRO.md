@@ -540,8 +540,11 @@ above. 🟡 Lateral actions are applied along the X and Y axes only. 🟠 Frame 
 which the IFC path does not yet export.
 
 **Data and catalogue.**
-🔴 *(human task)* The pyRevit extractor awaits validation on a live Revit model. 🟠 The bundled samples
-predate column‑coordinate capture and revert to defaults until re‑extracted. 🟠 The IFC extractor exports
+🟠 *(human task)* The pyRevit extractor has run on a live Revit model (the §12 case study was
+re‑extracted with full column coordinates), but the formal completeness check — member count against a
+Revit structural schedule, via `steelreuse-validate --schedule` — has not been ticked, and the extraction
+predates the measured‑dimension capture, so one further re‑extraction is needed for geometry
+auto‑confirmation to engage on the real model. 🟠 The IFC extractor exports
 no coordinates. 🟠 The catalogue omits small European sizes and the mono‑symmetric families (UB/UC,
 channels, angles) plus round tube, which require further shape‑aware checks (rectangular/square HSS are
 now catalogued and checked with hollow‑section rules). 🟡 Fuzzy matches without captured
@@ -555,15 +558,19 @@ scope with one dataset (no A4/A5 or end‑of‑life). 🟡 Cutting‑stock and t
 opt‑in toggles for alternative behaviour.
 
 **Machine learning and validation.**
-🟡 The ML study is exploratory and unintegrated; integration needs non‑circular validation. 🟠 Validation
-rests on per‑check hand calculations; a single end‑to‑end published worked example remains outstanding.
+🟡 The ML study is exploratory and unintegrated; integration needs non‑circular validation. 🟡 Validation
+rests on per‑check hand calculations plus the end‑to‑end worked example (§11; one complete bay through
+the whole pipeline with every stage asserted against the hand chain); the worked example is
+self‑derived, so a cross‑check against an independently *published* design example remains a
+worthwhile addition.
 
 **Priority roadmap.** (1) extend the connection screen toward capacity (standard end-connection shear
-tables); (2) live‑model extractor validation;
-(3) calibrate the audit condition→knockdown factors against test data; (4) shape‑aware checks for channels/angles/round tube; (5) IFC
-coordinate export; (6) full 6.3.3 and biaxial interaction; (7) a complete combination set and modal
-seismic; (8) construction‑stage case; (9) multi‑objective optimisation; (10) an end‑to‑end validation
-example; (11) catalogue expansion; (12) effective‑length inference.
+tables); (2) full 6.3.3 and biaxial interaction; (3) construction‑stage (bare‑steel) case;
+(4) calibrate the audit condition→knockdown factors against test data; (5) formal schedule‑count
+validation + re‑extraction with measured dimensions; (6) a complete combination set (pattern, uplift)
+and modal seismic; (7) shear–moment (6.2.8) interaction; (8) IFC coordinate export; (9) effective‑length
+inference; (10) shape‑aware checks for channels/angles/round tube and the small European sizes;
+(11) multi‑objective optimisation; (12) an independently published validation benchmark.
 
 ---
 

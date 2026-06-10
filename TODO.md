@@ -25,11 +25,14 @@
       CPython 3.12 has a Revit-2026 bug ("input string '3.12.3' was not in a correct format"). The
       extractor is stdlib-only and works fine on IronPython 3.
 
-## 2. Validate member count (Phase 1 official check)
+## 2. Re-extract with the dimension-capturing extractor + validate member count
 
-- [ ] In Revit, open the **donor** model → create a **Structural Framing + Structural Columns schedule**
-      (count of members). Confirm it matches the 1016 total in `donor_test2.json`. Same for demand (270).
-      This is the formal Phase 1 completeness check.
+- [ ] **Re-run SteelReuse → Extract** on both models (the extractor now also captures measured section
+      dimensions `h/b/tf/tw`, needed for geometry auto-confirmation of fuzzy names — the current
+      `donortest3.json`/`demandtest3.json` predate this).
+- [ ] In Revit, create a **Structural Framing + Structural Columns schedule** (count of members) and
+      run `steelreuse-validate <json> --schedule <csv>` (or compare counts by hand) for donor and
+      demand. This is the formal Phase 1 completeness check.
 
 ## 3. Review the unknown bucket
 

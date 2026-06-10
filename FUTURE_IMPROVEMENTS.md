@@ -221,9 +221,12 @@ checker and surrogate can disagree on).
 ### ✅ 8. Methodology document — DONE
 [docs/METHODOLOGY.md](docs/METHODOLOGY.md) maps each EN 1993-1-1 clause → code → assumption → validation
 source (classification 5.2, 6.2.x resistances, 6.3.x buckling/LTB, the simplified 6.3.3 interaction,
-SLS), with an assumptions register and the hand-calc validation basis. **Residual:** add an explicit
-**end-to-end validation against one published worked example** (currently the validation is the
-per-check hand calcs encoded in the tests, not a single textbook frame run start-to-finish).
+SLS), with an assumptions register and the hand-calc validation basis. **The end-to-end worked example
+is now DONE** ([tests/test_worked_example.py](tests/test_worked_example.py) + the "Worked example"
+section of [docs/VALIDATION.md](docs/VALIDATION.md)): one complete bay through `run_pipeline` with every
+stage — pressure, w, M/V/N, resistances, χ, baselines, carbon — asserted against the hand chain.
+**Residual:** the example is self-derived; a cross-check against an independently *published* design
+example (e.g. an SCI/Access-Steel worked beam+column) would add external authority.
 
 ### 9. Optimizer / reporting refinements
 - ✅ **Off-cut / cutting-stock — DONE (optional mode).** `match(..., allow_cutting=True)` / CLI `--cut`
@@ -244,11 +247,14 @@ per-check hand calcs encoded in the tests, not a single textbook frame run start
 
 ## Tier 4 — Human-only (cannot be automated)
 
-### 10. Run the pyRevit extractor on a real steel model
-The extractor ([extractor/pyrevit_extract.py](extractor/pyrevit_extract.py)) has never been run in
-real Revit (Phase 1's official check). Build a small donor + demand model, run the SteelReuse → Extract
-button, and confirm the JSON member count matches a Revit structural schedule. See
-[TODO.md](TODO.md) §4.
+### 🟡 10. pyRevit extractor on a real steel model — RUN, two residuals
+The extractor ([extractor/pyrevit_extract.py](extractor/pyrevit_extract.py)) **has now been run in real
+Revit** (2026-06-09): the case-study building was re-extracted to `pyrevit_extension/donortest3.json` /
+`demandtest3.json` with full column coordinates (74/74 donor, 54/54 demand) and the pipeline reproduces
+the test2 headline (140/349 reused, 16.5 t CO₂). **Residuals:** (a) the formal completeness check —
+member count vs a Revit structural schedule via `steelreuse-validate --schedule` — hasn't been ticked;
+(b) the test3 extraction predates the measured-dimension capture, so one more re-extraction is needed
+for geometry auto-confirmation of fuzzy names to engage on the real model. See [TODO.md](TODO.md).
 
 ### ✅ 11. Material-reuse verification model — DONE (pre-demolition audit layer)
 **Was:** coupon testing / corrosion survey / grade traceability were disclaimer-only, and the reclaimed
