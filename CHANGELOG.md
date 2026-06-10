@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Connection capacity screen** (`standard_shear_capacity` in `core/connections.py`): every
+  open-section donor gets a lower-bound *standard fin-plate* shear resistance (single row of M20 8.8
+  bolts in a 10 mm S275 plate; rows from the clear web depth; per bolt the EN 1993-1-8 Table 3.4
+  minimum of bolt shear and bearing, conservative α_b = 0.5 — IPE300 → 3 rows ≈ 183 kN,
+  hand-verified). The matcher screens the slot's worst V_Ed against it; exceedance flags `review`
+  ("bespoke end connection required"), never a gate. Tubes get no capacity opinion.
 - **Construction-stage (bare-steel) load case** (CLI `--construction` / `--construction-live`,
   `AreaLoadModel.construction_stage`): every beam slot's envelope gains an erection-stage entry —
   full permanent (wet slab) + the EN 1991-1-6 construction live load (default 0.75 kN/m²) with the

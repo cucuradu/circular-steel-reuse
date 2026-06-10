@@ -38,12 +38,26 @@ from .sections import SectionProps
 
 @dataclass(frozen=True)
 class ConnectionPolicy:
-    """Tolerances for the geometric compatibility screen (mm / ratios of the design value)."""
+    """Tolerances for the geometric compatibility screen (mm / ratios of the design value),
+    plus the parameters of the *standard simple end connection* used for the shear-capacity screen
+    (:func:`standard_shear_capacity`): a single vertical row of bolts through a fin plate, the
+    workhorse beam-to-column shear connection."""
 
     max_depth_over_mm: float = 50.0    # donor deeper than design by more than this -> incompatible
     max_depth_under_frac: float = 0.25  # donor shallower than (1-frac)*design depth -> review
     min_web_ratio: float = 0.80        # donor t_w below this fraction of design t_w -> review
     min_flange_ratio: float = 0.70     # donor b below this fraction of design b -> review
+    # Standard fin-plate parameters (EN 1993-1-8): M20 class 8.8 bolts in an S275 plate.
+    bolt_d_mm: float = 20.0            # bolt diameter
+    bolt_area_mm2: float = 245.0       # tensile stress area A_s (M20)
+    bolt_fub: float = 800.0            # bolt ultimate strength (class 8.8); alpha_v = 0.6 applies
+    plate_t_mm: float = 10.0           # fin-plate thickness
+    plate_fu: float = 430.0            # ultimate strength used for bearing (S275 plate; also used
+                                       # for the beam web -> conservative for S355+ donors)
+    end_dist_mm: float = 40.0          # e1, top/bottom edge distance in the web
+    pitch_mm: float = 70.0             # p1, vertical bolt pitch
+    max_bolt_rows: int = 8             # detailing cap
+    gamma_m2: float = 1.25
 
 
 @dataclass
@@ -56,18 +70,63 @@ class ConnectionCheck:
         return "; ".join(self.notes)
 
 
+def standard_shear_capacity(
+    sec: SectionProps,
+    policy: ConnectionPolicy | None = None,
+) -> tuple[float, int] | None:
+    """Shear resistance (N) of a *standard* fin-plate connection on this beam, and its bolt-row count.
+
+    A capacity screen, not a design: one vertical row of ``n`` bolts (as many as the clear web depth
+    accommodates at pitch ``p1`` with end distances ``e1``, capped at ``max_bolt_rows``), each worth
+    the minimum of (EN 1993-1-8 Table 3.4):
+      * bolt shear      ``F_v,Rd = 0.6 f_ub A_s / gamma_M2``  (alpha_v = 0.6, class 4.6/5.6/8.8);
+      * bearing         ``F_b,Rd = 2.5 * 0.5 * f_u * d * t / gamma_M2`` on the thinner of beam web
+        and fin plate, with the deliberately conservative ``alpha_b = 0.5`` (end-row value) so no
+        spacing optimisation is assumed.
+    Block tearing and plate shear are not evaluated — with these proportions (10 mm plate, alpha_b
+    = 0.5) they do not govern a *standard* detail, and the screen's job is a credible lower bound.
+    Returns ``None`` for hollow sections (a tube has no web to fin-plate into; different typology).
+    """
+    p = policy or ConnectionPolicy()
+    if sec.is_hollow:
+        return None
+    clear_web = sec.h - 2.0 * sec.tf - 2.0 * sec.r
+    rows = int((clear_web - 2.0 * p.end_dist_mm) // p.pitch_mm) + 1
+    rows = max(1, min(p.max_bolt_rows, rows))
+    f_v = 0.6 * p.bolt_fub * p.bolt_area_mm2 / p.gamma_m2
+    f_b_web = 2.5 * 0.5 * p.plate_fu * p.bolt_d_mm * sec.tw / p.gamma_m2
+    f_b_plate = 2.5 * 0.5 * p.plate_fu * p.bolt_d_mm * p.plate_t_mm / p.gamma_m2
+    return rows * min(f_v, f_b_web, f_b_plate), rows
+
+
 def screen_pair(
     donor: SectionProps,
     design: SectionProps | None,
     policy: ConnectionPolicy | None = None,
+    v_ed_n: float = 0.0,
 ) -> ConnectionCheck:
     """Geometric connection-compatibility of ``donor`` standing in for ``design``.
 
     ``design is None`` (the slot never specified / never mapped a section) returns ``unknown`` —
     there is nothing to compare against, and no opinion is honest opinion.
+
+    ``v_ed_n`` (optional, N): the slot's worst shear demand. When given, the donor's *standard*
+    fin-plate capacity (:func:`standard_shear_capacity`) is screened against it; exceeding it flags
+    ``review`` ("a standard end connection won't carry this — bespoke design needed"), never
+    ``incompatible`` (a bespoke connection may well work; that is the engineer's call).
     """
     p = policy or ConnectionPolicy()
+    cap_notes: list[str] = []
+    if v_ed_n > 0:
+        cap = standard_shear_capacity(donor, p)
+        if cap is not None and v_ed_n > cap[0]:
+            cap_notes.append(
+                f"shear {v_ed_n / 1e3:.0f} kN exceeds a standard {cap[1]}-row fin plate "
+                f"(~{cap[0] / 1e3:.0f} kN): bespoke end connection required"
+            )
     if design is None:
+        if cap_notes:
+            return ConnectionCheck("review", cap_notes)
         return ConnectionCheck("unknown", ["no design section to compare against"])
 
     if donor.is_hollow != design.is_hollow:
@@ -76,7 +135,7 @@ def screen_pair(
         return ConnectionCheck(
             "incompatible", [kind + ": connection typology must be redesigned"])
 
-    notes: list[str] = []
+    notes: list[str] = list(cap_notes)   # capacity flag (if any) joins the geometric findings
     over = donor.h - design.h
     if over > p.max_depth_over_mm:
         return ConnectionCheck(

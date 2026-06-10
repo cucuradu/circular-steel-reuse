@@ -237,11 +237,13 @@ def _feasible_cell(
     sec = catalog.get(supply.section)
     if sec is None:
         return None
-    # Geometric connection-compatibility vs the slot's design section. Always *annotated* on the
-    # assignment; an "incompatible" pair is *gated* only when the screen is enabled (the policy is
-    # set). Cheap, so it runs before the EN checks.
+    # Connection screen vs the slot's design section + its worst shear demand (a standard fin plate
+    # that can't carry V_Ed -> review). Always *annotated* on the assignment; an "incompatible" pair
+    # is *gated* only when the screen is enabled (the policy is set). Cheap, so it runs before the
+    # EN checks.
     design_sec = catalog.get(slot.design_section) if slot.design_section else None
-    conn = screen_pair(sec, design_sec, connection_policy)
+    v_ed = max((abs(d.Vz_Ed) for _, d in slot.combinations), default=0.0)
+    conn = screen_pair(sec, design_sec, connection_policy, v_ed_n=v_ed)
     if connection_policy is not None and conn.status == "incompatible":
         return None
     # Verify the reclaimed member against every load combination; the governing (worst-utilisation)

@@ -101,3 +101,40 @@ def test_no_design_section_never_gates(catalog):
     res = match(supply, [_beam_slot(None)], catalog, connection_policy=ConnectionPolicy())
     assert len(res.assignments) == 1
     assert res.assignments[0].connection_status == "unknown"
+
+
+# --- standard fin-plate shear-capacity screen --------------------------------
+#
+# Hand chain (IPE300, default policy: M20 8.8 in a 10 mm S275 plate, e1=40, p1=70):
+#   clear web  = 300 - 2*10.7 - 2*15 = 248.6 mm -> rows = floor((248.6-80)/70)+1 = 3
+#   bolt shear F_v,Rd   = 0.6*800*245/1.25  = 94 080 N
+#   web bearing F_b,Rd  = 2.5*0.5*430*20*7.1/1.25 = 61 060 N   <- governs (t_w = 7.1 < t_plate)
+#   plate bearing       = 2.5*0.5*430*20*10/1.25  = 86 000 N
+#   V_Rd = 3 * 61 060 = 183 180 N
+
+def test_standard_shear_capacity_hand_calc(catalog):
+    from steelreuse.core.connections import standard_shear_capacity
+    cap, rows = standard_shear_capacity(catalog["IPE300"])
+    assert rows == 3
+    assert cap == pytest.approx(3 * 61060, rel=1e-3)
+
+
+def test_standard_shear_capacity_skips_tubes_and_caps_rows(catalog):
+    from steelreuse.core.connections import standard_shear_capacity
+    hss = next(s for s in catalog.values() if s.is_hollow)
+    assert standard_shear_capacity(hss) is None          # no web to fin-plate into
+    deep = next(s for s in catalog.values() if not s.is_hollow and s.h > 900)
+    _, rows = standard_shear_capacity(deep)
+    assert rows == ConnectionPolicy().max_bolt_rows      # detailing cap engaged
+
+
+def test_v_ed_above_standard_capacity_flags_review(catalog):
+    sec = catalog["IPE300"]
+    ok = screen_pair(sec, sec, v_ed_n=120e3)             # 120 kN < 183 kN -> still ok
+    assert ok.status == "ok"
+    over = screen_pair(sec, sec, v_ed_n=200e3)           # 200 kN > 183 kN -> review, never gates
+    assert over.status == "review"
+    assert "bespoke end connection" in over.note
+    # capacity opinion stands even with no design section to compare against
+    no_design = screen_pair(sec, None, v_ed_n=200e3)
+    assert no_design.status == "review"

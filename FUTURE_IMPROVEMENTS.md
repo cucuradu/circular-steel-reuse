@@ -92,9 +92,16 @@ against the slot's design section** (what the connections were detailed around):
 (seats, end plates) → `review`. Every assignment is annotated (report "Connection" column +
 `Assignment.connection_status/note`); `--connections` (CLI), `connection_screen=` (pipeline), or the
 app checkbox additionally **exclude incompatible pairs** before matching. No design section → no
-opinion (never blocks). Tolerances live in `ConnectionPolicy`. **Residual:** extend toward capacity
-(standard fin-plate/end-plate shear tables so `V_Ed` can be screened too); actual connection design
-remains the engineer's.
+opinion (never blocks). Tolerances live in `ConnectionPolicy`.
+
+**✅ Capacity extension — DONE.** `standard_shear_capacity` gives each open-section donor a
+lower-bound *standard fin-plate* shear resistance (single row of M20 8.8 bolts in a 10 mm S275 plate,
+row count from the clear web depth, per-bolt EN 1993-1-8 Table 3.4 minimum of bolt shear and bearing
+with conservative `α_b = 0.5`; IPE300 → 3 rows ≈ 183 kN, hand-verified in `tests/test_connections.py`).
+The matcher passes the slot's worst `V_Ed` into the screen; exceeding the standard capacity flags
+`review` ("bespoke end connection required") — never a gate, because a bespoke connection may work.
+**Residual:** actual connection design (welds, block tearing, end plates in tension, moment
+connections) remains the engineer's; tube end connections get no capacity opinion.
 
 ---
 

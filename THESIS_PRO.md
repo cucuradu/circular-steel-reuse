@@ -440,8 +440,17 @@ connectable, but the details need an engineer's look. The screen never judges st
 EN checker's job) and a slot with no known design section yields no opinion, so absence of data never
 blocks reuse. By default the screen only *annotates* every assignment (a Connection column in the
 report); with `--connections` enabled, `incompatible` pairs are excluded before matching. All
-tolerances are an explicit, overridable policy. Designing the connections themselves — bolts, welds,
-plates — remains out of scope.
+tolerances are an explicit, overridable policy.
+
+The screen now also extends **toward capacity**: each donor's *standard* simple end connection — a
+fin plate with a single vertical row of M20 class 8.8 bolts in a 10 mm S275 plate, as many rows as the
+clear web depth accommodates — is given a lower‑bound shear resistance per EN 1993‑1‑8 Table 3.4
+(bolt shear `0.6 f_ub A_s/γ_M2` against bearing `2.5·0.5·f_u d t/γ_M2` on the thinner of web and
+plate, with the conservative end‑row `α_b = 0.5`). When the slot's worst shear demand exceeds this
+standard capacity the pair is flagged `review` — "a standard end connection will not carry this;
+bespoke design needed" — never excluded, because a bespoke connection may well work. For an IPE300 the
+screen yields a 3‑row plate at ≈ 183 kN, hand‑verified in the tests. Designing the connections
+themselves — bolts, welds, plates, block tearing, the bespoke cases — remains out of scope.
 
 ## 9.2 Optimisation and fallback
 
@@ -522,10 +531,11 @@ conservative and documented) · 🟡 minor. Items marked *(out of scope)* are de
 
 **Real‑world feasibility (governing).**
 🔴 *Connection design (out of scope):* bolts, welds and plates are not designed, yet often govern reuse.
-The tool now ships a **geometric connection feasibility screen** (§9.1.1) — shape family, depth band,
-web and flange compatibility against the slot's design section, annotating every assignment and
-optionally excluding incompatible donors — but the screen is geometry, not capacity: connection design
-and its verification remain the engineer's. 🟠 *Material certification:* the tool now
+The tool now ships a **connection feasibility screen** (§9.1.1) — shape family, depth band, web and
+flange compatibility against the slot's design section, plus a **standard fin‑plate shear‑capacity
+check** against the slot's worst shear demand — annotating every assignment and optionally excluding
+incompatible donors. The screen is a lower‑bound pre‑check, not a design: bespoke connections, welds,
+moment connections and their verification remain the engineer's. 🟠 *Material certification:* the tool now
 ingests a **pre‑demolition audit** (§4.4) — per‑member condition and verification basis driving a derived
 knockdown and a quarantine of unverified or unsuitable stock — so grade trust is an explicit, traceable
 input rather than a global figure; the survey itself (coupon‑test programme, corrosion/fatigue assessment,
@@ -581,8 +591,9 @@ the whole pipeline with every stage asserted against the hand chain); the worked
 self‑derived, so a cross‑check against an independently *published* design example remains a
 worthwhile addition.
 
-**Priority roadmap.** (1) extend the connection screen toward capacity (standard end-connection shear
-tables); (2) ~~full 6.3.3 and biaxial interaction~~ **done** (§6.5); (3) ~~construction‑stage
+**Priority roadmap.** (1) ~~extend the connection screen toward capacity~~ **done** (§9.1.1 — standard
+fin‑plate shear screen; bespoke connection design remains out of scope); (2) ~~full 6.3.3 and biaxial
+interaction~~ **done** (§6.5); (3) ~~construction‑stage
 (bare‑steel) case~~ **done** (§5.3, opt‑in `--construction`);
 (4) calibrate the audit condition→knockdown factors against test data; (5) formal schedule‑count
 validation + re‑extraction with measured dimensions; (6) a complete combination set (pattern, uplift)

@@ -316,9 +316,15 @@ material passport is meant to carry.
    around: wrong shape family (tube ↔ open) or more than 50 mm deeper → `incompatible`; markedly
    shallower, thinner web (bolt bearing), or narrower flange (seats/end plates) → `review`. Every
    assignment is annotated with the result (report "Connection" column); with `--connections`,
-   incompatible pairs are excluded before matching. The screen is geometry only — never a capacity
-   judgement, never an opinion when the slot has no design section — and the tolerances are an
-   explicit `ConnectionPolicy`. Connection *design* stays out of scope.
+   incompatible pairs are excluded before matching. The screen also estimates each donor's **standard
+   fin-plate shear capacity** (`standard_shear_capacity`: a single vertical row of M20 8.8 bolts in a
+   10 mm S275 plate, rows from the clear web depth at p1 = 70/e1 = 40, per bolt the EN 1993-1-8
+   Table 3.4 minimum of bolt shear `0.6·f_ub·A_s/γ_M2` and bearing `2.5·0.5·f_u·d·t/γ_M2` with the
+   conservative end-row `α_b = 0.5`; hand-verified ≈ 183 kN / 3 rows for IPE300) and flags `review`
+   when the slot's worst `V_Ed` exceeds it — a standard end connection won't carry the shear, so a
+   bespoke one is needed; never a gate. Tubes get no capacity opinion (different typology). The
+   tolerances and the standard detail are an explicit `ConnectionPolicy`. Connection *design* (welds,
+   block tearing, moment connections, the bespoke cases) stays out of scope.
 2. **Avoided-new baseline (per slot).** The honest CO₂ basis is the **lightest catalog section that
    passes the slot's exact check**, restricted to the **slot's own design standard** (a US slot's
    baseline is a W-shape, not a coincidentally-lighter IPE) **and shape family** (a hollow baseline
