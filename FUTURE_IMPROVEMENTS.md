@@ -67,6 +67,34 @@ irregular pieces that form a near-mechanism; the tool correctly falls back rathe
 
 ---
 
+## ✅ Geometry confirmation of fuzzy/unknown section names — NEW
+
+Fuzzy name matches were quarantined until a human confirmed them via the override CSV. The extractors
+now capture each member's **measured section dimensions** (`h/b/tf/tw` — pyRevit structural-section
+type parameters; IFC `IfcIShapeProfileDef`), and `resolve_members` confirms a fuzzy or unknown name
+when those dimensions match **exactly one** catalog row within `max(1 mm, 1.5 %)` (method `geometry`,
+confidence 1.0). A fuzzy name needs `h+b`; an unknown name needs all four dimensions. Ambiguity
+confirms nothing; models without dimensions behave exactly as before. **Residual:** the bundled sample
+models predate dimension capture (re-extract to benefit); a Streamlit review queue for the remaining
+unconfirmed fuzzy matches would close the loop.
+
+---
+
+## ✅ Connection feasibility screen — NEW (geometry; design still out of scope)
+
+Connections often govern whether reuse is practical, but the tool treated them as a flat 5 kg
+refabrication penalty. `core/connections.py` now screens each (donor, slot) pair **geometrically
+against the slot's design section** (what the connections were detailed around): wrong shape family or
+> 50 mm deeper → `incompatible`; markedly shallower / thinner web (bolt bearing) / narrower flange
+(seats, end plates) → `review`. Every assignment is annotated (report "Connection" column +
+`Assignment.connection_status/note`); `--connections` (CLI), `connection_screen=` (pipeline), or the
+app checkbox additionally **exclude incompatible pairs** before matching. No design section → no
+opinion (never blocks). Tolerances live in `ConnectionPolicy`. **Residual:** extend toward capacity
+(standard fin-plate/end-plate shear tables so `V_Ed` can be screened too); actual connection design
+remains the engineer's.
+
+---
+
 ## Tier 2 — Structural credibility (the thesis core)
 
 ### 🟡 1. Column loads — per-column tributary/floors (MOSTLY DONE), residuals below
@@ -130,11 +158,22 @@ section table in the [PedroBiel gist](https://gist.github.com/PedroBiel/980d8bc9
 IPE300 / HEB200 / HEB240 / HEB300 rows (incl. `Wpl`) **exactly** before trusting its `Wpl` column for the
 new sizes. Every added row passes the **catalog property-consistency test**
 (`test_catalog_property_consistency` in [tests/test_sections.py](tests/test_sections.py)), which
-recomputes mass/`Wel`/`i` from the primaries and checks `Wpl ≥ Wel` across all rows (EU + the 283 US).
+recomputes mass/`Wel`/`i` from the primaries and checks `Wpl ≥ Wel` across all rows (now 711: 40 EU +
+283 US W + 388 US HSS).
 
-**Residual (lower priority):** small sections (HEA/HEB/HEM 100–180, IPE80–140) and the other families
-(UB/UC, UPN/UPE channels, IPN, L-angles, RHS/CHS) — same gist/source covers most; add as needed. Channels
-and angles also need shape-aware checks (the EN I/H formulas don't apply to mono-symmetric/hollow shapes).
+**✅ HSS — DONE (shape-aware).** The **388 rectangular/square AISC HSS** now ship in
+[us_hss.csv](src/steelreuse/data/sections/us_hss.csv) (verbatim imperial from the AISC v15.0 database,
+design wall `t_des = 0.93·t_nom`) with **hollow-section rules** in the checker: every wall classified as
+an internal part (`c = h − 3t`, Table 5.2), cold-formed **buckling curve c** both axes, RHS shear area
+`A_v = A·h/(b+h)`, and **no LTB** (closed sections aren't susceptible; the open-section `I_t`/`I_w`
+approximations don't apply). The avoided-new baseline is additionally **shape-family-restricted**: a
+tube baseline only when the design section is a tube, so existing open-section results are unchanged.
+Tested in [tests/test_hss.py](tests/test_hss.py).
+
+**Residual (lower priority):** small sections (HEA/HEB/HEM 100–180, IPE80–140) and the remaining
+families (UB/UC, UPN/UPE channels, IPN, L-angles, round CHS/pipe) — the EU gist covers most of the open
+ones; round tube needs a `D/t` classification rule, and channels/angles need mono-symmetric checks
+(shear-centre offset, eccentric connections), which is why they stay excluded.
 
 ### ✅ 5. Surface χ_LT in the default run — DONE
 The restrained bending path now also computes the **"if unrestrained" χ_LT**
@@ -211,11 +250,24 @@ real Revit (Phase 1's official check). Build a small donor + demand model, run t
 button, and confirm the JSON member count matches a Revit structural schedule. See
 [TODO.md](TODO.md) §4.
 
-### 11. Material-reuse verification model (currently disclaimer-only)
-Coupon testing, corrosion/fatigue survey, weldability of old steel, and **connection design** are the
-real-world determinants of reuse feasibility and are explicitly out of scope — only a disclaimer
-covers them. A future version could at least ingest coupon-test results to set the per-member
-`knockdown` instead of a global default.
+### ✅ 11. Material-reuse verification model — DONE (pre-demolition audit layer)
+**Was:** coupon testing / corrosion survey / grade traceability were disclaimer-only, and the reclaimed
+`knockdown` was a single global value applied to all donor stock.
+
+**Done:** a **pre-demolition audit** layer ([core/audit.py](src/steelreuse/core/audit.py)) ingests, per
+donor member, a surveyed **condition grade** (A–D) and **verification basis** (mill cert / coupon test /
+documented / visual / unverified) — set in the model JSON or merged from a CSV via `--pda`. It derives a
+**per-member f_y knockdown** (condition × verification factor, or an explicit auditor value) and
+**quarantines** unverified or unsuitable (condition D) stock from the certified supply, exactly like a
+fuzzy section match — honest by default (a member with no audit data is unchanged; absence ≠ "fine").
+`recoverable_length_mm` feeds the matcher's length/cutting constraints. Provenance surfaces in the
+material passport, the HTML report (a Provenance column + an audit summary), and the console. See
+[docs/PRE_DEMOLITION_AUDIT.md](docs/PRE_DEMOLITION_AUDIT.md) and `tests/test_audit.py`.
+
+**Residual:** still out of scope (engineer's responsibility) — designing the coupon-test programme,
+weldability of old steel, and **connection design / condition**; the layer models how audit *findings*
+flow into the result, not the survey itself. The condition→knockdown factors are representative defaults
+(documented in METHODOLOGY §3.1), not a code-calibrated derating model.
 
 ---
 

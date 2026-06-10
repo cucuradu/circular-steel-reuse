@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Connection feasibility screen** (`core/connections.py`, CLI `--connections`): each (donor, slot)
+  pair is compared geometrically against the slot's **design section** — wrong shape family or
+  > 50 mm deeper → incompatible; markedly shallower / thinner web / narrower flange → review. Every
+  assignment is annotated (new report "Connection" column, `Assignment.connection_status`); enabling
+  the screen excludes incompatible pairs before matching. Geometry only — connection *design* remains
+  out of scope; tolerances adjustable via `ConnectionPolicy`.
+- **Rect/square HSS support** (388 AISC shapes, `data/sections/us_hss.csv`, verbatim imperial from the
+  AISC Shapes Database v15.0): the checker is now **shape-aware** — hollow sections classify every wall
+  as an internal part (`c = h − 3t`), use the cold-formed buckling curve c on both axes and the RHS
+  shear area `A_v = A·h/(b+h)`, and skip LTB (closed sections are not susceptible). The avoided-new
+  baseline is additionally restricted to the slot's **shape family**, so open-section results are
+  unchanged by the new tube rows. Catalog now 711 sections (40 EU + 283 US W + 388 US HSS). Round
+  HSS/pipe and channels/angles remain out of scope.
+- **Geometry confirmation of section names** (`core/sections.py`): the extractors now capture each
+  member's measured section dimensions (`h_mm`/`b_mm`/`tf_mm`/`tw_mm` — pyRevit from the type's
+  structural-section parameters, IFC from `IfcIShapeProfileDef`), and `resolve_members` uses them to
+  confirm a **fuzzy** or **unknown** type name against the catalog by physical dimensions (new mapping
+  method `geometry`, confidence 1.0). Unique match required (tolerance `max(1 mm, 1.5%)` per
+  dimension); a fuzzy name needs h+b, an unknown name all four. Replaces most manual override-CSV
+  confirmation; models without dimensions behave exactly as before.
+- **Pre-demolition audit layer** (`core/audit.py`, `--pda`): donor members carry a surveyed condition
+  grade (A–D) and verification basis (mill cert / coupon test / documented / visual / unverified),
+  supplied in the model JSON or merged from a CSV. These derive a **per-member f_y knockdown**
+  (condition × verification, or an explicit value) and **quarantine** unverified or unsuitable
+  (condition D) stock from the certified supply, the same way a fuzzy section match is withheld. Adds a
+  `recoverable_length_mm` (usable stock after de-construction). Honest by default: a member with no
+  audit data is unchanged (admitted at the run default). Provenance surfaces in the material passport,
+  the HTML report (audit section + per-assignment Provenance column), and the console. New flags
+  `--pda <csv>` and `--include-unverified`; new schema fields on `ExtractedMember`. See
+  `docs/PRE_DEMOLITION_AUDIT.md`. Closes FUTURE_IMPROVEMENTS #11.
+
 ## [0.2.0] - 2026-06-09
 
 First public, release-engineered version. The deterministic EN 1993-1-1 core is unchanged; this

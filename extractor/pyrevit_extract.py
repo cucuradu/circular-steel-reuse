@@ -149,6 +149,56 @@ def _column_point_xyz(elem, length_mm):
     return None, None
 
 
+# Measured section dimensions, read from the element's TYPE. Primary source: the Revit structural
+# section geometry built-ins (present on structural framing/column types since ~2017); fallback:
+# common family parameter names (US W-families use d/bf/tf/tw, EU families h/b/tf/tw). The names of
+# the BuiltInParameter members are looked up defensively (getattr) so an older API can't throw.
+# Downstream these let the mapping layer confirm a fuzzy/unknown type NAME by physical dimensions.
+_DIM_PARAMS = (
+    ("h_mm", "STRUCTURAL_SECTION_COMMON_HEIGHT", ("d", "h", "Height", "ht")),
+    ("b_mm", "STRUCTURAL_SECTION_COMMON_WIDTH", ("bf", "b", "Width")),
+    ("tf_mm", "STRUCTURAL_SECTION_ISHAPE_FLANGE_THICKNESS", ("tf", "Flange Thickness")),
+    ("tw_mm", "STRUCTURAL_SECTION_ISHAPE_WEB_THICKNESS", ("tw", "Web Thickness")),
+)
+
+
+def _dim_from(target, bip_name, fallback_names):
+    """One dimension (mm) from built-in or named parameters of a type/instance, else None."""
+    if target is None:
+        return None
+    bip = getattr(DB.BuiltInParameter, bip_name, None)
+    if bip is not None:
+        try:
+            p = target.get_Parameter(bip)
+            if p and p.HasValue and p.AsDouble() > 0:
+                return _mm(p.AsDouble())
+        except Exception:
+            pass
+    for nm in fallback_names:
+        try:
+            p = target.LookupParameter(nm)
+            if p and p.HasValue and p.AsDouble() > 0:
+                return _mm(p.AsDouble())
+        except Exception:
+            continue
+    return None
+
+
+def _section_dims(elem):
+    """Measured section dimensions {h_mm, b_mm, tf_mm, tw_mm} (mm), each None if unreadable."""
+    try:
+        sym = doc.GetElement(elem.GetTypeId())
+    except Exception:
+        sym = None
+    dims = {}
+    for key, bip_name, fallbacks in _DIM_PARAMS:
+        val = _dim_from(sym, bip_name, fallbacks)
+        if val is None:
+            val = _dim_from(elem, bip_name, fallbacks)
+        dims[key] = val
+    return dims
+
+
 def _collect(category):
     return (DB.FilteredElementCollector(doc)
             .OfCategory(category)
@@ -216,13 +266,15 @@ def extract(kind):
         length = _mm(crv.Length) if crv else _column_length_mm(col)
         if s is None and e is None:
             s, e = _column_point_xyz(col, length)   # recover plan x,y for point-placed columns
-        members.append({
+        member = {
             "id": _id_str(col.Id), "role": "column",
             "category": "Structural Columns", "raw_section": _type_name(col),
             "section": None, "material_grade": _grade(col), "level": _level_name(col),
             "length_mm": length, "spans_mm": [length] if length else [],
             "start_xyz": s, "end_xyz": e, "notes": "",
-        })
+        }
+        member.update(_section_dims(col))
+        members.append(member)
 
     for bm in beams:
         s, e, crv = _endpoints(bm)
@@ -233,13 +285,15 @@ def extract(kind):
         else:
             spans = [length] if length else []
             note = "donor: physical stock length" if kind == "donor" else ""
-        members.append({
+        member = {
             "id": _id_str(bm.Id), "role": "beam",
             "category": "Structural Framing", "raw_section": _type_name(bm),
             "section": None, "material_grade": _grade(bm), "level": _level_name(bm),
             "length_mm": length, "spans_mm": spans,
             "start_xyz": s, "end_xyz": e, "notes": note,
-        })
+        }
+        member.update(_section_dims(bm))
+        members.append(member)
 
     return {
         "kind": kind, "members": members, "source": "pyrevit",

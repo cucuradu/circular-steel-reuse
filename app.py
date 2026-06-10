@@ -59,7 +59,15 @@ def main() -> None:
             wind = st.number_input("Wind pressure (kN/m², frame only)", 0.0, 5.0, 0.0, 0.1)
             seismic = st.number_input("Seismic Cs (frame only)", 0.0, 1.0, 0.0, 0.05)
             allow_cutting = st.checkbox("Cutting-stock (1 donor → many cuts)", value=False)
+            connection_screen = st.checkbox(
+                "Connection feasibility screen", value=False,
+                help="Exclude donors geometrically incompatible with the slot's design section "
+                     "(wrong shape family, too deep for the detailed zone); milder mismatches are "
+                     "flagged 'review' either way.")
             all_demand = st.checkbox("Include non-steel demand", value=False)
+            include_unverified = st.checkbox(
+                "Admit unverified donor stock (pre-demolition audit)", value=False,
+                help="By default, donor members the audit could not verify are quarantined.")
 
     donor = _save_upload(donor_up, SAMPLES / "donor.json")
     demand = _save_upload(demand_up, SAMPLES / "demand.json")
@@ -72,8 +80,10 @@ def main() -> None:
     try:
         res = run_pipeline(
             donor, demand, loads=loads, knockdown=knockdown,
+            include_unverified=include_unverified,
             steel_only_demand=not all_demand, tributary_from_geometry=trib_from_geometry,
-            allow_cutting=allow_cutting, frame_analysis=frame_analysis,
+            allow_cutting=allow_cutting, connection_screen=connection_screen,
+            frame_analysis=frame_analysis,
             wind_kpa=wind, seismic_cs=seismic,
         )
     except ExtractionError as e:

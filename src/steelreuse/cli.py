@@ -46,7 +46,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--donor", help="donor (supply) extraction JSON")
     ap.add_argument("--demand", help="new-design (demand) extraction JSON")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
-    ap.add_argument("--knockdown", type=float, default=1.0, help="reclaimed f_y knockdown (<=1.0)")
+    ap.add_argument("--knockdown", type=float, default=1.0,
+                    help="default reclaimed f_y knockdown (<=1.0) for donor members with no audit data")
+    # Pre-demolition audit (PDA): per-member condition / verification provenance.
+    ap.add_argument("--pda", help="pre-demolition-audit CSV (id,condition_grade,verification_status,"
+                                  "knockdown,recoverable_length_mm,defects) merged onto donor members")
+    ap.add_argument("--include-unverified", action="store_true",
+                    help="admit donor members that the audit could not verify (at a conservative "
+                         "knockdown) instead of quarantining them; off by default")
     # Area-based load model (default). Floor pressures + tributary geometry + EN 1990 ULS factors.
     ap.add_argument("--dead", type=float, default=3.5, help="permanent area load g_k (kN/m^2)")
     ap.add_argument("--live", type=float, default=3.0, help="imposed area load q_k (kN/m^2)")
@@ -67,6 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cut", action="store_true",
                     help="cutting-stock: allow one donor to be cut into several pieces for several "
                          "slots (default: one piece per donor)")
+    ap.add_argument("--connections", action="store_true",
+                    help="enable the connection feasibility screen: exclude donors geometrically "
+                         "incompatible with the slot's design section (wrong shape family, too deep "
+                         "for the detailed zone); milder mismatches are flagged 'review' either way")
     ap.add_argument("--frame-analysis", action="store_true",
                     help="derive member forces from a global frame solve (PyNite) instead of "
                          "per-member closed forms; column axials then come from the real load path. "
@@ -126,8 +137,10 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         )
     res = run_pipeline(
         donor, demand, loads=loads, knockdown=args.knockdown,
+        include_unverified=args.include_unverified, pda_csv=args.pda,
         steel_only_demand=not args.all_demand, tributary_from_geometry=args.trib_from_geometry,
-        allow_cutting=args.cut, frame_analysis=args.frame_analysis, second_order=args.pdelta,
+        allow_cutting=args.cut, connection_screen=args.connections,
+        frame_analysis=args.frame_analysis, second_order=args.pdelta,
         wind_kpa=args.wind, seismic_cs=args.seismic,
     )
 
@@ -156,9 +169,18 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         else:
             why = res.frame.warnings[0] if res.frame.warnings else "unavailable"
             print(f"Forces: analytic (frame analysis not applied — {why})")
+    if res.audit is not None and res.audit.present:
+        print(f"Pre-demolition audit: {res.audit.n_audited} member(s) audited, "
+              f"{res.audit.n_admitted} admitted, {res.audit.n_quarantined} quarantined, "
+              f"avg knockdown {res.audit.avg_knockdown:g}"
+              f"{' (--include-unverified)' if args.include_unverified else ''}")
     print(f"Mapping: {res.validation.summary()}")
     print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
           f"{' (cutting-stock)' if args.cut else ''}")
+    conn_review = sum(1 for a in res.match.assignments if a.connection_status == "review")
+    if args.connections or conn_review:
+        print(f"Connections: screen {'on' if args.connections else 'off (annotate only)'} | "
+              f"{conn_review} assignment(s) flagged for connection review")
     print(f"CO2e saved by matches: {res.match.total_co2_saved_kg:.1f} kg "
           f"(full donor stock potential: {res.passport.total_saved_kgco2e:.1f} kg)")
     if args.cut and res.match.donor_leftover_mm:

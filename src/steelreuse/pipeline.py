@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
 from .core.carbon import Passport, build_passport
+from .core.connections import ConnectionPolicy
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
 from .core.frame import FrameOptions, FrameResult, analyze_frame
 from .core.loads import AreaLoadModel, estimate_column_loads, estimate_tributary_widths
@@ -63,16 +65,35 @@ class LoadModel:
 
 
 def build_supply(
-    donor: ExtractedModel, catalog: dict[str, SectionProps], knockdown: float = 1.0
-) -> tuple[list[SupplyItem], ValidationReport]:
+    donor: ExtractedModel,
+    catalog: dict[str, SectionProps],
+    knockdown: float = 1.0,
+    include_unverified: bool = False,
+) -> tuple[list[SupplyItem], ValidationReport, AuditSummary]:
+    """Build the reclaimed-steel supply from the donor model.
+
+    A donor member becomes supply only if it (a) maps to a catalog section (unmapped is reported
+    separately) **and** (b) passes the pre-demolition audit (:mod:`steelreuse.core.audit`): unverified
+    or unsuitable-condition members are quarantined, exactly like a fuzzy section match, so they cannot
+    silently enter analysis. Each admitted member carries its **audit-derived knockdown** on f_y and its
+    **recoverable length** (the usable stock after de-construction). Members with no audit data behave
+    as before: admitted at the run's default ``knockdown``, full length.
+    """
     report = resolve_members(donor.members, catalog)
     _fill_default_grades(donor.members)
-    supply = [
-        SupplyItem(id=m.id, section=m.section, grade=m.material_grade,
-                   length_mm=m.length_mm, knockdown=knockdown)
-        for m in donor.members if m.section  # unmapped excluded (reported separately)
-    ]
-    return supply, report
+    audit = assess_supply(donor.members, default_knockdown=knockdown,
+                          include_unverified=include_unverified)
+    supply: list[SupplyItem] = []
+    for m in donor.members:
+        if not m.section:  # unmapped -> excluded (reported separately)
+            continue
+        decision = audit.decisions.get(m.id)
+        if decision is not None and not decision.admitted:
+            continue  # quarantined by the audit (reported via the AuditSummary)
+        kd = decision.knockdown if decision is not None else knockdown
+        supply.append(SupplyItem(id=m.id, section=m.section, grade=m.material_grade,
+                                 length_mm=recoverable_length(m), knockdown=kd))
+    return supply, report, audit
 
 
 def build_slots(
@@ -80,7 +101,7 @@ def build_slots(
     loads: LoadModel | AreaLoadModel | None = None,
     backend: ForceBackend | None = None,
     steel_only: bool = False,
-    demands_by_member: dict[str, list[tuple[str, object]]] | None = None,
+    frame_slots: dict[str, list] | None = None,
 ) -> list[DemandSlot]:
     """Turn demand members into force-based slots.
 
@@ -88,11 +109,13 @@ def build_slots(
     (concrete columns, bar joists, ...) does not become a slot we would try to fill with reclaimed
     steel — it would otherwise inflate the "needs new steel" count and distort the match rate.
 
-    ``demands_by_member`` (optional) carries action-effect envelopes from a global **frame analysis**
-    (:func:`steelreuse.core.frame.analyze_frame`): ``{member_id: [(combo_name, MemberDemand), ...]}``.
-    When a member appears there, its forces come from the solved frame (one slot for the whole element);
-    members absent from it fall back to the per-member analytic load path below — a robust hybrid for
-    real models where some members lack usable geometry.
+    ``frame_slots`` (optional) carries the reuse slots from a global **frame analysis**
+    (:attr:`steelreuse.core.frame.FrameResult.slots_by_member`): ``{member_id: [FrameSlot, ...]}``, where
+    each :class:`~steelreuse.core.frame.FrameSlot` is one physical member (a column folds its storey lifts
+    into one slot) or one inter-column span of a continuous beam, carrying the solved action-effect
+    envelope. When a member appears there its forces come from the solved frame; members absent from it
+    fall back to the per-member analytic load path below — a robust hybrid for real models where some
+    members lack usable geometry.
     """
     loads = loads or LoadModel()
     backend = backend or AnalyticBackend()
@@ -100,31 +123,18 @@ def build_slots(
     for m in demand.members:
         if steel_only and not m.section:
             continue
-        # Frame path: forces come from the global solve. A column or single-span member is one solved
-        # element -> one slot; a continuous multi-span beam is split at its interior supports into one
-        # solved element per span (id'd `{id}#k`), so it yields one slot per span (see core/frame.py).
-        if demands_by_member:
-            if m.role == "column" or len(m.spans_mm) <= 1:
-                frame_combos = demands_by_member.get(m.id)
-                if frame_combos:
-                    req_len = m.length_mm if m.role == "column" else (
-                        m.spans_mm[0] if m.spans_mm else (m.length_mm or 0.0))
+        # Frame path: forces and slot structure come from the global solve (see core/frame.py).
+        if frame_slots is not None:
+            member_slots = frame_slots.get(m.id)
+            if member_slots:
+                for s in member_slots:
                     slots.append(DemandSlot(
-                        id=f"{m.id}#0", member_id=m.id, role=m.role,
-                        required_length_mm=req_len, demand=frame_combos[0][1], demands=frame_combos,
+                        id=s.slot_id, member_id=m.id, role=m.role,
+                        required_length_mm=s.required_length_mm,
+                        demand=s.demands[0][1], demands=s.demands,
                         grade=m.material_grade, design_section=m.section,
                     ))
-                    continue
-            else:
-                per_span = [demands_by_member.get(f"{m.id}#{k}") for k in range(len(m.spans_mm))]
-                if all(per_span):
-                    for k, fc in enumerate(per_span):
-                        slots.append(DemandSlot(
-                            id=f"{m.id}#{k}", member_id=m.id, role=m.role,
-                            required_length_mm=m.spans_mm[k], demand=fc[0][1], demands=fc,
-                            grade=m.material_grade, design_section=m.section,
-                        ))
-                    continue
+                continue
         # One demand list per load combination (aligned by span index — same member geometry), so
         # every slot carries the full envelope the matcher verifies it against.
         per_combo = [
@@ -154,6 +164,7 @@ class PipelineResult:
     passport: Passport
     match: MatchResult
     frame: FrameResult | None = None   # set when frame_analysis was used
+    audit: AuditSummary | None = None  # pre-demolition-audit provenance (always set by run_pipeline)
 
 
 def run_pipeline(
@@ -161,10 +172,13 @@ def run_pipeline(
     demand_path: str,
     loads: LoadModel | AreaLoadModel | None = None,
     knockdown: float = 1.0,
+    include_unverified: bool = False,
+    pda_csv: str | None = None,
     catalog: dict[str, SectionProps] | None = None,
     steel_only_demand: bool = False,
     tributary_from_geometry: bool = False,
     allow_cutting: bool = False,
+    connection_screen: bool = False,
     frame_analysis: bool = False,
     second_order: bool = False,
     wind_kpa: float = 0.0,
@@ -174,7 +188,12 @@ def run_pipeline(
     donor = ExtractedModel.load(donor_path)
     demand = ExtractedModel.load(demand_path)
 
-    supply, report = build_supply(donor, catalog, knockdown)
+    # Merge an external pre-demolition-audit CSV onto the donor members (condition / verification),
+    # if one is supplied — the audit may live alongside the BIM export rather than in it.
+    if pda_csv:
+        apply_audit(donor.members, load_audit_csv(pda_csv))
+
+    supply, report, audit = build_supply(donor, catalog, knockdown, include_unverified)
     # Map the new-design sections too, so each slot carries its design grade/section for the
     # avoided-new CO2 baseline (A1/A6). Matching itself stays force-based, not section-based.
     resolve_members(demand.members, catalog)
@@ -195,21 +214,22 @@ def run_pipeline(
     # Beam tributary widths (above) still set the floor load; column axials then come from the solved
     # load path. Falls back per member to the analytic path wherever the frame can't be built/solved.
     frame_result: FrameResult | None = None
-    demands_by_member = None
+    frame_slots = None
     if frame_analysis and isinstance(loads, AreaLoadModel):
         # Route the sway imperfection (--phi) to the frame-level EHF treatment (not the member-level
         # notional moment); P-Delta is auto-enabled there whenever phi > 0.
         opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
                             wind_kpa=wind_kpa, seismic_cs=seismic_cs)
         frame_result = analyze_frame(demand.members, loads, catalog, options=opts)
-        demands_by_member = frame_result.demands_by_member or None
+        frame_slots = frame_result.slots_by_member if frame_result.ok else None
 
     slots = build_slots(demand, loads, steel_only=steel_only_demand,
-                        demands_by_member=demands_by_member)
+                        frame_slots=frame_slots)
     passport = build_passport(donor.members, catalog)
-    result = match(supply, slots, catalog, allow_cutting=allow_cutting)
+    result = match(supply, slots, catalog, allow_cutting=allow_cutting,
+                   connection_policy=ConnectionPolicy() if connection_screen else None)
 
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
-        validation=report, passport=passport, match=result, frame=frame_result,
+        validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
     )

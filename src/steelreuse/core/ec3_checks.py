@@ -1,4 +1,4 @@
-"""EN 1993-1-1 member checks for hot-rolled I/H steel sections — the deterministic ground truth.
+"""EN 1993-1-1 member checks for hot-rolled I/H and rect/square hollow sections — the ground truth.
 
 Everything is in internal units: forces in N, moments in N*mm, lengths in mm, stresses in N/mm^2.
 Sign convention: ``N_Ed`` is **compression-positive**; a negative value is treated as tension.
@@ -62,6 +62,29 @@ def web_class(sec: SectionProps, eps: float, mode: str) -> int:
     return 4
 
 
+def _internal_part_class(ratio: float, eps: float, mode: str) -> int:
+    """Class of an internal compression part (Table 5.2 sheet 1) from its c/t ratio."""
+    limits = (33 * eps, 38 * eps, 42 * eps) if mode == "compression" else (72 * eps, 83 * eps, 124 * eps)
+    for cls, lim in zip((1, 2, 3), limits, strict=True):
+        if ratio <= lim:
+            return cls
+    return 4
+
+
+def tube_class(sec: SectionProps, eps: float, mode: str) -> int:
+    """Class of a rect/square hollow section (all walls are internal parts, Table 5.2 sheet 1).
+
+    Flat width taken as ``c = h - 3t`` / ``b - 3t`` (the Table 5.2 convention for RHS). The flange
+    (width-side wall) is in uniform compression under major-axis bending as well as under axial load,
+    so it always uses the compression limits; only the webs get the bending limits in ``mode``
+    'bending'.
+    """
+    t = sec.tf  # uniform wall
+    flange = _internal_part_class(max(sec.b - 3 * t, 0.0) / t, eps, "compression")
+    web = _internal_part_class(max(sec.h - 3 * t, 0.0) / t, eps, mode)
+    return max(flange, web)
+
+
 def classify(sec: SectionProps, fy: float, N_Ed: float = 0.0, My_Ed: float = 0.0) -> int:
     """Overall section class = worst of flange and web.
 
@@ -69,14 +92,15 @@ def classify(sec: SectionProps, fy: float, N_Ed: float = 0.0, My_Ed: float = 0.0
     is no axial; otherwise the stricter 'compression' limits are used for combined N+M.
     """
     eps = epsilon(fy)
-    fcl = flange_class(sec, eps)
     if abs(My_Ed) < 1e-9 and N_Ed > 0:
         mode = "compression"
     elif N_Ed > 0:
         mode = "compression"   # combined N+M -> conservative
     else:
         mode = "bending"
-    return max(fcl, web_class(sec, eps, mode))
+    if sec.is_hollow:
+        return tube_class(sec, eps, mode)
+    return max(flange_class(sec, eps), web_class(sec, eps, mode))
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +180,11 @@ def _buckling_alpha(sec: SectionProps, axis: str) -> float:
       * h/b <= 1.2, t_f <= 100 mm     -> y: b, z: c.
     """
     a = {"a": 0.21, "b": 0.34, "c": 0.49, "d": 0.76}
+    if sec.is_hollow:
+        # Cold-formed hollow sections -> curve c, both axes (Table 6.2). AISC HSS (A500) are
+        # cold-formed; hot-finished tube (curve a) would need a fabrication flag we don't have,
+        # so the conservative curve is used for all hollow stock.
+        return a["c"]
     if sec.tf > 100.0:
         curve = "d"
     elif sec.h / sec.b > 1.2:
@@ -272,7 +301,13 @@ def check_member(
     # Bending (major axis), with LTB when the compression flange is unrestrained
     if abs(demand.My_Ed) > 0:
         mc = M_c_Rd(sec, fy, section_class)
-        if demand.compression_flange_restrained:
+        if sec.is_hollow:
+            # Closed sections are torsionally stiff: lambda_bar_LT stays far below the 0.4 plateau
+            # for any practical span, so LTB is not a design case (EN 1993-1-1 cl. 6.3.2.1(2) scope;
+            # the open-section I_t/I_w approximations below would also be meaningless for a tube).
+            mrd = mc
+            detail = {"M_c_Rd": mc, "chi_LT": 1.0, "hollow": True}
+        elif demand.compression_flange_restrained:
             mrd = mc
             # Surface what LTB *would* do without the slab restraint, so the chi_LT computation is
             # visible even on the (default) restrained path and restraint-critical beams are flagged.
@@ -308,7 +343,7 @@ def check_member(
         nb_y, _ = N_b_Rd(sec, fy, demand.L, demand.ky, "y")
         nb_z, _ = N_b_Rd(sec, fy, demand.L, demand.kz, "z")
         mc = M_c_Rd(sec, fy, section_class)
-        if demand.compression_flange_restrained:
+        if sec.is_hollow or demand.compression_flange_restrained:
             mrd, ltb = mc, 1.0
         else:
             ltb = chi_LT(sec, fy, demand.L, section_class, demand.C1)

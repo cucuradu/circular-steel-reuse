@@ -24,16 +24,23 @@ def build_report_context(res: PipelineResult) -> dict:
     """Flatten a :class:`PipelineResult` into a JSON-ish dict of pre-computed values for the template."""
     m = res.match
     p = res.passport
-    assignments = [
-        {
+    decisions = res.audit.decisions if res.audit else {}
+    assignments = []
+    for a in m.assignments:
+        d = decisions.get(a.supply_id)
+        assignments.append({
             "slot": a.slot_id, "supply": a.supply_id, "section": a.section,
             "utilization": a.utilization, "status": a.status,
             "offcut_mm": a.offcut_mm, "co2_saved_kg": a.co2_saved_kg,
             "chi_lt": a.chi_lt, "chi_lt_if_free": a.chi_lt_if_free,
             "governing": a.governing_combination,
-        }
-        for a in m.assignments
-    ]
+            # Pre-demolition-audit provenance for the reclaimed member used in this assignment.
+            "verification": (d.verification or "—") if (d and d.audited) else "—",
+            "condition": (d.condition.upper() or "—") if (d and d.audited and d.condition) else "—",
+            "knockdown": round(d.knockdown, 3) if d else 1.0,
+            "connection": a.connection_status,
+            "connection_note": a.connection_note,
+        })
     # How many reuses are governed by a non-gravity combination (e.g. the sway-imperfection case),
     # so the report can note that the load-combination envelope, not just gravity, sized the member.
     n_imperfection_governed = sum(
@@ -73,10 +80,33 @@ def build_report_context(res: PipelineResult) -> dict:
         "assignments": assignments,
         "ltb_restraint_reliant": ltb_restraint_reliant,
         "n_imperfection_governed": n_imperfection_governed,
+        # Geometric connection-compatibility screen (core/connections.py): how many reuses need a
+        # connection look before they are practical. "unknown" (no design section) is not counted.
+        "connection_review": sum(1 for a in m.assignments if a.connection_status == "review"),
+        "connection_screen_on": bool(m.weights.get("connection_screen")),
         "cut_donors": len(m.donor_leftover_mm),
         "reusable_remainder_m": round(m.total_donor_leftover_mm / 1000.0, 1),
         "disclaimer": SCOPE_DISCLAIMER,
     }
+    # Pre-demolition-audit provenance summary (only shown when the donor model carried audit data).
+    if res.audit and res.audit.present:
+        a = res.audit
+        ctx["audit_present"] = True
+        ctx["audit_audited"] = a.n_audited
+        ctx["audit_admitted"] = a.n_admitted
+        ctx["audit_quarantined"] = a.n_quarantined
+        ctx["audit_avg_knockdown"] = a.avg_knockdown
+        ctx["audit_verification"] = [
+            {"basis": k, "count": v} for k, v in sorted(a.verification_counts.items())
+        ]
+        ctx["audit_condition"] = [
+            {"grade": k, "count": v} for k, v in sorted(a.condition_counts.items())
+        ]
+        ctx["audit_quarantined_list"] = [
+            {"id": mid, "reason": reason} for mid, reason in a.quarantined
+        ]
+    else:
+        ctx["audit_present"] = False
     return ctx
 
 
@@ -127,6 +157,10 @@ def deterministic_narrative(ctx: dict) -> str:
         top = "; ".join(f"{b['count']}x {b['name']}" for b in ctx["unknown_breakdown"][:5])
         parts.append(f"{ctx['unknown']} donor member(s) across {ctx['unknown_kinds']} type(s) could "
                      f"not be identified and were excluded from analysis (top: {top}).")
+    if ctx.get("audit_present"):
+        parts.append(f"A pre-demolition audit covered {ctx['audit_audited']} donor member(s) "
+                     f"(average f_y knockdown {ctx['audit_avg_knockdown']}); "
+                     f"{ctx['audit_quarantined']} were quarantined as unverified or unsuitable.")
     return " ".join(parts)
 
 
@@ -163,6 +197,7 @@ _TEMPLATE = """<!doctype html>
  th,td{border:1px solid #ddd;padding:.4rem .6rem;text-align:left;font-size:.9rem}
  th{background:#eef2ef} .review{color:#a15c00} .warn{background:#fff7e6;padding:.75rem;border-radius:8px}
  .disc{color:#555;font-size:.85rem;border-left:3px solid #bbb;padding-left:.8rem;margin-top:1.5rem}
+ .note{color:#555;font-size:.9rem}
 </style></head><body>
 <h1>Circular Structural Reuse — Matching Report</h1>
 <p><em>{{ narrative }}</em> <span style="color:#888">(narrative: {{ narrative_source }})</span></p>
@@ -174,7 +209,8 @@ _TEMPLATE = """<!doctype html>
 </div>
 <h2>Assignments</h2>
 <table><tr><th>Demand slot</th><th>Reclaimed member</th><th>Section</th><th>Utilization</th>
-<th>Gov. load case</th><th>Status</th><th>&chi;<sub>LT</sub></th><th>Off-cut (mm)</th>
+<th>Gov. load case</th><th>Status</th><th>&chi;<sub>LT</sub></th><th>Connection</th>
+{% if ctx.audit_present %}<th>Provenance</th>{% endif %}<th>Off-cut (mm)</th>
 <th>CO2e saved (kg)</th></tr>
 {% for a in ctx.assignments %}<tr>
  <td>{{ a.slot }}</td><td>{{ a.supply }}</td><td>{{ a.section }}</td>
@@ -182,8 +218,32 @@ _TEMPLATE = """<!doctype html>
  <td>{{ a.governing }}</td>
  <td class="{{ 'review' if a.status=='REVIEW' else '' }}">{{ a.status }}</td>
  <td>{% if a.chi_lt is none %}—{% else %}{{ '%.2f'|format(a.chi_lt) }}{% if a.chi_lt == 1.0 and a.chi_lt_if_free is not none and a.chi_lt_if_free < 0.85 %} <span class="review" title="would be {{ '%.2f'|format(a.chi_lt_if_free) }} if the flange were unrestrained">⚠</span>{% endif %}{% endif %}</td>
+ <td>{% if a.connection == 'review' %}<span class="review" title="{{ a.connection_note }}">review</span>{% elif a.connection == 'unknown' %}—{% else %}{{ a.connection }}{% endif %}</td>
+ {% if ctx.audit_present %}<td>{{ a.verification }}{% if a.condition != '—' %} / cond {{ a.condition }}{% endif %}{% if a.knockdown < 1.0 %} / k={{ '%.2f'|format(a.knockdown) }}{% endif %}</td>{% endif %}
  <td>{{ a.offcut_mm }}</td><td>{{ a.co2_saved_kg }}</td></tr>{% endfor %}
 </table>
+{% if ctx.connection_review %}<p class="note">{{ ctx.connection_review }} assignment(s) are geometrically
+compatible but flagged <b>connection review</b> (shallower than the design section, thinner web, or
+narrower flange than the connections were detailed for — hover the cell for the reason). Connection
+design itself remains outside this tool's scope.</p>{% endif %}
+{% if ctx.connection_screen_on %}<p class="note">The connection feasibility screen was ON: donors
+geometrically incompatible with a slot's design section (wrong shape family, or too deep for the
+detailed zone) were excluded before matching.</p>{% endif %}
+{% if ctx.audit_present %}<h2>Pre-demolition audit</h2>
+<p>{{ ctx.audit_audited }} donor member(s) carried audit data: {{ ctx.audit_admitted }} admitted to
+ supply, {{ ctx.audit_quarantined }} quarantined. Average f<sub>y</sub> knockdown on admitted members:
+ {{ ctx.audit_avg_knockdown }}.</p>
+<table><tr><th>Verification basis</th><th>Count</th></tr>
+ {% for v in ctx.audit_verification %}<tr><td>{{ v.basis }}</td><td>{{ v.count }}</td></tr>{% endfor %}
+</table>
+{% if ctx.audit_condition %}<table><tr><th>Condition grade</th><th>Count</th></tr>
+ {% for c in ctx.audit_condition %}<tr><td>{{ c.grade }}</td><td>{{ c.count }}</td></tr>{% endfor %}
+</table>{% endif %}
+{% if ctx.audit_quarantined_list %}<div class="warn">⚠ {{ ctx.audit_quarantined }} donor member(s)
+ quarantined by the audit (excluded from reuse until verified):
+ <table><tr><th>Member</th><th>Reason</th></tr>
+ {% for q in ctx.audit_quarantined_list %}<tr><td>{{ q.id }}</td><td>{{ q.reason }}</td></tr>{% endfor %}
+ </table></div>{% endif %}{% endif %}
 {% if ctx.n_imperfection_governed %}<div class="warn">⚠ {{ ctx.n_imperfection_governed }} reused
  member(s) are governed by a load combination other than plain gravity (e.g. the EN 1993-1-1 §5.3.2
  sway-imperfection case) — the member is sized by the worst case across the combination envelope.</div>{% endif %}

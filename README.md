@@ -56,6 +56,11 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
   instead assembled and solved as one **simple-braced frame** in PyNiteFEA (license-free) — beams stay
   simply-supported but column axials then come from the **real load path** (multi-storey accumulation,
   interior vs. corner). Members without usable geometry fall back to the per-member path automatically.
+- **Pre-demolition audit**: the donor inventory can carry a surveyed condition (A–D) and verification
+  basis (mill cert / coupon test / documented / visual / unverified) per member — in the JSON or merged
+  from a CSV with `--pda`. These drive a per-member `f_y` knockdown and **quarantine** unverified or
+  unsuitable stock from the supply (honest by default: a member with no audit data is unchanged). See
+  [docs/PRE_DEMOLITION_AUDIT.md](docs/PRE_DEMOLITION_AUDIT.md).
 - **The LLM does no arithmetic** — every number is computed in Python and injected into the report;
   the model only writes the surrounding prose.
 
@@ -71,7 +76,7 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
 | 5 | MILP matching (the flagship) | ✅ |
 | 6 | Report (Jinja2 HTML) + provider-agnostic LLM narrative | ✅ (Gemini verified live; Ollama optional) |
 | 7 | Real LTB (χ_LT), IFC extractor, Streamlit dashboard, trained-model artifacts | ✅ |
-| 7+ | Cutting-stock (1 member → many cuts, `--cut`) ✅ · **Global frame analysis** (`--frame-analysis`: gravity load path + EN 5.3.2 sway EHF + `--wind` + EN 1998 `--seismic` lateral force + P-Δ via PyNite) ✅ · SAP2000 backend, modal-spectrum seismic, multi-objective ⬜ | ◑ partial |
+| 7+ | Cutting-stock (1 member → many cuts, `--cut`) ✅ · **Global frame analysis** (`--frame-analysis`: gravity load path + EN 5.3.2 sway EHF + `--wind` + EN 1998 `--seismic` lateral force + P-Δ via PyNite) ✅ · **Pre-demolition audit** (`--pda`: per-member condition/verification → knockdown + quarantine) ✅ · **HSS catalog + hollow-section checks** (388 AISC rect/square HSS) ✅ · **Connection feasibility screen** (`--connections`: geometric donor-vs-design-section compatibility) ✅ · **Geometry confirmation** of fuzzy/unknown section names from measured dimensions ✅ · SAP2000 backend, modal-spectrum seismic, multi-objective ⬜ | ◑ partial |
 
 Entry points (once installed, the `steelreuse` command is on your PATH):
 
@@ -95,7 +100,7 @@ into the same JSON schema as the pyRevit extractor — so the whole pipeline run
 ## Layout
 
 ```
-src/steelreuse/data/sections/   # steel section catalogs (EU IPE/HE + US AISC W) — bundled in the wheel
+src/steelreuse/data/sections/   # steel section catalogs (EU IPE/HE + US AISC W + HSS) — bundled in the wheel
 src/steelreuse/data/samples/*.json  # sample extracted models for offline testing — bundled in the wheel
 extractor/pyrevit_extract.py    # runs INSIDE Revit (IronPython 3 engine; stdlib-only)
 src/steelreuse/

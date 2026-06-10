@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 import pulp
 
 from ..core.carbon import CarbonFactor, load_factors
+from ..core.connections import ConnectionPolicy, screen_pair
 from ..core.ec3_checks import MemberDemand, check_member
 from ..core.sections import SectionProps
 
@@ -70,6 +71,11 @@ class Assignment:
     chi_lt: float | None = None       # LTB reduction used (1.0 if restrained, None if no bending)
     chi_lt_if_free: float | None = None  # what chi_LT would be if the flange were unrestrained
     governing_combination: str = "ULS gravity"  # load combination that drove the utilisation
+    # Geometric connection-compatibility vs the slot's design section (core/connections.py):
+    # "ok" | "review" | "incompatible" | "unknown" (no design section). Purely informational unless
+    # the screen is enabled, in which case "incompatible" pairs never get this far.
+    connection_status: str = "unknown"
+    connection_note: str = ""
 
 
 @dataclass
@@ -116,6 +122,8 @@ class _Cell:
     chi_lt_if_free: float | None = None
     governing_combination: str = "ULS gravity"
     used_len_mm: float = 0.0   # length this piece consumes from the donor (for the cutting-stock cap)
+    connection_status: str = "unknown"
+    connection_note: str = ""
 
 
 def _passes_all(sec: SectionProps, grade: str, slot: DemandSlot, knockdown: float = 1.0) -> bool:
@@ -157,6 +165,17 @@ def _slot_standard(slot: DemandSlot, catalog: dict[str, SectionProps]) -> str | 
     return None
 
 
+def _slot_wants_hollow(slot: DemandSlot, catalog: dict[str, SectionProps]) -> bool:
+    """Whether the slot's new-build baseline should be a hollow section.
+
+    Only when the design explicitly specifies one: the baseline is "the new member you would otherwise
+    buy", and that is an open I/H section unless the design says tube. Keeps results for all existing
+    (open-section) models unchanged by the presence of HSS rows in the catalog.
+    """
+    sec = catalog.get(slot.design_section) if slot.design_section else None
+    return bool(sec is not None and sec.is_hollow)
+
+
 def baseline_new_mass_kg(
     slot: DemandSlot, catalog: dict[str, SectionProps], new_build_grade: str = "S355"
 ) -> float | None:
@@ -172,15 +191,21 @@ def baseline_new_mass_kg(
     adequate W-shape, not a coincidentally-lighter IPE, and vice-versa) — you would buy new steel in the
     standard you are designing to. Reclaimed *supply* is deliberately not restricted (reusing a donor
     across standards is fine). Falls back to the whole catalog when the standard can't be determined.
+    The search is likewise restricted to the slot's **shape family**: the baseline is a hollow section
+    only when the design section is one, and an open (I/H) section otherwise — a W-shape slot must not
+    book its avoided carbon against a coincidentally-lighter tube nobody would have bought.
     Returns ``None`` if nothing passes (then the slot is infeasible for reuse too).
     """
     if _degenerate(slot):
         return None
     grade = slot.grade or new_build_grade
     target_std = _slot_standard(slot, catalog)
+    want_hollow = _slot_wants_hollow(slot, catalog)
     best: float | None = None
     for sec in catalog.values():
         if target_std is not None and sec.standard != target_std:
+            continue
+        if sec.is_hollow != want_hollow:
             continue
         if _passes_all(sec, grade, slot):
             mass = sec.mass_kgm * slot.required_length_mm / 1000.0
@@ -200,6 +225,7 @@ def _feasible_cell(
     connection_penalty_kg: float,
     baseline_mass_kg: float | None,
     allow_cutting: bool = False,
+    connection_policy: ConnectionPolicy | None = None,
 ) -> _Cell | None:
     """Return an economics cell if the pair is feasible, else ``None``."""
     # Skip degenerate geometry (garbage rows) before any EN check that could divide by zero; such
@@ -210,6 +236,13 @@ def _feasible_cell(
         return None
     sec = catalog.get(supply.section)
     if sec is None:
+        return None
+    # Geometric connection-compatibility vs the slot's design section. Always *annotated* on the
+    # assignment; an "incompatible" pair is *gated* only when the screen is enabled (the policy is
+    # set). Cheap, so it runs before the EN checks.
+    design_sec = catalog.get(slot.design_section) if slot.design_section else None
+    conn = screen_pair(sec, design_sec, connection_policy)
+    if connection_policy is not None and conn.status == "incompatible":
         return None
     # Verify the reclaimed member against every load combination; the governing (worst-utilisation)
     # one is what we report. A single failing combination makes the pair infeasible.
@@ -248,7 +281,8 @@ def _feasible_cell(
     chi_lt = bending.detail.get("chi_LT") if bending else None
     chi_lt_if_free = bending.detail.get("chi_LT_if_unrestrained", chi_lt) if bending else None
     return _Cell(si, sj, res.utilization, res.status, cell_offcut, co2_saved, score,
-                 chi_lt, chi_lt_if_free, governing_name or "ULS gravity", used_len_mm=used_len)
+                 chi_lt, chi_lt_if_free, governing_name or "ULS gravity", used_len_mm=used_len,
+                 connection_status=conn.status, connection_note=conn.note)
 
 
 def match(
@@ -261,6 +295,7 @@ def match(
     time_limit_s: float = 30.0,
     new_build_grade: str = "S355",
     allow_cutting: bool = False,
+    connection_policy: ConnectionPolicy | None = None,
 ) -> MatchResult:
     """Optimal supply->slot assignment maximizing net CO2 saved (with greedy fallback).
 
@@ -269,10 +304,16 @@ def match(
     instead of the default one-piece-per-donor rule. This removes the bias against long stock and books
     each filled slot's avoided-new saving; the leftover of each cut donor is reported as reusable
     remainder (``MatchResult.donor_leftover_mm``).
+
+    ``connection_policy`` enables the **connection feasibility screen** (`core/connections.py`):
+    geometrically incompatible (donor, slot) pairs — wrong shape family, donor too deep for the
+    detailed zone — are excluded; milder mismatches surface as ``connection_status = "review"``.
+    With the default ``None`` nothing is gated, but every assignment is still annotated.
     """
     factor = (factors or load_factors())["steel"]
     weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg,
-               "allow_cutting": allow_cutting}
+               "allow_cutting": allow_cutting,
+               "connection_screen": connection_policy is not None}
 
     # Avoided-new baseline per slot (lightest adequate section), computed once — see A1.
     baselines = [baseline_new_mass_kg(slot, catalog, new_build_grade) for slot in slots]
@@ -281,7 +322,8 @@ def match(
     for i, sup in enumerate(supply):
         for j, slot in enumerate(slots):
             cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
-                                  connection_penalty_kg, baselines[j], allow_cutting)
+                                  connection_penalty_kg, baselines[j], allow_cutting,
+                                  connection_policy)
             if cell is not None:
                 cells.append(cell)
 
@@ -307,6 +349,7 @@ def match(
             score=round(c.score, 2),
             chi_lt=c.chi_lt, chi_lt_if_free=c.chi_lt_if_free,
             governing_combination=c.governing_combination,
+            connection_status=c.connection_status, connection_note=c.connection_note,
         )
         for c in chosen
     ]

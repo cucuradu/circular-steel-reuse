@@ -39,19 +39,44 @@ stress is N/mm² = MPa throughout. Loads enter in kN/m² and m and are converted
 
 ## 3. Section catalog and name mapping  (`core/sections.py`)
 
-- **Catalogs.** European IPE/HE (`data/sections/eu_sections.csv`) and the full **283-shape AISC
-  W-series** (`us_sections.csv`, stored verbatim in imperial units from the AISC Shapes Database v15.0
-  and converted on load so the source numbers stay auditable). `SectionProps.standard` ∈ {`EU`,`US`}.
+- **Catalogs.** European IPE/HE (`data/sections/eu_sections.csv`), the full **283-shape AISC
+  W-series** (`us_sections.csv`) and the **388 rectangular/square AISC HSS** (`us_hss.csv`) — the US
+  files stored verbatim in imperial units from the AISC Shapes Database v15.0 and converted on load so
+  the source numbers stay auditable (HSS: uniform design wall `t_des = 0.93·t_nom`, the basis of all
+  AISC tabulated tube properties). `SectionProps.standard` ∈ {`EU`,`US`}; `SectionProps.is_hollow`
+  marks tubes for the shape-aware checks. Round HSS and pipe are excluded (CHS needs a `D/t`
+  classification rule).
 - **Mapping** (never silently guesses, CLAUDE.md rule 5): `exact → user-override → normalized → fuzzy
   (quarantined) → unknown`. Fuzzy matches (e.g. `IPE300` vs `IPE330`, ratio ≈ 0.83) are **quarantined
   by default** — reported but excluded from analysis until confirmed via an override CSV — because a
   near-miss would otherwise enter the checks with the wrong section properties.
+- **Geometry confirmation.** When the extractor captured the member's measured section dimensions
+  (`h/b/tf/tw` — pyRevit type parameters, or the IFC `IfcIShapeProfileDef`), a fuzzy or unknown *name*
+  can be confirmed against the catalog by **physical dimensions** (`resolve_members`, method
+  `geometry`): every captured dimension must match within `max(1 mm, 1.5 %)` and the match must be
+  **unique**, else nothing is confirmed. A fuzzy name needs `h+b`; an unknown name needs all four
+  dimensions (no name signal → stronger physical evidence required). This is identification, not a
+  guess — the tolerance band sits far below the step between adjacent catalog sizes — and it removes
+  most of the manual override-CSV confirmation work.
 - **Grades.** EN grades (`S235…S460`) and ASTM (`A992`, `A36`, `A500`, …) in `FY_BY_GRADE`. Ungraded
   AISC members get a conservative shape-based default (W→A992 50 ksi, etc.) and the assumption is
   flagged in the member `notes` (`pipeline._fill_default_grades`).
 - **Data integrity.** `tests/test_sections.py::test_catalog_property_consistency` recomputes the derived
   properties from the primaries for **every** row and asserts the physical relations hold (see §10), so
   a transcription slip in either CSV fails loudly.
+
+### 3.1 Pre-demolition audit  (`core/audit.py`)
+The donor model is the deliverable of a **pre-demolition audit** — the survey that records, per
+reclaimed member, its physical **condition** and the **basis on which its grade can be trusted**. The
+audit layer converts those two facts into numbers the EN 1993 check already understands: a per-member
+`f_y` **knockdown** and a **quarantine** decision (unverified or unsuitable stock is excluded from the
+certified supply, exactly like a fuzzy section match). Knockdown = `condition × verification` factor
+(e.g. condition `B` 0.95 × `documented` 0.95 = 0.9025), unless an explicit per-member `knockdown`
+overrides it; a value below `MIN_KNOCKDOWN = 0.30` quarantines rather than zeroing capacity. Audit data
+is optional: a member with **none** behaves exactly as before (admitted at the run default, full
+length), so the feature changes no legacy result. Supplied in the model JSON or merged from a CSV
+(`--pda`); see [`docs/PRE_DEMOLITION_AUDIT.md`](PRE_DEMOLITION_AUDIT.md) for the factor tables, the CSV
+schema, and the regulatory context (SCI P427; EU C&D Waste Protocol; *Diagnostic PEMD*; Level(s); CAM).
 
 ## 4. Load model  (`core/loads.py`, `core/forces.py`)
 
@@ -106,12 +131,19 @@ default and fallback.
   (50 mm default) are snapped into shared nodes so beams and columns connect. Members without usable
   coordinates are reported and **fall back to the per-member analytic load** (a robust hybrid for messy
   real models); if no connectable geometry exists at all, the whole run falls back.
-- **Idealisation — simple braced frame** (the project default): beam-to-column connections release the
-  **major-axis bending moment** at each end (beams stay simply-supported, recovering `wL²/8`) while
-  retaining minor-axis and torsional continuity — a realistic shear connection that also gives
-  beam-to-beam joints rotational stiffness about the vertical axis, avoiding spurious singularities on
-  real BIM. Columns are **continuous** and column bases are **fixed** so the lateral load (§4.1 sway
-  case) is carried by the column bases (no explicit bracing) or by the **braces** (pin-ended axial).
+- **Idealisation — simple braced frame** (the project default): a beam-to-column connection releases the
+  **major-axis bending moment** at a *real support* — the beam's true ends and any interior point that
+  sits on a column (beams stay simply-supported there, recovering `wL²/8`) — while retaining minor-axis
+  and torsional continuity (a realistic shear connection that also gives beam-to-beam joints rotational
+  stiffness about the vertical axis, avoiding spurious singularities on real BIM). Columns are
+  **continuous** and column bases are **fixed** so the lateral load (§4.1 sway case) is carried by the
+  column bases (no explicit bracing) or by the **braces** (pin-ended axial).
+- **Two-way floor framing** (`split_columns_at_framing` / continuity-at-crossings): real BIM models a
+  girder + secondary-beam floor with full-height columns and continuous girders. The assembler **splits
+  a full-height column at every floor that frames into it** (folding the storey lifts back into one
+  reused column) and **keeps a girder moment-continuous where a secondary beam crosses it with no
+  column below** (so the girder supports the secondary instead of forming a vertical mechanism). A
+  continuous girder maps to a single reused member; a beam over interior columns still slots per span.
 - **Robustness on messy real models** (`snap_nodes` / `_stabilize_topology`): each **disconnected
   component is supported at its own lowest level** (so a multi-piece or split-level model doesn't leave
   higher pieces floating); members that **hang off the structure** (a free, unsupported end) are pruned
@@ -178,6 +210,11 @@ W-shapes) are flagged in the member warnings.
 ### 5.1 Cross-section classification (Table 5.2)
 - Flange outstand `c = (b − t_w − 2r)/2`, ratio `c/t_f` vs limits `9ε / 10ε / 14ε` → class 1/2/3, else 4.
 - Web `c = h − 2t_f − 2r`, ratio `c/t_w` vs `33ε/38ε/42ε` (compression) or `72ε/83ε/124ε` (bending).
+- **Rect/square hollow (HSS):** every wall is an *internal* part with flat width `c = h − 3t` /
+  `b − 3t` (the Table 5.2 RHS convention). The width-side wall is in uniform compression under
+  major-axis bending as well as axial load, so it always takes the compression limits; the webs take
+  the bending limits in bending. Thin-walled tubes (e.g. HSS12X12X3/16, `c/t ≈ 66`) classify as
+  class 4 and get the same `REVIEW` treatment as slender open sections.
 - Overall class = worst of flange and web. **Combined N+M conservatively uses the compression web
   limits.** Class 4 (slender) → resistance falls back to `W_el` with a warning and member status
   `REVIEW` (effective-section design is out of scope).
@@ -188,16 +225,18 @@ W-shapes) are flagged in the member warnings.
 | Tension | 6.2.3 (6.6) | `N_t,Rd = A·f_y/γ_M0` |
 | Compression (section) | 6.2.4 (6.10) | `N_c,Rd = A·f_y/γ_M0` |
 | Bending (major) | 6.2.5 (6.13)/(6.14) | `M_c,Rd = W_pl·f_y` (cl.1–2) or `W_el·f_y` (cl.3) |
-| Shear | 6.2.6 (6.18) | `V_c,Rd = A_v·(f_y/√3)/γ_M0`, `A_v = max(A − 2b·t_f + (t_w+2r)·t_f, h_w·t_w)` |
+| Shear | 6.2.6 (6.18) | `V_c,Rd = A_v·(f_y/√3)/γ_M0`, `A_v = max(A − 2b·t_f + (t_w+2r)·t_f, h_w·t_w)`; RHS: `A_v = A·h/(b+h)` (6.2.6(3)) |
 
 ### 5.3 Flexural buckling (6.3.1)
 `N_cr = π²E·I/L_cr²`, `L_cr = k·L`, `λ̄ = √(A·f_y/N_cr)`. Reduction `χ = 1/(φ + √(φ² − λ̄²))` with
 `φ = 0.5(1 + α(λ̄ − 0.2) + λ̄²)`, `χ = 1` for `λ̄ ≤ 0.2`. Buckling curves (Table 6.2, rolled I) are
 selected from `h/b` **and the flange thickness** `t_f`: for `h/b > 1.2`, `t_f ≤ 40 mm` → y curve a
 (α 0.21) / z curve b (0.34), but `40 < t_f ≤ 100 mm` shifts to y curve b / z curve c (0.49); for
-`h/b ≤ 1.2` (`t_f ≤ 100`) → y b / z c; and `t_f > 100 mm` → curve d (0.76) both axes. Compression members
-are governed by the **weaker axis** (`min(N_b,Rd,y, N_b,Rd,z)`); `k_y = k_z = 1.0` (pinned, conservative)
-unless set.
+`h/b ≤ 1.2` (`t_f ≤ 100`) → y b / z c; and `t_f > 100 mm` → curve d (0.76) both axes. **Hollow sections
+use curve c both axes** (cold-formed per Table 6.2 — AISC HSS are A500 cold-formed; hot-finished tube
+would rate curve a but we have no fabrication flag, so the conservative curve applies). Compression
+members are governed by the **weaker axis** (`min(N_b,Rd,y, N_b,Rd,z)`); `k_y = k_z = 1.0` (pinned,
+conservative) unless set.
 
 ### 5.4 Lateral-torsional buckling (6.3.2.3, rolled sections)
 `I_t = (2·b·t_f³ + (h − 2t_f)·t_w³)/3` (St-Venant, thin-wall) and `I_w = I_z·h_s²/4` with `h_s = h − t_f`
@@ -207,6 +246,9 @@ the rolled-section method `λ̄_LT,0 = 0.4`, `β = 0.75`, `α_LT = 0.34` (h/b �
 (curve c): `χ_LT = 1/(φ_LT + √(φ_LT² − β·λ̄_LT²))`, capped at `1.0` and `1/λ̄_LT²`; `χ_LT = 1` for
 `λ̄_LT ≤ 0.4`. **A restrained compression flange (a floor slab) sets `χ_LT = 1`**; an unrestrained beam
 in bending is reduced by `χ_LT` and flagged. `C₁ = 1.0` (uniform moment) is the conservative default.
+**Hollow sections skip LTB entirely** (`χ_LT = 1`, detail flag `hollow`): a closed section's torsional
+stiffness keeps `λ̄_LT` far below the 0.4 plateau for any practical span, and the open-section
+`I_t`/`I_w` approximations above would be meaningless for a tube.
 
 ### 5.5 Combined N + M
 A **simplified linear, LTB-aware** interaction (conservative relative to the full 6.3.3):
@@ -220,7 +262,10 @@ Simply-supported UDL `δ = 5·w·L⁴/(384·E·I_y)` against limit `L/250` (defa
 
 ### 5.7 Reclaimed-steel knockdown
 `knockdown ≤ 1.0` multiplies `f_y` (a condition/uncertainty proxy for reclaimed material) and is always
-flagged; default 1.0 (no reduction) assumes the grade is confirmed by testing — set it lower otherwise.
+flagged. The knockdown is **per member**, derived from the pre-demolition audit (§3.1): condition ×
+verification factor, or an explicit auditor value. A member with no audit data uses the run default
+(`--knockdown`, default 1.0, which assumes the grade is confirmed by testing); set it lower for an
+un-audited donor stock you don't yet trust.
 
 Member status: `FAIL` if governing utilisation > 1, `REVIEW` if class 4, else `OK`.
 
@@ -228,7 +273,9 @@ Member status: `FAIL` if governing utilisation > 1, `REVIEW` if class 4, else `O
 
 Factors from `data/carbon/factors.csv` (ICE v3, 2019, UK structural steel): production `A1–A3 = 1.55`
 kgCO₂e/kg, reuse process (clean/test/refabricate) `= 0.10` kgCO₂e/kg. The **material passport** reports,
-per mapped member, mass, volume, new-build embodied carbon, reuse process carbon, and the net saved.
+per mapped member, mass, volume, new-build embodied carbon, reuse process carbon, the net saved, and
+(when audited) the member's **verification basis and condition grade** (§3.1) — the provenance a
+material passport is meant to carry.
 
 ## 7. The matcher  (`match/optimize.py`)
 
@@ -236,10 +283,20 @@ per mapped member, mass, volume, new-build embodied carbon, reuse process carbon
    enough (`length ≥ required + 50 mm` cut tolerance) **and** passes the exact EN check for that slot's
    forces in **every** load combination of the envelope (§4); the governing combination is recorded and
    reported. Most pairs are infeasible and never enter the model — this tames the MILP size.
+   Additionally, a **connection feasibility screen** (`core/connections.py`) compares each donor
+   geometrically against the slot's *design section* — the section its connections were detailed
+   around: wrong shape family (tube ↔ open) or more than 50 mm deeper → `incompatible`; markedly
+   shallower, thinner web (bolt bearing), or narrower flange (seats/end plates) → `review`. Every
+   assignment is annotated with the result (report "Connection" column); with `--connections`,
+   incompatible pairs are excluded before matching. The screen is geometry only — never a capacity
+   judgement, never an opinion when the slot has no design section — and the tolerances are an
+   explicit `ConnectionPolicy`. Connection *design* stays out of scope.
 2. **Avoided-new baseline (per slot).** The honest CO₂ basis is the **lightest catalog section that
    passes the slot's exact check**, restricted to the **slot's own design standard** (a US slot's
-   baseline is a W-shape, not a coincidentally-lighter IPE). Using this rather than the donor's mass
-   stops a heavy donor in a light slot from over-booking carbon as "saved".
+   baseline is a W-shape, not a coincidentally-lighter IPE) **and shape family** (a hollow baseline
+   only when the design section is a tube; open I/H otherwise — you would not have bought a tube for a
+   W-shape slot). Using this rather than the donor's mass stops a heavy donor in a light slot from
+   over-booking carbon as "saved".
 3. **Net CO₂ saved (booked & reported).** `co2_saved = baseline_mass·A1A3 − used_mass·reuse_process −
    connection_refab`. The off-cut term is a **soft preference only** (the remainder returns to stock, it
    is not emitted) and steers the optimiser but is not booked.
@@ -295,8 +352,18 @@ degenerate-geometry safety, the greedy net-positive guard, the load-combination 
 + baseline passing every combination), and **cutting-stock** (one donor cut to fill several slots, length
 capacity respected by both the MILP and the greedy fallback, leftover reported).
 
-**Catalog integrity (`tests/test_sections.py`).** For all 305 rows: `mass ≈ 0.785·A`,
-`W_el,y ≈ I_y/(h/2)`, `i = √(I/A)`, `W_el,z ≈ I_z/(b/2)`, `W_pl ≥ W_el` (worst real deviation ≈ 1.5 %).
+**Connection screen (`tests/test_connections.py`).** Family mismatch and over-deep donors are
+incompatible; shallower/thin-web/narrow-flange donors are `review`; no design section → no opinion;
+the screen gates only when enabled and otherwise annotates; policy tolerances are adjustable.
+
+**HSS (`tests/test_hss.py`).** AISC v15 anchor conversion (HSS6X6X1/2), internal-part classification
+(class 1 and class 4 walls), curve c both axes, RHS shear area, no-LTB bending (vs an LTB-reduced open
+section at the same span), compression χ hand-recomputed, and the family-restricted baseline.
+
+**Catalog integrity (`tests/test_sections.py`).** For all 711 rows (40 EU + 283 US W + 388 US HSS):
+`mass ≈ 0.785·A`, `W_el,y ≈ I_y/(h/2)`, `i = √(I/A)`, `W_el,z ≈ I_z/(b/2)`, `W_pl ≥ W_el` (worst real
+deviation ≈ 1.5 %). HSS use the AISC mass basis `0.785·A/0.93` (nominal weight from the nominal wall,
+properties from the design wall `t_des = 0.93·t_nom`).
 
 **Load-combination envelope (`tests/test_match.py`, `tests/test_loads.py`).** The matcher checks every
 combination and reports the governing one; the avoided-new baseline must pass the whole envelope (a

@@ -51,6 +51,26 @@ class ExtractedMember:
     end_xyz: list[float] | None = None
     notes: str = ""
 
+    # Measured section dimensions read from the BIM type (all optional). When present they let the
+    # mapping layer confirm a fuzzy/unknown type *name* against the catalog by physical dimensions
+    # (see ``steelreuse.core.sections.resolve_members``, method ``geometry``).
+    h_mm: float | None = None      # section depth
+    b_mm: float | None = None      # flange width
+    tf_mm: float | None = None     # flange thickness
+    tw_mm: float | None = None     # web thickness
+
+    # --- Pre-demolition audit (PDA) fields ---------------------------------------------------------
+    # These describe a *donor* member's surveyed condition and the basis on which its material is
+    # trusted, as recorded by a pre-demolition audit (the upstream survey that produces the donor
+    # inventory). They are all optional: a model with none of them behaves exactly as before (the
+    # member is admitted to supply at the run's default knockdown). See :mod:`steelreuse.core.audit`.
+    condition_grade: str | None = None      # surveyed physical condition: "A" (good) .. "D" (unsuitable)
+    verification_status: str | None = None  # how the grade is trusted: mill_cert | coupon_tested |
+    #                                         documented | visual_only | unverified
+    knockdown: float | None = None          # explicit auditor f_y knockdown (<=1); overrides derivation
+    defects: str = ""                       # free-text survey notes (corrosion, deformation, holes, ...)
+    recoverable_length_mm: float | None = None  # usable length after de-construction (defaults to length)
+
     def __post_init__(self) -> None:
         if self.role not in ROLES:
             self.role = "unknown"
@@ -123,8 +143,9 @@ class ExtractedModel:
                 raise ExtractionError(f"{p}: members[{i}] must be an object, got {type(m).__name__}")
             if "id" not in m:
                 raise ExtractionError(f"{p}: members[{i}] is missing the required 'id' field")
-            for fld in ("length_mm",):
-                if fld in m and not isinstance(m[fld], (int, float)):
+            for fld in ("length_mm", "knockdown", "recoverable_length_mm",
+                        "h_mm", "b_mm", "tf_mm", "tw_mm"):
+                if fld in m and m[fld] is not None and not isinstance(m[fld], (int, float)):
                     raise ExtractionError(
                         f"{p}: members[{i}] ({m['id']}).{fld} must be a number, "
                         f"got {type(m[fld]).__name__}"

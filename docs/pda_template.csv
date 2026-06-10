@@ -1,0 +1,8 @@
+id,condition_grade,verification_status,knockdown,recoverable_length_mm,defects
+# One row per surveyed donor member. Only 'id' is required; leave any cell blank if not surveyed.
+# condition_grade: A (as-new) | B (minor) | C (significant) | D (unsuitable -> quarantined)
+# verification_status: mill_cert | coupon_tested | documented | visual_only | unverified (-> quarantined)
+# knockdown: optional explicit f_y factor (<=1) that overrides the derived condition x verification factor
+# recoverable_length_mm: usable length after de-construction (defaults to the member's physical length)
+# defects: free-text survey notes (corrosion, deformation, holes, ...)
+D1,A,mill_cert,,,

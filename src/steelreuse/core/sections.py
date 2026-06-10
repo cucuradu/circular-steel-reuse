@@ -10,6 +10,10 @@ Two jobs:
   2. Map messy Revit type names (EN ``IPE300``/``HE 300 A`` *and* AISC ``W18x55``/``HSS6x6x5/8``)
      onto canonical catalog names *without ever silently guessing*:
      exact -> user override -> normalized -> fuzzy (reported) -> ``unknown`` bucket.
+     A fuzzy or unknown name can additionally be **confirmed by geometry**: if the extractor captured
+     the member's measured section dimensions (h/b/tf/tw) and they match exactly one catalog row, the
+     member is identified by its physical dimensions (method ``geometry``) — identification, not a
+     name guess.
 
 Standard library only (imported on both sides of the Revit boundary).
 """
@@ -31,6 +35,7 @@ from pathlib import Path
 _DATA = Path(__file__).resolve().parent.parent / "data" / "sections"
 DEFAULT_CATALOG = _DATA / "eu_sections.csv"        # European IPE/HE (metric source units)
 DEFAULT_US_CATALOG = _DATA / "us_sections.csv"     # US AISC W-shapes (imperial source units)
+DEFAULT_US_HSS_CATALOG = _DATA / "us_hss.csv"      # US AISC rect/square HSS (imperial source units)
 
 # Nominal yield strength f_y (N/mm^2) by grade.
 #   * EN 1993-1-1 Table 3.1 (t <= 40 mm) for European grades;
@@ -80,7 +85,7 @@ class SectionProps:
     """Section properties in internal units: lengths in mm, areas mm^2, I in mm^4, W in mm^3."""
 
     name: str
-    shape: str          # "I" (IPE) or "H" (HE...)
+    shape: str          # "I" (IPE/W), "H" (HE...), or "HSS" (rect/square hollow)
     h: float            # mm
     b: float
     tw: float
@@ -100,8 +105,19 @@ class SectionProps:
                            # within the slot's own design standard (see match.baseline_new_mass_kg)
 
     @property
+    def is_hollow(self) -> bool:
+        """True for closed (tube) sections, which take different classification/buckling/LTB rules."""
+        return self.shape.upper() in ("HSS", "RHS", "SHS", "CHS")
+
+    @property
     def Av_z(self) -> float:
-        """Shear area A_v for load along the web, EN 1993-1-1 eq. (6.18), rolled I/H (mm^2)."""
+        """Shear area A_v for load along the depth, EN 1993-1-1 cl. 6.2.6(3) (mm^2).
+
+        Rolled I/H: eq. for rolled sections (web + fillet zone). Rect/square hollow of uniform
+        thickness: ``A·h/(b+h)`` (the two webs' share of the area).
+        """
+        if self.is_hollow:
+            return self.A * self.h / (self.b + self.h)
         return max(self.A - 2 * self.b * self.tf + (self.tw + 2 * self.r) * self.tf,
                    1.0 * (self.h - 2 * self.tf) * self.tw)
 
@@ -180,10 +196,49 @@ def load_catalog_imperial(path: str | Path = DEFAULT_US_CATALOG) -> dict[str, Se
     return out
 
 
+def load_catalog_hss(path: str | Path = DEFAULT_US_HSS_CATALOG) -> dict[str, SectionProps]:
+    """Read the US AISC rectangular/square HSS catalog CSV (imperial source units) -> internal mm.
+
+    Stored verbatim from the AISC Shapes Database v15.0 like the W-shapes. The wall is uniform:
+    ``tf = tw = tdes`` (the *design* wall thickness, 0.93 x nominal for A500 ERW tube — AISC's basis
+    for all tabulated properties). ``r = 0``: hollow-section classification uses the ``c = h - 3t``
+    flat-width convention (EN 1993-1-1 Table 5.2), not the fillet radius. Round HSS and pipe are
+    intentionally excluded (CHS needs its own classification rule, ``D/t``).
+    """
+    out: dict[str, SectionProps] = {}
+    with Path(path).open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            name = row["name"].strip().upper()
+            t = float(row["tdes_in"]) * _IN_MM
+            out[name] = SectionProps(
+                name=name,
+                shape="HSS",
+                h=float(row["Ht_in"]) * _IN_MM,
+                b=float(row["B_in"]) * _IN_MM,
+                tw=t,
+                tf=t,
+                r=0.0,
+                A=float(row["A_in2"]) * _IN2_MM2,
+                mass_kgm=float(row["mass_lbft"]) * _LBFT_KGM,
+                Iy=float(row["Ix_in4"]) * _IN4_MM4,        # AISC strong axis (x) -> EN major (y)
+                Wel_y=float(row["Sx_in3"]) * _IN3_MM3,
+                Wpl_y=float(row["Zx_in3"]) * _IN3_MM3,
+                iy=float(row["rx_in"]) * _IN_MM,
+                Iz=float(row["Iy_in4"]) * _IN4_MM4,         # AISC weak axis (y) -> EN minor (z)
+                Wel_z=float(row["Sy_in3"]) * _IN3_MM3,
+                Wpl_z=float(row["Zy_in3"]) * _IN3_MM3,
+                iz=float(row["ry_in"]) * _IN_MM,
+                standard="US",
+            )
+    return out
+
+
 def load_default_catalog(
-    eu_path: str | Path = DEFAULT_CATALOG, us_path: str | Path = DEFAULT_US_CATALOG
+    eu_path: str | Path = DEFAULT_CATALOG,
+    us_path: str | Path = DEFAULT_US_CATALOG,
+    us_hss_path: str | Path = DEFAULT_US_HSS_CATALOG,
 ) -> dict[str, SectionProps]:
-    """Combined catalog: European IPE/HE + US AISC W-shapes (disjoint name spaces, safe to merge).
+    """Combined catalog: European IPE/HE + US AISC W-shapes + US HSS (disjoint names, safe to merge).
 
     This is what the CLI/pipeline use by default so a single run can read either a metric/EU model or
     an imperial/US model. Tests that need a fixed standard still call :func:`load_catalog` directly.
@@ -191,6 +246,8 @@ def load_default_catalog(
     catalog = load_catalog(eu_path)
     if Path(us_path).exists():
         catalog.update(load_catalog_imperial(us_path))
+    if Path(us_hss_path).exists():
+        catalog.update(load_catalog_hss(us_hss_path))
     return catalog
 
 
@@ -293,8 +350,8 @@ def normalize_name(raw: str) -> str:
 class MappingResult:
     raw: str
     canonical: str | None
-    method: str            # exact | override | normalized | fuzzy | unknown
-    confidence: float      # 1.0 exact/override/normalized; <1 fuzzy; 0 unknown
+    method: str            # exact | override | normalized | geometry | fuzzy | unknown
+    confidence: float      # 1.0 exact/override/normalized/geometry; <1 fuzzy; 0 unknown
     candidates: list[str]  # fuzzy alternatives, for the validation report
 
 
@@ -345,6 +402,72 @@ class ValidationReport:
         )
 
 
+# ---------------------------------------------------------------------------
+# Geometry confirmation (measured dimensions -> unique catalog row)
+# ---------------------------------------------------------------------------
+
+# Tolerance for comparing a measured dimension against a catalog value. BIM type parameters carry the
+# *nominal* section dimensions, so agreement should be essentially exact; the band only has to absorb
+# unit-conversion rounding (ft->mm, in->mm) while staying far below the step between adjacent catalog
+# sizes (e.g. IPE300 h=300 vs IPE330 h=330; W14X30 tf=9.8 vs W14X34 tf=11.6).
+_GEOM_TOL_REL = 0.015
+_GEOM_TOL_ABS_MM = 1.0
+
+# (member attribute, dims key == SectionProps attribute)
+_DIM_ATTRS = (("h_mm", "h"), ("b_mm", "b"), ("tf_mm", "tf"), ("tw_mm", "tw"))
+
+
+def member_dims(member) -> dict[str, float]:
+    """Measured section dimensions carried by an extracted member, as ``{h|b|tf|tw: mm}``.
+
+    Only positive numeric values count; anything missing is simply absent from the dict.
+    """
+    dims: dict[str, float] = {}
+    for attr, key in _DIM_ATTRS:
+        v = getattr(member, attr, None)
+        if isinstance(v, (int, float)) and v > 0:
+            dims[key] = float(v)
+    return dims
+
+
+def match_by_dimensions(
+    dims: dict[str, float],
+    catalog: dict[str, SectionProps],
+    tol_rel: float = _GEOM_TOL_REL,
+    tol_abs_mm: float = _GEOM_TOL_ABS_MM,
+) -> list[str]:
+    """All catalog sections whose dimensions agree with the measured ``dims`` within tolerance.
+
+    Every dimension present in ``dims`` must match (per-dimension tolerance =
+    ``max(tol_abs_mm, tol_rel * catalog value)``); dimensions the extractor could not read are
+    not constraints. The caller decides what to do with 0 / 1 / many matches.
+    """
+    matches: list[str] = []
+    for name, sec in catalog.items():
+        for key, measured in dims.items():
+            cat_val = getattr(sec, key)
+            if abs(measured - cat_val) > max(tol_abs_mm, tol_rel * cat_val):
+                break
+        else:
+            matches.append(name)
+    return matches
+
+
+def _geometry_confirmation(member, catalog, require_all: bool) -> str | None:
+    """The unique catalog section identified by the member's measured dimensions, or ``None``.
+
+    For a *fuzzy* name (some name signal exists) ``h`` and ``b`` suffice; for an *unknown* name
+    (no signal at all) all four dimensions are required (``require_all``), so a coincidental
+    height/width hit on a non-steel member can never map it. Ambiguity (>1 match) confirms nothing.
+    """
+    dims = member_dims(member)
+    needed = {"h", "b", "tf", "tw"} if require_all else {"h", "b"}
+    if not needed.issubset(dims):
+        return None
+    matches = match_by_dimensions(dims, catalog)
+    return matches[0] if len(matches) == 1 else None
+
+
 def load_overrides(path: str | Path) -> dict[str, str]:
     """Optional user override CSV with columns ``raw,canonical`` (raw is normalized on load)."""
     overrides: dict[str, str] = {}
@@ -371,6 +494,15 @@ def resolve_members(
     wrong section properties. Quarantined fuzzy members keep ``section=None`` (excluded from supply,
     passport, and matching) but are still listed in the report so the user can confirm them via an
     override CSV. Set ``include_fuzzy=True`` only when the caller has accepted that risk.
+
+    **Geometry confirmation** upgrades a fuzzy or unknown member to ``mapped`` when the extractor
+    captured its measured section dimensions (``h_mm``/``b_mm``/``tf_mm``/``tw_mm``) and they match
+    exactly one catalog row (method ``geometry``, confidence 1.0). This is identification by physical
+    dimensions, not a name guess — the measured h/b(/tf/tw) pin the section regardless of how the
+    type was named. A fuzzy name needs h+b; an unknown name needs all four dimensions (no name
+    signal -> stronger physical evidence required). The geometry match wins even when it differs
+    from the fuzzy name candidate (dimensions are authoritative; the candidates list is kept for
+    the report).
     """
     mapped: list[MappingResult] = []
     fuzzy: list[MappingResult] = []
@@ -378,11 +510,23 @@ def resolve_members(
     for m in members:
         res = map_section(m.raw_section, catalog, overrides, fuzzy_cutoff)
         if res.method == "fuzzy":
-            fuzzy.append(res)
-            m.section = res.canonical if include_fuzzy else None  # quarantined unless confirmed
+            geom = _geometry_confirmation(m, catalog, require_all=False)
+            if geom is not None:
+                res = MappingResult(res.raw, geom, "geometry", 1.0, res.candidates)
+                mapped.append(res)
+                m.section = geom
+            else:
+                fuzzy.append(res)
+                m.section = res.canonical if include_fuzzy else None  # quarantined unless confirmed
         elif res.method == "unknown":
-            unknown.append(res)
-            m.section = None
+            geom = _geometry_confirmation(m, catalog, require_all=True)
+            if geom is not None:
+                res = MappingResult(res.raw, geom, "geometry", 1.0, [])
+                mapped.append(res)
+                m.section = geom
+            else:
+                unknown.append(res)
+                m.section = None
         else:
             mapped.append(res)
             m.section = res.canonical

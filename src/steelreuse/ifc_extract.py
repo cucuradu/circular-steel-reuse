@@ -56,6 +56,28 @@ def _grade(el) -> str | None:
     return None
 
 
+def _profile_dims(el, scale_to_m: float) -> dict:
+    """Measured section dimensions from an I-shaped material profile (IfcIShapeProfileDef).
+
+    Returns whichever of ``{h_mm, b_mm, tf_mm, tw_mm}`` the profile carries (often all four), so the
+    mapping layer can confirm a fuzzy/unknown profile *name* by physical dimensions. Profiles of
+    other shapes simply lack these attributes and yield ``{}``.
+    """
+    mat = _material_obj(el)
+    profiles = getattr(mat, "MaterialProfiles", None)
+    prof = getattr(profiles[0], "Profile", None) if profiles else None
+    if prof is None:
+        return {}
+    to_mm = scale_to_m * 1000.0
+    dims = {}
+    for attr, key in (("OverallDepth", "h_mm"), ("OverallWidth", "b_mm"),
+                      ("FlangeThickness", "tf_mm"), ("WebThickness", "tw_mm")):
+        v = getattr(prof, attr, None)
+        if isinstance(v, (int, float)) and v > 0:
+            dims[key] = float(v) * to_mm
+    return dims
+
+
 def _length_mm(el, scale_to_m: float) -> float:
     """Find a 'Length' base quantity (any case) and convert to mm."""
     qsets = ue.get_psets(el, qtos_only=True) or {}
@@ -78,6 +100,7 @@ def extract_ifc(path: str, kind: str = "donor") -> ExtractedModel:
                 role=role, category=ifc_class,
                 raw_section=_section_name(el), material_grade=_grade(el),
                 length_mm=length, spans_mm=[length] if length else [],
+                **_profile_dims(el, scale_to_m),
             ))
     name = ""
     projects = model.by_type("IfcProject")

@@ -74,6 +74,54 @@ IPE300, S275, `L = 4000 mm`, `k = 1`, weak (z) axis, buckling **curve b** (`h/b 
 
 ---
 
+## §5 Worked example — the whole pipeline, start to finish
+
+The sections above validate each check in isolation. This worked example validates the **complete
+pipeline as one run** (`tests/test_worked_example.py`): two extraction JSONs go in, and mapping →
+loads → forces → EN 1993-1-1 checks → MILP matching → carbon accounting come out, with **every stage
+asserted against the hand chain below** (statics are closed-form; resistances use the same published
+ArcelorMittal table values cross-checked in §2–§3).
+
+**The bay.** New design: one **IPE300** floor beam (S275, `L = 6 m`, slab-restrained, 3 m tributary)
+on two **HEB200** columns (S275, `L = 3 m`, 9 m² tributary each). Donor stock: one **IPE330 × 7 m**
+and two **HEB220 × 3.2 m**, all S275, no audit knockdown.
+
+**1 — Actions (EN 1990 6.10, office defaults):**
+`9.225 kPa = 1.35·3.5 + 1.5·3.0` → beam `w = 27.675 N/mm`,
+`M_Ed = wL²/8 = 124.5375 kNm`, `V_Ed = wL/2 = 83.025 kN`; column `N_Ed = 9.225 × 9 = 83.025 kN`;
+service load `w_ser = 6.5 × 3 = 19.5 N/mm`.
+
+**2 — Donor beam check (IPE330, Class 1):**
+`M_c,Rd = 804×10³ × 275 = 221.1 kNm` → bending utilisation `124.5375 / 221.1 = 0.5633` (**governs**);
+deflection `δ = 5·19.5·6000⁴/(384·E·117.7×10⁶ mm⁴) = 13.3 mm` vs 24 mm → 0.555; shear
+`83.0 / 489.1 = 0.170`.
+
+**3 — Donor column check (HEB220, curve c both `h/b = 1`):**
+`N_cr,z = π²·210000·28.43×10⁶ / 3000² = 6547 kN`, `λ̄_z = √(9100·275/6.547×10⁶) = 0.618`,
+`Φ = 0.794`, `χ_z = 0.7745` → `N_b,Rd = 1938 kN` → utilisation `83.025 / 1938 = 0.0428`.
+
+**4 — Matching.** Only the 7 m donor fits the 6 m beam slot (`required + 50 mm`); the MILP fills all
+three slots: IPE330→beam (off-cut 1000 mm), HEB220→each column (off-cut 200 mm). Connection screen:
+IPE330 stands +30 mm deeper than IPE300 (≤ 50 mm) and HEB220 +20 mm deeper than HEB200 → all `ok`.
+
+**5 — Avoided-new baselines (the honest CO₂ basis):**
+- Beam: the lightest EU section passing *all* checks is **IPE300 itself** — IPE270 fails the SLS
+  deflection check (`δ = 27.1 mm > L/250 = 24 mm`), everything lighter fails bending. Baseline mass
+  `42.2 × 6 = 253.2 kg`.
+- Column: **IPE160** (15.8 kg/m), the lightest EU row, passes (`λ̄_z = 1.875`, curve b,
+  `χ_z = 0.235`, `N_b,Rd = 129.8 kN ≥ 83.0 kN`). Baseline mass `15.8 × 3 = 47.4 kg`.
+
+**6 — Carbon (ICE v3 factors: A1–A3 1.55, reuse process 0.10, connection refab 5 kg):**
+`beam: 253.2·1.55 − 294.6·0.10 − 5 = 358.00 kg` · `column: 47.4·1.55 − 214.5·0.10 − 5 = 47.02 kg`
+(each) → **total 452.04 kg CO₂e**, which is exactly what the pipeline books and reports.
+
+Note what the example exercises beyond arithmetic: the deflection-governed baseline (IPE270 is
+strength-adequate but serviceability-inadequate), the length feasibility cut, the shape-aware
+connection annotations, and the avoided-new basis (the saving is measured against IPE300/IPE160,
+*not* the heavier donors actually used).
+
+---
+
 ## Summary
 
 | Quantity | Hand value | Code | Source check |
@@ -87,7 +135,11 @@ IPE300, S275, `L = 4000 mm`, `k = 1`, weak (z) axis, buckling **curve b** (`h/b 
 | `χ_z` (L=4 m, curve b) | 0.392 | 0.392 | test_ec3 / test_validation |
 | `χ_LT` (L=6 m) | 0.45 | 0.45 | test_ec3 |
 | Deflection `5wL⁴/384EI` | 9.62 mm | 9.62 | test_ec3 |
+| Worked-example beam util | 0.5633 | 0.5633 | test_worked_example |
+| Worked-example column util | 0.0428 | 0.0428 | test_worked_example |
+| Worked-example CO₂ saved | 452.04 kg | 452.04 | test_worked_example |
 
-**Residual:** the validation above is hand-calc + section-table based. A future addition is a single
-*published textbook frame* (e.g. an SCI/Eurocode design guide worked example) run start-to-finish, to
-corroborate the combined N+M interaction against an external reference rather than internal hand calcs.
+**Residual:** the worked example above is hand-derived (closed-form statics + the published section
+tables of §2–§3) and runs the pipeline start-to-finish. What remains open is corroborating the
+simplified **N+M interaction** against an external textbook beam-column example (our interaction is
+deliberately conservative relative to EN 6.3.3, so an external example would quantify the margin).

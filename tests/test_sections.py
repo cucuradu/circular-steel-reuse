@@ -82,6 +82,56 @@ def test_override_wins(catalog):
     assert r.method == "override" and r.canonical == "IPE300"
 
 
+def test_geometry_confirms_fuzzy_match(catalog):
+    # "IPE305" is fuzzy by name, but the measured dimensions pin it to exactly one catalog row.
+    m = ExtractedMember(id="x", raw_section="IPE305", h_mm=300.0, b_mm=150.0)
+    report = resolve_members([m], catalog)
+    assert m.section == "IPE300"
+    assert len(report.fuzzy) == 0
+    assert report.mapped[0].method == "geometry" and report.mapped[0].confidence == 1.0
+
+
+def test_geometry_beats_the_fuzzy_name_candidate(catalog):
+    # The name suggests IPE330, but the physical dimensions are IPE360's -> dimensions win.
+    assert map_section("IPE335", catalog).canonical == "IPE330"
+    m = ExtractedMember(id="x", raw_section="IPE335",
+                        h_mm=360.0, b_mm=170.0, tf_mm=12.7, tw_mm=8.0)
+    report = resolve_members([m], catalog)
+    assert m.section == "IPE360" and report.mapped[0].method == "geometry"
+
+
+def test_ambiguous_dimensions_do_not_confirm(catalog):
+    # Two catalog rows share h/b within tolerance -> no unique identification -> stays quarantined.
+    from dataclasses import replace
+
+    doctored = dict(catalog)
+    doctored["IPE300X"] = replace(catalog["IPE300"], name="IPE300X")
+    m = ExtractedMember(id="x", raw_section="IPE305", h_mm=300.0, b_mm=150.0)
+    report = resolve_members([m], doctored)
+    assert m.section is None and len(report.fuzzy) == 1
+
+
+def test_geometry_rescues_unknown_name_only_with_all_dims(catalog):
+    # No name signal at all: all four dimensions are required before geometry may identify it.
+    full = ExtractedMember(id="a", raw_section="Mystery Steel Thing",
+                           h_mm=300.0, b_mm=150.0, tf_mm=10.7, tw_mm=7.1)
+    partial = ExtractedMember(id="b", raw_section="Mystery Steel Thing",
+                              h_mm=300.0, b_mm=150.0)
+    report = resolve_members([full, partial], catalog)
+    assert full.section == "IPE300" and report.mapped[0].method == "geometry"
+    assert partial.section is None and len(report.unknown) == 1
+
+
+def test_member_dims_roundtrip_through_schema(tmp_path):
+    m = ExtractedMember(id="x", raw_section="IPE305", h_mm=300.0, b_mm=150.0,
+                        tf_mm=10.7, tw_mm=7.1)
+    model = ExtractedModel(kind="donor", members=[m])
+    p = tmp_path / "donor.json"
+    model.save(p)
+    loaded = ExtractedModel.load(p)
+    assert loaded.members[0].h_mm == 300.0 and loaded.members[0].tw_mm == 7.1
+
+
 def test_fuzzy_matches_are_quarantined_by_default(catalog):
     # "IPE305" is a near-miss (~0.83 to IPE300/IPE330) -> a fuzzy hit, not exact/normalized/unknown.
     assert map_section("IPE305", catalog).method == "fuzzy"
@@ -195,6 +245,10 @@ def test_catalog_property_consistency():
     Relations (catalogue units): mass ≈ 0.785·A_cm2 (steel at 7850 kg/m³, +fillets);
     Wel_y ≈ Iy/(h/2); iy ≈ √(Iy/A); Wel_z ≈ Iz/(b/2); iz ≈ √(Iz/A); and Wpl ≥ Wel on both axes.
     Tolerances have generous headroom over the worst real deviation (~1.5%).
+
+    AISC HSS have a different mass basis by design: the tabulated *nominal weight* is computed from
+    the nominal wall, while the area (and all section properties) use the design wall
+    ``tdes = 0.93·tnom`` (A500 ERW), so for tubes the expected mass is ``0.785·A/0.93``.
     """
     cat = load_default_catalog()
     assert len(cat) > 250                                   # EU + US merged
@@ -203,7 +257,8 @@ def test_catalog_property_consistency():
         Wely, Welz = s.Wel_y / 1e3, s.Wel_z / 1e3           # -> cm^3
         Wply, Wplz = s.Wpl_y / 1e3, s.Wpl_z / 1e3
         h, b, iy, iz = s.h / 10, s.b / 10, s.iy / 10, s.iz / 10  # -> cm
-        assert s.mass_kgm == pytest.approx(0.785 * A, rel=0.05), f"{s.name}: mass vs area"
+        mass_expected = 0.785 * A / (0.93 if s.is_hollow else 1.0)
+        assert s.mass_kgm == pytest.approx(mass_expected, rel=0.05), f"{s.name}: mass vs area"
         assert Wely == pytest.approx(Iy / (h / 2), rel=0.03), f"{s.name}: Wel_y vs Iy/(h/2)"
         assert iy == pytest.approx(math.sqrt(Iy / A), rel=0.03), f"{s.name}: iy vs sqrt(Iy/A)"
         assert Welz == pytest.approx(Iz / (b / 2), rel=0.03), f"{s.name}: Wel_z vs Iz/(b/2)"

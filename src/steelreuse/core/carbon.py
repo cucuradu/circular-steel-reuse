@@ -63,6 +63,10 @@ class PassportEntry:
     ec_new_kgco2e: float      # if procured new
     ec_reuse_kgco2e: float    # process carbon to reuse
     ec_saved_kgco2e: float    # new - reuse
+    # Pre-demolition-audit provenance (None when the member was not audited) — the material passport
+    # is the natural home for "where did this come from and how do we know its grade".
+    verification_status: str | None = None
+    condition_grade: str | None = None
 
 
 @dataclass
@@ -102,5 +106,7 @@ def build_passport(
             ec_new_kgco2e=mass * f.a1a3,
             ec_reuse_kgco2e=mass * f.reuse_process,
             ec_saved_kgco2e=mass * f.saved_per_kg,
+            verification_status=getattr(m, "verification_status", None),
+            condition_grade=getattr(m, "condition_grade", None),
         ))
     return Passport(entries=entries)

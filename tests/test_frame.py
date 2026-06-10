@@ -393,6 +393,66 @@ def test_run_pipeline_frame_splits_multispan_into_slots(tmp_path):
     assert res.match.n_reused >= 1
 
 
+def test_split_columns_at_framing_inserts_a_node_at_the_floor():
+    from steelreuse.core.frame import split_columns_at_framing
+    # a single full-height column with a beam framing into its mid-height: it must split there.
+    members = [_col("C", 0, 0, 0, 6000), _beam("b", 0, 6000, 3000)]
+    out = split_columns_at_framing(members)
+    col_ids = [m.id for m in out if m.role == "column"]
+    assert col_ids == ["C@0", "C@1"]
+    seg = {m.id: (m.start_xyz[2], m.end_xyz[2]) for m in out if m.role == "column"}
+    assert seg["C@0"] == (0, 3000) and seg["C@1"] == (3000, 6000)
+    # a column with nothing framing into its interior passes through untouched.
+    plain = split_columns_at_framing([_col("P", 0, 0, 0, 3000), _beam("t", 0, 6000, 3000)])
+    assert [m.id for m in plain if m.role == "column"] == ["P"]
+
+
+def test_full_height_column_picks_up_an_intermediate_floor():
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    loads = AreaLoadModel()
+    # one bay, two floors, but each column modelled as a SINGLE full-height element (the common Revit
+    # pattern). The mid-floor beam must connect (column auto-split) and the column carry both floors.
+    members = [
+        _col("c1", 0, 0, 0, 6000), _col("c2", 6000, 0, 0, 6000),         # full-height columns
+        _beam("lvl1", 0, 6000, 3000), _beam("lvl2", 0, 6000, 6000),      # floor + roof beams
+    ]
+    res = analyze_frame(members, loads, cat)
+    assert res.ok
+    w = loads.factored_area_kpa() * 3.0
+    half_floor = w * 6000.0 / 2.0
+    # the split column folds back into ONE slot over its full height, carrying both floors' reactions.
+    slots = res.slots_by_member["c1"]
+    assert len(slots) == 1
+    assert slots[0].required_length_mm == pytest.approx(6000.0, rel=1e-6)
+    assert slots[0].demands[0][1].N_Ed == pytest.approx(2 * half_floor, rel=1e-3)
+
+
+def test_girder_stays_continuous_at_a_secondary_beam_crossing():
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    loads = AreaLoadModel()
+    # A girder spanning column-to-column whose spans_mm records a SECONDARY-beam crossing (no column at
+    # midspan). The old per-span-pinned model made a vertical mechanism there; the girder must instead
+    # stay moment-continuous, support the secondary, solve, and map to ONE reused slot (not two).
+    girder = ExtractedMember(id="G", role="beam", section="IPE400", material_grade="S275",
+                             raw_section="IPE400", start_xyz=[0, 0, 3000], end_xyz=[12000, 0, 3000],
+                             spans_mm=[6000, 6000])
+    secondary = ExtractedMember(id="S", role="beam", section="IPE240", material_grade="S275",
+                                raw_section="IPE240", start_xyz=[6000, 0, 3000],
+                                end_xyz=[6000, 6000, 3000], spans_mm=[6000])
+    members = [
+        _col("cL", 0, 0, 0, 3000), _col("cR", 12000, 0, 0, 3000),    # girder end columns
+        _col("cS", 6000, 6000, 0, 3000),                            # supports the secondary's far end
+        girder, secondary,
+    ]
+    res = analyze_frame(members, loads, cat)
+    assert res.ok                                   # no vertical mechanism at the crossing
+    assert len(res.slots_by_member["G"]) == 1       # continuous girder -> a single reused member
+    assert res.slots_by_member["G"][0].required_length_mm == pytest.approx(12000.0, rel=1e-3)
+    assert len(res.slots_by_member["S"]) == 1
+
+
 def test_run_pipeline_frame_analysis_falls_back_without_geometry(tmp_path):
     # demand members without coordinates: the frame can't build, pipeline still runs (analytic path).
     demand = ExtractedModel(kind="demand", members=[

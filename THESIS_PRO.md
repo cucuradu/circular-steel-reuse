@@ -128,10 +128,12 @@ approximately 1.55 − 0.10 = 1.45 kgCO₂e per kilogram relative to new procure
 ## 2.2 Steel sections
 
 Hot‑rolled sections are catalogued shapes with standardised geometric properties. The tool covers
-doubly‑symmetric I/H profiles: the European IPE and HEA/HEB/HEM series and the American AISC W series.
-Each section is characterised by its overall depth `h`, flange width `b`, web and flange thicknesses `t_w`
-and `t_f`, root radius `r`, area `A`, mass per metre, second moments of area `I_y`/`I_z`, elastic and
-plastic section moduli `W_el`/`W_pl`, and radii of gyration `i_y`/`i_z`. The major (strong) axis is `y`
+doubly‑symmetric open I/H profiles — the European IPE and HEA/HEB/HEM series and the American AISC W
+series — and the closed rectangular/square AISC HSS (hollow structural sections), each verified with the
+rules appropriate to its shape family. Each section is characterised by its overall depth `h`, flange
+width `b`, web and flange thicknesses `t_w` and `t_f` (a hollow section has one uniform wall `t`), root
+radius `r`, area `A`, mass per metre, second moments of area `I_y`/`I_z`, elastic and plastic section
+moduli `W_el`/`W_pl`, and radii of gyration `i_y`/`i_z`. The major (strong) axis is `y`
 and the minor (weak) axis is `z`; bending resistance and buckling behaviour differ greatly between them.
 
 [[FIG-SECTION]]
@@ -200,16 +202,55 @@ string, e.g. "W Shapes‑Column W14x109" → "W14X109"); fuzzy similarity; other
 analysis until confirmed, since substituting near‑neighbour properties would corrupt the checks. A
 validation report summarises the mapped, fuzzy and unknown counts.
 
+When the extractor has captured the member's **measured section dimensions** (depth, flange width,
+flange and web thickness — read from the Revit type's structural‑section parameters, or from the IFC
+I‑shaped profile definition), a fuzzy or unknown *name* can additionally be confirmed by **physical
+dimensions**: if every captured dimension matches exactly one catalogue row within a tight tolerance
+(`max(1 mm, 1.5 %)`, far below the step between adjacent catalogue sizes), the member is identified by
+geometry (method `geometry`) rather than left to manual confirmation. A fuzzy name requires depth and
+width; a name with no signal at all requires all four dimensions. Ambiguity confirms nothing — this is
+identification by measurement, never a guess.
+
 ## 4.3 Catalogues and grades
 
-The bundled catalogue holds 323 sections: 40 European (IPE 160–600; HEA/HEB/HEM 200–400) and 283 AISC
-W‑shapes stored verbatim in imperial units from the AISC Shapes Database v15.0 and converted on load, so
-the published values remain auditable. Each section is tagged by standard (EU/US). Only doubly‑symmetric
-I/H/W shapes are catalogued, because the EN 1993‑1‑1 I/H formulae apply to them; channels, hollow sections
-and angles are deliberately left in the unknown category rather than checked with inapplicable formulae.
-Members without a grade — common in US models — receive the standard grade for their shape family
-(e.g. W → A992, 345 N/mm²) rather than the weaker European default, and the assumption is recorded. A
-property‑consistency test re‑derives mass, moduli and radii from primary dimensions for all 323 rows.
+The bundled catalogue holds 711 sections: 40 European (IPE 160–600; HEA/HEB/HEM 200–400), 283 AISC
+W‑shapes, and 388 AISC rectangular/square HSS — the US tables stored verbatim in imperial units from the
+AISC Shapes Database v15.0 and converted on load, so the published values remain auditable. Each section
+is tagged by standard (EU/US) and shape family. The verification layer is **shape‑aware**: I/H/W shapes
+use the EN 1993‑1‑1 open‑section rules, while hollow sections classify every wall as an internal part
+(`c = h − 3t`), take the cold‑formed buckling curve c on both axes, use the RHS shear area
+`A_v = A·h/(b+h)`, and are exempt from lateral‑torsional buckling (a closed section's torsional stiffness
+keeps the LTB slenderness below the plateau at any practical span). Mono‑symmetric shapes — channels and
+angles — remain deliberately in the unknown category rather than be checked with inapplicable formulae;
+round tube likewise awaits a `D/t` classification rule. Members without a grade — common in US models —
+receive the standard grade for their shape family (e.g. W → A992, 345 N/mm²; HSS → A500) rather than the
+weaker European default, and the assumption is recorded. A property‑consistency test re‑derives mass,
+moduli and radii from primary dimensions for all 711 rows (HSS on the AISC nominal‑weight/design‑wall
+basis, `t_des = 0.93·t_nom`).
+
+## 4.4 Pre‑demolition audit and provenance
+
+The donor inventory is, in regulatory terms, the deliverable of a **pre‑demolition audit**: the survey
+conducted before demolition or deep refurbishment that records, member by member, the quantity, the
+physical condition, and the basis on which the steel grade can be trusted. The audit is increasingly
+mandated or recommended — the EU Construction & Demolition Waste Management Protocol, France's
+*Diagnostic PEMD*, the EU *Level(s)* framework, and Italy's *CAM Edilizia* — and reuse‑specific guidance
+(SCI P427) permits reliance on reclaimed steel only where its grade is established by mill certificate or
+coupon test and its condition is sound. Where §4.1's inventory answers *how much*, the audit answers
+*how trustworthy*.
+
+The tool represents the two audit facts as fields on each donor member — a condition grade (A–D) and a
+verification basis (mill certificate, coupon test, documentary, visual, or unverified) — supplied in the
+model file or merged from an auditor's CSV (`--pda`). It converts them into the two quantities the
+verification already understands: a per‑member knockdown on the yield strength, taken as the product of a
+condition factor and a verification factor (or an explicit value the auditor sets directly), and a
+quarantine decision that removes unverified or unsuitable (condition D) members from the certified supply
+in the same way a fuzzy section match is withheld. A recoverable length captures the usable stock after
+de‑construction. The design is honest by default: a member carrying no audit data is treated as legacy
+input and admitted at the run's default knockdown, so the feature never alters a result that was not
+audited — absence of data is read as "not audited", not as "sound". The provenance then surfaces in the
+material passport (§8.1), in a dedicated audit section and per‑assignment column of the report (§10), and
+on the console, making the audit an explicit, traceable input rather than a silent assumption.
 
 ---
 
@@ -373,6 +414,22 @@ envelope; the governing combination is recorded. Admissible pairs are scored by 
 less a soft off‑cut penalty that discourages consuming long stock for short demands without booking the
 remainder as emitted.
 
+## 9.1.1 Connection feasibility screen
+
+Connections frequently govern whether a reuse is *practical*, yet connection design is outside this
+tool's scope. The middle ground is a **geometric compatibility screen** between each donor and the
+section the design specified for the slot — the section its connections (fin plates, end plates, seats,
+splices) were detailed around. A donor of the wrong shape family (tube for an open position or vice
+versa), or one standing more than 50 mm deeper than the design section, is `incompatible`: the
+connection typology or the detailed zone itself would have to change. A donor markedly shallower, with
+a much thinner web (bolt bearing) or a much narrower flange (seats, end plates) is flagged `review` —
+connectable, but the details need an engineer's look. The screen never judges strength (that is the
+EN checker's job) and a slot with no known design section yields no opinion, so absence of data never
+blocks reuse. By default the screen only *annotates* every assignment (a Connection column in the
+report); with `--connections` enabled, `incompatible` pairs are excluded before matching. All
+tolerances are an explicit, overridable policy. Designing the connections themselves — bolts, welds,
+plates — remains out of scope.
+
 ## 9.2 Optimisation and fallback
 
 The selection is a Mixed‑Integer Linear Program (binary assignment variables, at most one supply per slot
@@ -414,7 +471,7 @@ decreasing with span, and deflection `δ ≈ 9.62 mm` (w = 10 N/mm, L = 6 m).
 checks, the matcher (known‑answer feasibility, use constraints, the avoided‑new and standard‑restricted
 baselines, degenerate‑geometry safety, the greedy guard, the combination envelope, cutting‑stock), the
 frame analysis (topology, recovery of `wL²/8`, multi‑storey accumulation, sway/wind/seismic forces,
-multi‑span splitting), and catalogue integrity for all 323 rows.
+multi‑span splitting), and catalogue integrity for all 711 rows.
 
 **Methodology record.** A methodology document maps each clause to its implementation, assumption and
 validation basis; the limitation register (Chapter 13) states the explicit non‑claims.
@@ -423,21 +480,24 @@ validation basis; the limitation register (Chapter 13) states the explicit non�
 
 # 12. Results
 
-On a representative US donor of 1016 members, 434 map to catalogue sections (all W‑shapes), the remainder
-(concrete, joists, channels, hollow sections, angles) being correctly reported as unknown; missing grades
-are assigned flagged defaults. With geometry‑estimated loads on a steel‑only demand of 349 positions, the
-optimiser reuses 144 (41 %), saving ≈ 14.7 t CO₂e, reported separately from the donor's total reuse
-potential so the design's absorptive capacity is visible. Under frame analysis, a two‑bay two‑storey
-demand yields an interior column of 332 kN against a corner column of 166 kN — the 2:1 ratio confirmed by
-hand statics — demonstrating the load‑path effect. A representative run summary is:
+On a representative US donor of 1016 members, 435 map to catalogue sections (the W‑shapes plus one HSS),
+the remainder (overwhelmingly open‑web bar joists, plus concrete, channels and angles) being correctly
+reported as unknown; missing grades are assigned flagged defaults. The demand model is assembled into a
+**global frame of 274 nodes and 492 elements** and solved, so the design forces come from the real load
+path; the new design resolves to 181 steel positions, of which the optimiser fills 50 with reclaimed
+members that pass every EN 1993‑1‑1 combination, saving ≈ 39.3 t CO₂e on the avoided‑new basis — reported
+separately from the donor stock's ≈ 315 t total embodied carbon so the design's absorptive capacity is
+visible. On a hand‑checkable two‑bay two‑storey demand, frame analysis yields an interior column of
+332 kN against a corner column of 166 kN — the 2:1 ratio confirmed by hand statics — demonstrating the
+load‑path effect. The case‑study run summary is:
 
 ```
-Loads: area-based, 3.5+3.0 kN/m^2 (G+Q), ULS 1.35G+1.5Q, tributary geometry-estimated; demand = steel only
-Forces: frame analysis (PyNite) — 9 nodes, 10 members
-Mapping: 434 mapped, 0 fuzzy, 582 unknown of 1016 members
-Supply 434 | demand slots 349 | reused 144
-CO2e saved by matches: 14700 kg (full donor stock potential: 36000 kg)
-Narrative source: gemini
+Loads: area-based, 3.5+3 kN/m^2 (G+Q), ULS 1.35G+1.5Q, tributary 3 m; demand = steel only
+Forces: frame analysis (PyNite) — 274 nodes, 492 members
+Mapping: 435 mapped, 0 fuzzy, 581 unknown of 1016 members
+Supply 435 | demand slots 181 | reused 50
+CO2e saved by matches: 39264.5 kg (full donor stock potential: 315486.4 kg)
+Narrative source: deterministic
 ```
 
 ---
@@ -448,10 +508,15 @@ Severity follows the project register: 🔴 affects credibility or correctness �
 conservative and documented) · 🟡 minor. Items marked *(out of scope)* are deliberate non‑goals.
 
 **Real‑world feasibility (governing).**
-🔴 *Connection design (out of scope):* bolts, welds and plates are not designed, yet often govern reuse —
-a per‑connection feasibility screen is the priority extension. 🔴 *Material certification (out of scope):*
-grade, corrosion and fatigue require coupon testing and survey; the tool offers only a global knockdown
-and a disclaimer, with per‑member knockdown from test data as future work. 🔴 *Not code‑certified:*
+🔴 *Connection design (out of scope):* bolts, welds and plates are not designed, yet often govern reuse.
+The tool now ships a **geometric connection feasibility screen** (§9.1.1) — shape family, depth band,
+web and flange compatibility against the slot's design section, annotating every assignment and
+optionally excluding incompatible donors — but the screen is geometry, not capacity: connection design
+and its verification remain the engineer's. 🟠 *Material certification:* the tool now
+ingests a **pre‑demolition audit** (§4.4) — per‑member condition and verification basis driving a derived
+knockdown and a quarantine of unverified or unsuitable stock — so grade trust is an explicit, traceable
+input rather than a global figure; the survey itself (coupon‑test programme, corrosion/fatigue assessment,
+weldability of old steel) remains the engineer's responsibility and out of scope. 🔴 *Not code‑certified:*
 results are decision support, to be confirmed by a qualified engineer.
 
 **Member verification.**
@@ -477,9 +542,12 @@ which the IFC path does not yet export.
 **Data and catalogue.**
 🔴 *(human task)* The pyRevit extractor awaits validation on a live Revit model. 🟠 The bundled samples
 predate column‑coordinate capture and revert to defaults until re‑extracted. 🟠 The IFC extractor exports
-no coordinates. 🟠 The catalogue omits small European sizes and non‑I/H families (UB/UC, channels, hollow
-sections, angles), which additionally require shape‑aware checks. 🟡 Fuzzy matches require manual
-confirmation by design.
+no coordinates. 🟠 The catalogue omits small European sizes and the mono‑symmetric families (UB/UC,
+channels, angles) plus round tube, which require further shape‑aware checks (rectangular/square HSS are
+now catalogued and checked with hollow‑section rules). 🟡 Fuzzy matches without captured
+dimensions still require manual confirmation; when the extractor records the measured section
+dimensions, a fuzzy or unknown name is auto‑confirmed by a unique physical‑dimension match
+(method `geometry`).
 
 **Carbon and optimisation.**
 🟠 Single‑objective (carbon only); cost, transport and programme are not yet traded off. 🟡 Cradle‑to‑gate
@@ -490,8 +558,9 @@ opt‑in toggles for alternative behaviour.
 🟡 The ML study is exploratory and unintegrated; integration needs non‑circular validation. 🟠 Validation
 rests on per‑check hand calculations; a single end‑to‑end published worked example remains outstanding.
 
-**Priority roadmap.** (1) per‑connection feasibility screen; (2) live‑model extractor validation;
-(3) per‑member knockdown from coupon tests; (4) shape‑aware checks for channels/hollow/angles; (5) IFC
+**Priority roadmap.** (1) extend the connection screen toward capacity (standard end-connection shear
+tables); (2) live‑model extractor validation;
+(3) calibrate the audit condition→knockdown factors against test data; (4) shape‑aware checks for channels/angles/round tube; (5) IFC
 coordinate export; (6) full 6.3.3 and biaxial interaction; (7) a complete combination set and modal
 seismic; (8) construction‑stage case; (9) multi‑objective optimisation; (10) an end‑to‑end validation
 example; (11) catalogue expansion; (12) effective‑length inference.
@@ -551,7 +620,8 @@ LTB, MILP, P‑Δ, SLS, ULS.
 
 # Appendix B — Command‑line interface
 
-`steelreuse --donor D.json --demand M.json --out report.html` with options: `--knockdown`; loads
+`steelreuse --donor D.json --demand M.json --out report.html` with options: `--knockdown`; audit
+`--pda audit.csv --include-unverified`; loads
 `--dead --live --gamma-g --gamma-q --trib-width --col-trib-area --col-floors --trib-from-geometry`;
 combination `--col-ecc --phi`; demand filter `--all-demand`; matching `--cut`; analysis
 `--frame-analysis --pdelta --wind --seismic`; legacy `--beam-udl --column-axial`. Additional entry points:
@@ -569,6 +639,8 @@ inventory); `python -m steelreuse.ml.train` (regenerate the ML study).
 | Frame idealisation | simple braced; fixed bases | + optional sway/wind/seismic/P‑Δ |
 | Column moment | 0 unless `--phi`/`--col-ecc` | member‑level notional only |
 | Effective length `k` | 1.0 | conservative |
+| Reclaimed knockdown | 1.0, or audit‑derived | condition × verification factor (§4.4) |
+| Unverified / condition‑D donor | quarantined | `--include-unverified` to admit |
 | LTB `C₁` | 1.0 | conservative |
 | Compression‑flange restraint | restrained | non‑conservative if absent — warned |
 | Reclaimed knockdown | 1.0 | assumes grade confirmed |

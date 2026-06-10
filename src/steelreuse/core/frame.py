@@ -90,6 +90,19 @@ class Topology:
 
 
 @dataclass
+class FrameSlot:
+    """One reusable demand slot derived from the solve: one physical member, or one inter-column span of
+    a continuous beam. Carries the worst-case action-effect envelope over the segments it was built from
+    (a split column's storey lifts, or a girder's segments between secondary-beam crossings)."""
+
+    slot_id: str
+    member_id: str
+    role: str
+    required_length_mm: float
+    demands: list[tuple[str, MemberDemand]]
+
+
+@dataclass
 class FrameResult:
     """Per-member design-force envelope from the frame solve, ready for the matcher/checker."""
 
@@ -100,25 +113,33 @@ class FrameResult:
     skipped_member_ids: list[str]     # fell back to the analytic path
     warnings: list[str] = field(default_factory=list)
     ok: bool = True                   # False if the solve failed and everything fell back
+    # Reuse slots grouped per ORIGINAL member id (one physical member or one inter-column span). The
+    # pipeline consumes this; ``demands_by_member`` above keeps the raw per-solved-segment physics view.
+    slots_by_member: dict[str, list[FrameSlot]] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
 # Continuous-member splitting (pure Python)
 # ---------------------------------------------------------------------------
 
-def expand_spans(members) -> list:
-    """Split continuous (multi-span) beams into one sub-member per span at the interior supports.
+def _expand_spans_tracked(members) -> tuple[list, set[tuple[str, str]]]:
+    """Split continuous (multi-span) beams into one sub-member per span, tracking the interior joins.
 
     A beam that spans several bays is extracted as a single member carrying ``spans_mm = [s1, s2, ...]``
     with its endpoints at the far ends. Modelled whole, the frame would dump its entire load at those two
-    ends and leave the **interior columns under it unloaded** (they sit on the member but aren't connected
-    to it). Splitting it at the cumulative span positions — placed by interpolating along the member axis
-    so the interior nodes land on the columns below — gives each span its own simply-supported element and
-    routes each bay's reaction into the correct column. Single-span members, columns and braces (and any
-    multi-span member lacking geometry) pass through unchanged. Sub-members are id'd ``f"{id}#k"`` to align
-    with the per-span slot ids the pipeline already uses.
+    ends and leave the **interior supports under it unloaded** (they sit on the member but aren't connected
+    to it). Splitting it at the cumulative span positions — interpolated along the member axis so the
+    interior nodes land on whatever is below — gives each span its own element and creates the shared nodes
+    the snapper needs. Single-span members, columns and braces (and any multi-span member lacking geometry)
+    pass through unchanged. Sub-members are id'd ``f"{id}#k"``.
+
+    Returns ``(members, interior_ends)`` where ``interior_ends`` is the set of ``(submember_id, "i"|"j")``
+    that are **interior joins** — the same physical beam continues past that end. The solver uses this to
+    keep a girder moment-continuous at a secondary-beam crossing (no real support) while still pinning it
+    at a genuine support; see :func:`analyze_frame`.
     """
     out: list = []
+    interior_ends: set[tuple[str, str]] = set()
     for m in members:
         spans = m.spans_mm or []
         if m.role != "beam" or len(spans) <= 1 or not m.start_xyz or not m.end_xyz:
@@ -130,15 +151,81 @@ def expand_spans(members) -> list:
             out.append(m)
             continue
         cum = 0.0
+        n = len(spans)
         for k, span in enumerate(spans):
             f0, f1 = cum / total, (cum + span) / total
             p0 = [s[a] + (e[a] - s[a]) * f0 for a in range(3)]
             p1 = [s[a] + (e[a] - s[a]) * f1 for a in range(3)]
+            sid = f"{m.id}#{k}"
             out.append(ExtractedMember(
-                id=f"{m.id}#{k}", role="beam", section=m.section, material_grade=m.material_grade,
+                id=sid, role="beam", section=m.section, material_grade=m.material_grade,
                 raw_section=m.raw_section, start_xyz=p0, end_xyz=p1,
                 spans_mm=[span], length_mm=span))
+            if k > 0:
+                interior_ends.add((sid, "i"))   # start continues the previous span
+            if k < n - 1:
+                interior_ends.add((sid, "j"))   # end continues into the next span
             cum += span
+    return out, interior_ends
+
+
+def expand_spans(members) -> list:
+    """Split continuous multi-span beams at their interior supports (see :func:`_expand_spans_tracked`)."""
+    return _expand_spans_tracked(members)[0]
+
+
+def split_columns_at_framing(members, snap_tol_mm: float = 50.0) -> list:
+    """Split a multi-storey column wherever another member frames into its interior.
+
+    A column extracted from Revit as a single full-height element carries nodes only at its two ends, so
+    beams that frame in at an intermediate floor land on the bare shaft and never connect — the floor
+    floats off as a disconnected component (the dominant cause of a fractured demand model). For each
+    (near-)vertical column this inserts a node at every interior elevation where another member's endpoint
+    meets its axis (same plan position within ``snap_tol_mm``), splitting it into storey segments. The
+    segments keep role ``"column"`` and are never released, so the split is structurally identical to the
+    continuous member (the solver enforces full continuity at the inserted node) while restoring the load
+    path: the floor's reactions now flow into the column and it accumulates the storeys above. Sub-ids are
+    ``f"{id}@{k}"`` (separator distinct from the beam span ``#k``) so the per-segment forces fold back into
+    the single physical column after the solve. Non-columns, sloped columns, and columns with no interior
+    framing pass through unchanged.
+    """
+    tol = snap_tol_mm
+    pts: list[tuple[float, float, float]] = []
+    for m in members:
+        if m.start_xyz:
+            pts.append((m.start_xyz[0], m.start_xyz[1], m.start_xyz[2]))
+        if m.end_xyz:
+            pts.append((m.end_xyz[0], m.end_xyz[1], m.end_xyz[2]))
+    out: list = []
+    for m in members:
+        if m.role != "column" or not m.start_xyz or not m.end_xyz:
+            out.append(m)
+            continue
+        s, e = m.start_xyz, m.end_xyz
+        if math.hypot(e[0] - s[0], e[1] - s[1]) > tol:   # not (near-)vertical -> leave alone
+            out.append(m)
+            continue
+        lo, hi = min(s[2], e[2]), max(s[2], e[2])
+        cx, cy = s[0], s[1]
+        cuts_at: set[float] = set()
+        for px, py, pz in pts:
+            if math.hypot(px - cx, py - cy) <= tol and lo + tol < pz < hi - tol:
+                cuts_at.add(round(pz, 3))
+        if not cuts_at:
+            out.append(m)
+            continue
+        clustered: list[float] = []
+        for z in sorted(cuts_at):
+            if not clustered or z - clustered[-1] > tol:
+                clustered.append(z)
+        cuts = [lo, *clustered, hi]
+        for k in range(len(cuts) - 1):
+            za, zb = cuts[k], cuts[k + 1]
+            out.append(ExtractedMember(
+                id=f"{m.id}@{k}", role="column", section=m.section,
+                material_grade=m.material_grade, raw_section=m.raw_section,
+                start_xyz=[cx, cy, za], end_xyz=[cx, cy, zb],
+                spans_mm=[zb - za], length_mm=zb - za))
     return out
 
 
@@ -423,6 +510,73 @@ def _governing_shear(member, combo: str) -> float:
                abs(member.max_shear("Fz", combo)), abs(member.min_shear("Fz", combo)))
 
 
+def _build_slots_by_member(
+    demands_by_member: dict[str, list[tuple[str, MemberDemand]]],
+    members_by_id: dict,
+    topo: Topology,
+    loads,
+    column_nodes: set[str],
+    flange_restrained: bool,
+) -> dict[str, list[FrameSlot]]:
+    """Group the per-segment solve results back into reusable slots — one per physical member or per
+    inter-column span — keyed by ORIGINAL member id (the pipeline looks them up that way).
+
+    A split column (``id@k``) folds into one slot over its full height (a column is one reused element).
+    A continuous beam (``id#k``) is cut into a new slot only at an interior join that lands on a **column**
+    (a real support, so each inter-column span is a separately reusable simply-supported member);
+    secondary-beam crossings stay within one slot, so a girder maps to a single reused member. Each slot
+    carries the worst-case (max-magnitude) action-effect envelope over its segments per load combination,
+    with the slot's full length as the buckling/deflection length.
+    """
+    segs: dict[str, list[str]] = {}
+    for sid in demands_by_member:
+        orig = sid.split("@", 1)[0].split("#", 1)[0]
+        segs.setdefault(orig, []).append(sid)
+
+    def _seg_index(sid: str) -> int:
+        for sep in ("@", "#"):
+            if sep in sid:
+                return int(sid.rsplit(sep, 1)[1])
+        return 0
+
+    slots_by_member: dict[str, list[FrameSlot]] = {}
+    for orig, seg_ids in segs.items():
+        seg_ids = sorted(seg_ids, key=_seg_index)
+        role = members_by_id[seg_ids[0]].role
+        # A new slot starts at an interior join that is a column node (real support); columns never split.
+        groups: list[list[str]] = [[seg_ids[0]]]
+        for prev, cur in zip(seg_ids, seg_ids[1:], strict=False):
+            shared = set(topo.member_nodes[prev]) & set(topo.member_nodes[cur])
+            boundary = role == "beam" and bool(shared) and next(iter(shared)) in column_nodes
+            (groups.append([cur]) if boundary else groups[-1].append(cur))
+
+        width = loads.beam_tributary_width_m
+        if getattr(loads, "tributary_overrides", None):
+            width = loads.tributary_overrides.get(orig, width)
+        w_serv = (loads.characteristic_area_kpa() * width or None) if role == "beam" else None
+        restrained = flange_restrained if role == "beam" else False
+
+        slots: list[FrameSlot] = []
+        for gi, group in enumerate(groups):
+            length = 0.0
+            for sid in group:
+                ni, nj = (topo.nodes[x] for x in topo.member_nodes[sid])
+                length += math.dist((ni.x, ni.y, ni.z), (nj.x, nj.y, nj.z))
+            combo_names = [name for name, _ in demands_by_member[group[0]]]
+            envelope: list[tuple[str, MemberDemand]] = []
+            for ci, name in enumerate(combo_names):
+                ds = [demands_by_member[sid][ci][1] for sid in group]
+                envelope.append((name, MemberDemand(
+                    N_Ed=max((d.N_Ed for d in ds), key=abs),
+                    My_Ed=max(d.My_Ed for d in ds),
+                    Vz_Ed=max(d.Vz_Ed for d in ds),
+                    L=length, compression_flange_restrained=restrained, w_service=w_serv,
+                )))
+            slots.append(FrameSlot(f"{orig}#{gi}", orig, role, length, envelope))
+        slots_by_member[orig] = slots
+    return slots_by_member
+
+
 def analyze_frame(
     demand_members,
     loads,
@@ -441,11 +595,18 @@ def analyze_frame(
     """
     options = options or FrameOptions()
     catalog = catalog or {}
-    # Split continuous multi-span beams at their interior supports first, so the load path is correct.
-    expanded = expand_spans(demand_members)
+    # Connect the real load path of a messy BIM model: (1) split full-height columns at the floors that
+    # frame into them, then (2) split continuous beams at their span points. Both create the shared nodes
+    # the snapper needs; the release logic below keeps columns and beam-interior crossings continuous.
+    columns_split = split_columns_at_framing(demand_members, options.snap_tol_mm)
+    expanded, interior_ends = _expand_spans_tracked(columns_split)
     members_by_id = {m.id: m for m in expanded}
     topo = snap_nodes(expanded, options.snap_tol_mm, options.base_tol_mm)
     pruned_free = _stabilize_topology(topo) if options.prune_free_ends else []
+    # Nodes that a column is incident to: a beam end here has a real vertical support (pin it), and an
+    # interior beam join here is a genuine inter-column span boundary (a new reuse slot).
+    column_nodes = {n for mid, ends in topo.member_nodes.items()
+                    if members_by_id[mid].role == "column" for n in ends}
 
     if not topo.member_nodes or not topo.base_node_ids:
         return FrameResult({}, len(topo.nodes), 0, topo.base_node_ids,
@@ -479,12 +640,17 @@ def analyze_frame(
         fm.add_section(sname, a, iy, iz, jt)
         fm.add_member(mid, i, j, "steel", sname)
         if options.pin_beams and m.role in ("beam", "brace"):
-            # Pin the connection by releasing the MAJOR-axis bending moment at each end (local My, the
-            # one that carries gravity → recovers the simply-supported wL^2/8). Minor-axis bending and
-            # torsion stay connected: a realistic shear connection retains some continuity there, and
-            # keeping them connected gives beam-to-beam nodes (no column) rotational stiffness about the
-            # vertical axis, which otherwise leaves that DOF singular on real BIM models.
-            fm.def_releases(mid, Ryi=True, Ryj=True)
+            # Pin the connection by releasing the MAJOR-axis bending moment (local My, the one that carries
+            # gravity → recovers the simply-supported wL^2/8) — but only at a real support: the member's
+            # true ends, and interior joins that sit on a column. At an interior beam-to-beam crossing with
+            # no column (a secondary framing into a girder) the member stays moment-CONTINUOUS, so the
+            # girder supports the secondary instead of forming a vertical mechanism. Minor-axis bending and
+            # torsion always stay connected (gives beam-to-beam nodes vertical-axis rotational stiffness,
+            # otherwise singular on real BIM models).
+            rel_i = (mid, "i") not in interior_ends or i in column_nodes
+            rel_j = (mid, "j") not in interior_ends or j in column_nodes
+            if rel_i or rel_j:
+                fm.def_releases(mid, Ryi=rel_i, Ryj=rel_j)
         if m.role == "beam":
             beam_ids.append(mid)
 
@@ -638,6 +804,9 @@ def analyze_frame(
                 return _fallback(
                     "frame solve ill-conditioned (non-physical forces) — using analytic loads")
 
+    slots_by_member = _build_slots_by_member(
+        demands_by_member, members_by_id, topo, loads, column_nodes, flange_restrained)
+
     return FrameResult(
         demands_by_member=demands_by_member,
         node_count=len(topo.nodes),
@@ -646,4 +815,5 @@ def analyze_frame(
         skipped_member_ids=topo.skipped_member_ids,
         warnings=warnings,
         ok=True,
+        slots_by_member=slots_by_member,
     )
