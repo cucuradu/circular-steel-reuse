@@ -132,3 +132,43 @@ def test_combination_loads_adds_sway_imperfection_for_columns():
 
     beam = ExtractedMember(id="b", role="beam", spans_mm=[6000])
     assert len(m.combination_loads(beam)) == 1
+
+
+# ---------------------------------------------------------------------------
+# Construction-stage (bare-steel erection) case
+# ---------------------------------------------------------------------------
+
+def test_construction_udl_arithmetic():
+    # w_c = (gamma_G*g_k + gamma_Q*q_ca) * width = (1.35*3.5 + 1.5*0.75) * 3 = 17.55 N/mm
+    m = AreaLoadModel(construction_stage=True)
+    assert m.construction_udl_Npmm() == pytest.approx((1.35 * 3.5 + 1.5 * 0.75) * 3.0)
+    # per-beam tributary override is honoured
+    m2 = AreaLoadModel(construction_stage=True, tributary_overrides={"b1": 2.0})
+    assert m2.construction_udl_Npmm("b1") == pytest.approx((1.35 * 3.5 + 1.5 * 0.75) * 2.0)
+
+
+def test_construction_stage_adds_unrestrained_beam_entry_to_slots():
+    from steelreuse.pipeline import build_slots
+    from steelreuse.schema import ExtractedModel
+
+    demand = ExtractedModel(kind="demand", members=[
+        ExtractedMember(id="b1", role="beam", section="IPE300", raw_section="IPE300",
+                        material_grade="S275", length_mm=6000, spans_mm=[6000]),
+        ExtractedMember(id="c1", role="column", section="HEB200", raw_section="HEB200",
+                        material_grade="S275", length_mm=3000),
+    ])
+    slots = build_slots(demand, AreaLoadModel(construction_stage=True))
+    beam = next(s for s in slots if s.member_id == "b1")
+    names = [n for n, _ in beam.combinations]
+    assert names == ["ULS gravity", "ULS construction stage"]
+    cons = dict(beam.combinations)["ULS construction stage"]
+    assert not cons.compression_flange_restrained                  # the defining feature: no slab
+    assert cons.My_Ed == pytest.approx(17.55 * 6000**2 / 8)        # 78.975 kNm
+    assert cons.Vz_Ed == pytest.approx(17.55 * 6000 / 2)
+    # columns are untouched (reduced load is never their governing erection case here)
+    col = next(s for s in slots if s.member_id == "c1")
+    assert [n for n, _ in col.combinations] == ["ULS gravity"]
+    # and default-off keeps the envelope exactly as before
+    slots_off = build_slots(demand, AreaLoadModel())
+    assert [n for n, _ in next(
+        s for s in slots_off if s.member_id == "b1").combinations] == ["ULS gravity"]

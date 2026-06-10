@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
 from .core.carbon import Passport, build_passport
 from .core.connections import ConnectionPolicy
+from .core.ec3_checks import MemberDemand
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
 from .core.frame import FrameOptions, FrameResult, analyze_frame
 from .core.loads import AreaLoadModel, estimate_column_loads, estimate_tributary_widths
@@ -96,6 +97,24 @@ def build_supply(
     return supply, report, audit
 
 
+def _construction_demand(loads, member_id: str, span_mm: float) -> tuple[str, MemberDemand] | None:
+    """Bare-steel erection-stage envelope entry for a beam span (EN 1991-1-6), or ``None`` if off.
+
+    The defining feature of the stage is the **missing slab**: the compression flange is unrestrained,
+    so chi_LT applies in earnest, under full permanent load (wet slab) + the construction live load.
+    Simply-supported statics are used in both the analytic and the frame path — during erection the
+    diaphragm/continuity the frame model assumes is not yet present, so the isolated-span idealisation
+    is the honest one for this stage. SLS deflection is not re-checked here (a temporary situation).
+    """
+    if not getattr(loads, "construction_stage", False) or span_mm <= 0:
+        return None
+    w = loads.construction_udl_Npmm(member_id)
+    return ("ULS construction stage", MemberDemand(
+        My_Ed=w * span_mm**2 / 8.0, Vz_Ed=w * span_mm / 2.0, L=span_mm,
+        compression_flange_restrained=False,
+    ))
+
+
 def build_slots(
     demand: ExtractedModel,
     loads: LoadModel | AreaLoadModel | None = None,
@@ -128,10 +147,15 @@ def build_slots(
             member_slots = frame_slots.get(m.id)
             if member_slots:
                 for s in member_slots:
+                    envelope = list(s.demands)
+                    if m.role == "beam":
+                        extra = _construction_demand(loads, m.id, s.required_length_mm)
+                        if extra:
+                            envelope.append(extra)
                     slots.append(DemandSlot(
                         id=s.slot_id, member_id=m.id, role=m.role,
                         required_length_mm=s.required_length_mm,
-                        demand=s.demands[0][1], demands=s.demands,
+                        demand=envelope[0][1], demands=envelope,
                         grade=m.material_grade, design_section=m.section,
                     ))
                 continue
@@ -147,6 +171,10 @@ def build_slots(
         for idx in range(n_demands):
             span = spans[idx] if idx < len(spans) else spans[-1]
             combo_demands = [(name, dl[idx]) for name, dl in per_combo]
+            if m.role == "beam":
+                extra = _construction_demand(loads, m.id, span or 0.0)
+                if extra:
+                    combo_demands.append(extra)
             req_len = m.length_mm if m.role == "column" else span
             slots.append(DemandSlot(
                 id=f"{m.id}#{idx}", member_id=m.id, role=m.role,

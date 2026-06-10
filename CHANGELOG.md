@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Construction-stage (bare-steel) load case** (CLI `--construction` / `--construction-live`,
+  `AreaLoadModel.construction_stage`): every beam slot's envelope gains an erection-stage entry —
+  full permanent (wet slab) + the EN 1991-1-6 construction live load (default 0.75 kN/m²) with the
+  compression flange **unrestrained**, so χ_LT applies where the persistent case relied on the slab.
+  Works on both the analytic and frame paths (isolated-span statics — the diaphragm is not yet
+  erected); a beam that passes only via slab restraint is now rejected, not merely warned about.
+  Off by default (results unchanged).
 - **Full EN 1993-1-1 6.3.3 beam-column interaction, biaxial** (`core/ec3_checks.py`): the simplified
   linear N+M sum is replaced by equations (6.61)/(6.62) with **Annex B (Method 2)** interaction
   factors (Tables B.1/B.2, susceptible/not-susceptible `k_zy`, RHS `k_zz` variant; all `C_m = 1.0`,

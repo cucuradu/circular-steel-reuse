@@ -111,6 +111,15 @@ pre-sizing, with explicit EN 1990 partial factors rather than a single magic num
   gravity only, so default results are unchanged. Adding further design situations (uplift `1.0G+1.5Q`,
   wind, seismic) is a matter of appending entries to the envelope. This is a **member-level** envelope,
   not a global frame analysis (see §12).
+- **Construction-stage case** (opt-in `--construction`, `_construction_demand` in `pipeline.py`): every
+  beam slot gains a **bare-steel erection-stage** entry — full permanent load (the wet slab is on the
+  beam; finishes/services conservatively included) + the **EN 1991-1-6** construction live load
+  (`--construction-live`, default `q_ca = 0.75 kN/m²`), with the compression flange **unrestrained**:
+  the slab that justifies `χ_LT = 1` in the persistent situation does not yet exist, so a beam that
+  passes only via slab restraint fails here instead of merely being flagged. The entry uses
+  isolated-span statics on **both** the analytic and frame paths (the diaphragm/continuity the frame
+  assumes is not yet erected); SLS deflection is not re-checked (temporary situation). Columns are
+  unchanged (their erection-stage load is lower, never governing in this model).
 - **Continuous beams** are split at supports into `spans_mm` upstream (by the extractor); each span is
   checked as simply supported (conservative for both moment envelope and deflection).
 
@@ -356,7 +365,8 @@ never given a calculator (CLAUDE.md rule 1).
 | LTB C₁ | 1.0 (uniform) | — | conservative |
 | 6.3.3 C_m factors | 1.0 (uniform moment) | — | Table B.3 upper bound (conservative) |
 | Member axis rotation | default orientation | — | local→section axis mapping assumed |
-| Compression-flange restraint | restrained (slab) | load model | **non-conservative if slab absent** |
+| Compression-flange restraint | restrained (slab) | load model | **non-conservative if slab absent** — mitigated by the χ_LT warning + `--construction` |
+| Construction stage | off | `--construction` / `--construction-live` | full dead + q_ca 0.75 kN/m², unrestrained (conservative) |
 | Reclaimed knockdown | 1.0 | `--knockdown` | assumes grade confirmed |
 | Carbon factors | ICE v3 | `factors.csv` | swap for Ökobaudat/Climatiq |
 

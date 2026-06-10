@@ -67,6 +67,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--phi", type=float, default=0.0,
                     help="EN 1993-1-1 5.3.2 global sway imperfection for the load-combination "
                          "envelope (e.g. 0.005 = 1/200); 0 = gravity only")
+    ap.add_argument("--construction", action="store_true",
+                    help="add the bare-steel erection-stage case for beams: full dead + construction "
+                         "live, compression flange UNRESTRAINED (chi_LT applies)")
+    ap.add_argument("--construction-live", type=float, default=0.75,
+                    help="construction live load q_ca for --construction (kN/m^2, EN 1991-1-6)")
     ap.add_argument("--trib-from-geometry", action="store_true",
                     help="estimate per-beam width AND per-column tributary area/floors from geometry")
     ap.add_argument("--all-demand", action="store_true",
@@ -134,6 +139,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
             beam_tributary_width_m=args.trib_width, column_tributary_area_m2=args.col_trib_area,
             column_floors=args.col_floors, column_eccentricity_mm=args.col_ecc,
             notional_phi=args.phi,
+            construction_stage=args.construction, construction_live_kpa=args.construction_live,
         )
     res = run_pipeline(
         donor, demand, loads=loads, knockdown=args.knockdown,
@@ -154,7 +160,12 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
 
     if isinstance(loads, AreaLoadModel):
         trib = "geometry-estimated" if args.trib_from_geometry else f"{args.trib_width:g} m"
-        combos = f"gravity + sway imperfection (phi={args.phi:g})" if args.phi > 0 else "gravity only"
+        parts = ["gravity"]
+        if args.phi > 0:
+            parts.append(f"sway imperfection (phi={args.phi:g})")
+        if args.construction:
+            parts.append(f"construction stage ({args.construction_live:g} kN/m^2, unrestrained)")
+        combos = " + ".join(parts) if len(parts) > 1 else "gravity only"
         print(f"Loads: area-based, {args.dead:g}+{args.live:g} kN/m^2 (G+Q), "
               f"ULS {args.gamma_g:g}G+{args.gamma_q:g}Q, tributary {trib}; "
               f"combinations: {combos}; "

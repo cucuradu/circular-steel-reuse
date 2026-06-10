@@ -45,6 +45,8 @@ class AreaLoadModel:
     column_eccentricity_mm: float = 0.0    # notional moment lever for columns (0 = pure axial)
     notional_phi: float = 0.0              # EN 5.3.2 global sway imperfection (0 = off; EN value 1/200)
     flange_restrained: bool = True         # a floor slab restrains the beam's compression flange
+    construction_stage: bool = False       # add the bare-steel erection-stage case for beams (opt-in)
+    construction_live_kpa: float = 0.75    # EN 1991-1-6 q_ca, working personnel (kN/m^2)
     tributary_overrides: dict[str, float] = field(default_factory=dict)         # beam id -> width (m)
     column_area_overrides: dict[str, float] = field(default_factory=dict)       # col id -> area (m^2)
     column_floor_overrides: dict[str, float] = field(default_factory=dict)      # col id -> floor count
@@ -65,6 +67,18 @@ class AreaLoadModel:
     def beam_udl_Npmm(self, tributary_width_m: float | None = None) -> float:
         w = self.beam_tributary_width_m if tributary_width_m is None else tributary_width_m
         return self.factored_area_kpa() * w        # kN/m^2 * m = kN/m = N/mm
+
+    def construction_udl_Npmm(self, member_id: str | None = None) -> float:
+        """Erection-stage ULS line load: full permanent + EN 1991-1-6 construction live (q_ca).
+
+        Keeping the full ``dead_kpa`` is deliberately conservative for the casting situation (the wet
+        slab is on the beam but finishes/services are not yet) and saves a second dead-load input; the
+        defining difference of the stage is the **missing flange restraint**, applied by the caller.
+        """
+        trib = self.tributary_overrides.get(member_id) if (
+            member_id and self.tributary_overrides) else None
+        width = self.beam_tributary_width_m if trib is None else trib
+        return (self.gamma_g * self.dead_kpa + self.gamma_q * self.construction_live_kpa) * width
 
     def column_axial_N(self, tributary_area_m2: float | None = None,
                        floors: float | None = None) -> float:

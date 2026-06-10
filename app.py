@@ -58,6 +58,10 @@ def main() -> None:
             phi = st.number_input("Sway imperfection φ (0 = off)", 0.0, 0.02, 0.0, 0.001, format="%.3f")
             wind = st.number_input("Wind pressure (kN/m², frame only)", 0.0, 5.0, 0.0, 0.1)
             seismic = st.number_input("Seismic Cs (frame only)", 0.0, 1.0, 0.0, 0.05)
+            construction = st.checkbox(
+                "Construction-stage case (bare steel)", value=False,
+                help="Adds an erection-stage check for every beam: full dead + construction live "
+                     "with the compression flange UNRESTRAINED (no slab yet), so χ_LT applies.")
             allow_cutting = st.checkbox("Cutting-stock (1 donor → many cuts)", value=False)
             connection_screen = st.checkbox(
                 "Connection feasibility screen", value=False,
@@ -75,6 +79,7 @@ def main() -> None:
     loads = AreaLoadModel(
         dead_kpa=dead, live_kpa=live, gamma_g=gamma_g, gamma_q=gamma_q,
         beam_tributary_width_m=trib_width, notional_phi=phi,
+        construction_stage=construction,
     )
 
     try:

@@ -186,8 +186,15 @@ matcher threads `chi_lt` / `chi_lt_if_free` onto each `Assignment`; the report s
 a note counting beams that pass only because of the slab restraint (construction-stage risk). On the
 sample model, 4 reused beams are flagged (χ_LT 0.45–0.71 if unrestrained).
 
-Residual: a full **construction-stage load case** (reduced load, no slab) as a second check, rather than
-the current informational flag.
+✅ **Construction-stage load case — DONE.** `--construction` (CLI) / `construction_stage=True`
+(`AreaLoadModel`) appends a **bare-steel erection-stage entry** to every beam slot's envelope:
+full permanent (wet slab) + the EN 1991-1-6 construction live load (`--construction-live`,
+default 0.75 kN/m²) with the compression flange **unrestrained**, so `chi_LT` applies in earnest.
+Works on both the analytic and frame paths (the stage deliberately uses isolated-span statics — the
+diaphragm the frame assumes is not yet present). A reuse and the avoided-new baseline must pass the
+stage like any other combination; the report shows it as the governing case where it bites. Tested
+end-to-end in `tests/test_match.py`: an IPE300 donor passes gravity restrained but is **rejected** for
+a 6 m IPE300 slot under the stage (`chi_LT(6 m) ≈ 0.45` → `M_b,Rd ≈ 77.7 < 78.975 kNm`).
 
 ### ✅ 6. Heavy-section edge cases (t_f > 40 mm) — DONE
 **Was:** `_buckling_alpha` and the `FY_BY_GRADE` table both assumed `t_f ≤ 40 mm`, so the 88 AISC

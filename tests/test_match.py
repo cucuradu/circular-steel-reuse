@@ -276,3 +276,36 @@ def test_cutting_stock_greedy_packs_by_length():
     ]
     chosen = _solve_greedy(cells, n_supply=1, n_slots=3, caps=[9000.0])
     assert len(chosen) == 2     # only two 4050-mm pieces fit a 9000-mm donor
+
+
+def test_construction_stage_governs_and_can_reject_a_slender_beam(cat):
+    # #8 construction-stage case, end to end through build_slots + match: an IPE300-design beam slot
+    # at 6 m / 3 m tributary. Under gravity (restrained, w = 27.675 N/mm) M_Ed = 124.5 kNm and an
+    # IPE330 donor sits at 124.5/221.1 = 0.56. The erection-stage entry (w_c = 17.55 N/mm,
+    # M = 78.975 kNm, UNRESTRAINED -> chi_LT * M_pl,Rd) is the worse case for the donor, so it must
+    # be reported as governing. An IPE300 donor passes gravity restrained (0.72) but FAILS the
+    # construction case (chi_LT(6 m) ~ 0.45 -> M_b,Rd ~ 77.7 kNm < 78.975), so with the stage enabled
+    # it may not be assigned to its own slot.
+    from steelreuse.core.loads import AreaLoadModel
+    from steelreuse.pipeline import build_slots
+    from steelreuse.schema import ExtractedMember, ExtractedModel
+
+    demand = ExtractedModel(kind="demand", members=[
+        ExtractedMember(id="b1", role="beam", section="IPE300", raw_section="IPE300",
+                        material_grade="S275", length_mm=6000, spans_mm=[6000]),
+    ])
+    slots = build_slots(demand, AreaLoadModel(construction_stage=True))
+
+    ok = match([SupplyItem(id="d330", section="IPE330", grade="S275", length_mm=7000)], slots, cat)
+    assert len(ok.assignments) == 1
+    assert ok.assignments[0].governing_combination == "ULS construction stage"
+
+    rejected = match([SupplyItem(id="d300", section="IPE300", grade="S275", length_mm=7000)],
+                     slots, cat)
+    assert rejected.assignments == []   # fails the bare-steel stage despite passing gravity
+
+    # without the stage, the same IPE300 donor is accepted (gravity restrained only)
+    slots_off = build_slots(demand, AreaLoadModel())
+    accepted = match([SupplyItem(id="d300", section="IPE300", grade="S275", length_mm=7000)],
+                     slots_off, cat)
+    assert len(accepted.assignments) == 1

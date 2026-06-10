@@ -283,7 +283,12 @@ an equivalence enforced by test.
 A member is verified against a list of design situations and must satisfy every one; the governing
 (worst‑utilisation) situation is reported. The default envelope is the gravity case plus, optionally for
 columns, the EN 1993‑1‑1 §5.3.2 global sway imperfection applied as a notional moment `M = N·φ·L` (the EN
-value φ = 1/200; disabled by default so baseline results are unchanged). Reuse feasibility and the
+value φ = 1/200; disabled by default so baseline results are unchanged). An opt‑in **construction‑stage
+case** (`--construction`) adds, for every beam, the bare‑steel erection situation: full permanent load
+(the wet slab is on the beam) plus the EN 1991‑1‑6 construction live load (default 0.75 kN/m²), with the
+compression flange **unrestrained** — the slab that justifies `χ_LT = 1` in the persistent case does not
+yet exist, so the lateral‑torsional reduction applies in earnest. A beam that passes only by virtue of
+slab restraint is thereby caught as a hard check, not merely flagged. Reuse feasibility and the
 avoided‑new baseline (§8.2) both require passing the entire envelope. Additional situations append to this
 list, which is the mechanism by which the frame analysis introduces wind and seismic.
 
@@ -533,8 +538,10 @@ conservative upper bound — no moment‑shape refinement) and member rotation a
 at the default orientation. 🟠 No shear–moment (6.2.8) interaction.
 🟠 Effective lengths are fixed at `k = 1.0`. 🟠 Class 4 sections are flagged, not designed.
 🟡 LTB uses `C₁ = 1.0` and geometry‑approximated `I_t`/`I_w` (conservative); the slab‑restraint assumption
-is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning.
-🟠 No explicit construction‑stage (bare‑steel) load case.
+is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning
+and the opt‑in construction‑stage case. 🟡 The construction‑stage (bare‑steel) case is opt‑in
+(`--construction`) rather than always on, and uses the full permanent load with isolated‑span statics
+(conservative for the casting situation, but no staged erection sequence).
 
 **Actions.**
 🟠 The member‑level envelope ships only gravity and the optional sway case; wind, seismic, pattern and
@@ -575,7 +582,8 @@ self‑derived, so a cross‑check against an independently *published* design e
 worthwhile addition.
 
 **Priority roadmap.** (1) extend the connection screen toward capacity (standard end-connection shear
-tables); (2) ~~full 6.3.3 and biaxial interaction~~ **done** (§6.5); (3) construction‑stage (bare‑steel) case;
+tables); (2) ~~full 6.3.3 and biaxial interaction~~ **done** (§6.5); (3) ~~construction‑stage
+(bare‑steel) case~~ **done** (§5.3, opt‑in `--construction`);
 (4) calibrate the audit condition→knockdown factors against test data; (5) formal schedule‑count
 validation + re‑extraction with measured dimensions; (6) a complete combination set (pattern, uplift)
 and modal seismic; (7) shear–moment (6.2.8) interaction; (8) IFC coordinate export; (9) effective‑length
