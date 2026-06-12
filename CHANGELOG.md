@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Cutting-stock is now the DEFAULT** (CLI, app, `run_pipeline`): reclamation practice cuts
+  members to length routinely, and the one-piece rule artificially stranded long donors (an
+  18.8 m W14X109 could fill one 7.6 m slot and waste 11 m). `--no-cut` (app checkbox) restores
+  whole-member-only reuse; `--cut` is kept as a harmless no-op. The low-level `match()` kernel
+  keeps `allow_cutting=False` as its neutral baseline. Real test-4 case study moves from
+  50 reused / 39.3 t to **71 reused / 60.6 t** (54 donors cut, ≈ 160 m reusable remainder);
+  the demo headline is unchanged. CASE_STUDY/METHODOLOGY/README updated.
+
 ### Added
 - **Selectable matching objectives** (`--objective {co2,members,mass}`, `run_pipeline(objective=)`,
   app selectbox): the matcher can now maximize net CO₂ saved (default, unchanged), the **number of

@@ -384,7 +384,8 @@ material passport is meant to carry.
      (members / CO₂ / steel mass per goal) without changing the shipped assignments — on the real case
      study it shows the CO₂-vs-members tension disappearing under cutting-stock, where the off-cut
      preference no longer applies.
-5. **Cutting-stock (optional, `allow_cutting` / `--cut`).** Instead of one piece per donor, a donor may
+5. **Cutting-stock (the default; `--no-cut` restricts to whole-member reuse).** Reclamation stockists
+   cut members to length as a matter of course, so by default a donor may
    be cut into several pieces for several slots, bounded by its length:
    `Σ_j (required_len_j + 50 mm cut tolerance)·x_ij ≤ length_i`. The off-cut penalty is dropped (the
    remainder is genuinely reusable, so the bias against long stock disappears — this is the real fix for

@@ -264,9 +264,9 @@ detailed zone) were excluded before matching.</p>{% endif %}
 {% if ctx.n_imperfection_governed %}<div class="warn">⚠ {{ ctx.n_imperfection_governed }} reused
  member(s) are governed by a load combination other than plain gravity (e.g. the EN 1993-1-1 §5.3.2
  sway-imperfection case) — the member is sized by the worst case across the combination envelope.</div>{% endif %}
-{% if ctx.cut_donors %}<div class="warn">✂ Cutting-stock: {{ ctx.cut_donors }} donor(s) were each cut
- into several pieces to fill multiple slots, leaving {{ ctx.reusable_remainder_m }} m of reusable
- remainder returned to stock.</div>{% endif %}
+{% if ctx.cut_donors %}<div class="warn">✂ Cutting-stock: {{ ctx.cut_donors }} donor(s) were cut to
+ length (some into several pieces for several slots), leaving {{ ctx.reusable_remainder_m }} m of
+ reusable remainder returned to stock.</div>{% endif %}
 {% if ctx.ltb_restraint_reliant %}<div class="warn">⚠ {{ ctx.ltb_restraint_reliant }} reused beam(s)
  pass bending only because the floor slab restrains the compression flange (&chi;<sub>LT</sub> would
  fall below 0.85 if unrestrained) — confirm the restraint, especially at the construction stage before

@@ -86,9 +86,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="estimate per-beam width AND per-column tributary area/floors from geometry")
     ap.add_argument("--all-demand", action="store_true",
                     help="also slot non-steel demand (concrete, joists); default is steel members only")
-    ap.add_argument("--cut", action="store_true",
-                    help="cutting-stock: allow one donor to be cut into several pieces for several "
-                         "slots (default: one piece per donor)")
+    # Cutting-stock is the DEFAULT: reclamation practice cuts members to length as a matter of
+    # course, and the one-piece rule artificially strands long donors. --cut kept as a no-op for
+    # backward compatibility; --no-cut restores whole-member-only reuse.
+    ap.add_argument("--cut", dest="cut", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--no-cut", dest="cut", action="store_false",
+                    help="whole-member reuse only: a donor fills at most one slot, never cut "
+                         "(by default one donor may be cut into several pieces for several slots)")
+    ap.set_defaults(cut=True)
     ap.add_argument("--objective", choices=("co2", "members", "mass"), default="co2",
                     help="what the matcher maximizes: net CO2 saved (default), the number of "
                          "members reused, or the reclaimed steel mass put back to work (the latter "
@@ -219,7 +224,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
               f"{' (--include-unverified)' if args.include_unverified else ''}")
     print(f"Mapping: {res.validation.summary()}")
     print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
-          f"{' (cutting-stock)' if args.cut else ''}")
+          f"{' (cutting-stock)' if args.cut else ' (whole-member only)'}")
     goal = {"co2": "net-CO2", "members": "members-reused",
             "mass": "reclaimed-mass"}[args.objective]
     if res.match.proven_optimal:

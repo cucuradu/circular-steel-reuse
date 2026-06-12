@@ -318,7 +318,10 @@ def run_pipeline(
     catalog: dict[str, SectionProps] | None = None,
     steel_only_demand: bool = False,
     tributary_from_geometry: bool = False,
-    allow_cutting: bool = False,
+    # Cutting-stock is the product default (CLI/app follow it): reclamation stockists cut members
+    # to length routinely, and the one-piece rule strands long donors. The low-level match() kernel
+    # keeps allow_cutting=False as its neutral baseline; this is the policy layer.
+    allow_cutting: bool = True,
     connection_screen: bool = False,
     frame_analysis: bool = False,
     second_order: bool = False,

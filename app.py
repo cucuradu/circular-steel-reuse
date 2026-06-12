@@ -81,7 +81,10 @@ def main() -> None:
                 help="Also solve the match under every goal (CO₂ / members / mass) and show what "
                      "each policy choice costs in the other currencies. The assignments shown "
                      "still follow the objective selected above.")
-            allow_cutting = st.checkbox("Cutting-stock (1 donor → many cuts)", value=False)
+            allow_cutting = st.checkbox(
+                "Cutting-stock (1 donor → many cuts)", value=True,
+                help="Default: reclamation practice cuts members to length routinely. Untick for "
+                     "whole-member-only reuse (a donor fills at most one slot).")
             connection_screen = st.checkbox(
                 "Connection feasibility screen", value=False,
                 help="Exclude donors geometrically incompatible with the slot's design section "

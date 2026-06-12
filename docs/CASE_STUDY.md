@@ -27,10 +27,16 @@ steelreuse --donor pyrevit_extension/donor_test_4.json --demand pyrevit_extensio
 ```
 Forces: frame analysis (PyNite) — 274 nodes, 492 members
 Mapping: 435 mapped, 0 fuzzy, 581 unknown of 1016 members
-Supply 435 | demand slots 181 | reused 50
-CO2e saved by matches: 39,264 kg  (full donor stock potential: 315,486 kg)
+Supply 435 | demand slots 181 | reused 71 (cutting-stock)
+Matching: MILP proven optimal (CBC) — best possible net-CO2 assignment under the use constraints
+CO2e saved by matches: 60,610 kg  (full donor stock potential: 315,486 kg)
+Cut donors: 54 | reusable remainder 159.7 m
 Narrative source: deterministic
 ```
+
+(**Cutting-stock is the default** — reclamation stockists cut members to length routinely, e.g. the
+18.8 m W14X109 donors each fill two ~7 m slots. `--no-cut` restricts to whole-member reuse: 50
+slots fill and ≈ 39.3 t CO₂e books, the difference being long donors stranded by the one-piece rule.)
 
 - **Frame analysis engages:** the demand structure is assembled into a **global PyNite frame of 274
   nodes / 492 elements** and solved — the per-member design forces come from the real load path, not
@@ -46,7 +52,7 @@ Narrative source: deterministic
   dimensions. Every W-shape among them already maps by name; the 31 dimension-carrying members that
   do *not* map are **L-angles and C-channels**, and the unique-match rule correctly refuses to force
   them onto any W-row — zero false confirmations on ~500 dimension-carrying members.
-- **Connection screen on a real model:** with the screen in annotate mode, 8 assignments are flagged
+- **Connection screen on a real model:** with the screen in annotate mode, 10 assignments are flagged
   for connection review (standard fin-plate capacity vs the slot's worst shear, plus the geometric
   rules) — surfaced in the report's Connection column without gating any match.
 - **Sway classification exposes the missing lateral system:** running with `--phi 0.005` adds the EHF
@@ -54,18 +60,25 @@ Narrative source: deterministic
   *correct* finding, not a defect: the steel skeleton is pinned-beam gravity framing, and the real
   building's lateral system (cores/walls/diaphragm) is non-steel and therefore outside the extraction.
   The tool warns to verify global stability by a dedicated analysis instead of silently treating the
-  bare skeleton as laterally adequate. (Under the sway cases 46 of 181 slots reuse, ≈ 54.7 t CO₂e —
-  four marginal gravity matches correctly drop.)
+  bare skeleton as laterally adequate. (Under the sway cases 63 of 181 slots reuse, ≈ 72.1 t CO₂e —
+  marginal gravity matches correctly drop while the heavier sway demands raise the avoided-new
+  baselines of the surviving reuses.)
 - **Matching:** the new design resolves to **181 steel slots** (after steel-only filtering, multi-span
-  splitting at columns, and merging each continuous girder into a single reused member); **50 are
-  filled by reclaimed members** that pass every EN 1993-1-1 load combination. A whole girder is one
-  reusable element: the analytic path now reaches the same 181-slot structure by verifying each span
+  splitting at columns, and merging each continuous girder into a single reused member); **71 are
+  filled by reclaimed members** that pass every EN 1993-1-1 load combination — 54 donors are cut to
+  length (e.g. each 18.8 m W14X109 yields two ~7 m column pieces), leaving ≈ 160 m of reusable
+  remainder in stock. A whole girder is one
+  reusable element: the analytic path reaches the same 181-slot structure by verifying each span
   joint against column geometry (all 42 multi-span members merge — every recorded joint is a joist
-  crossing, not a support; the analytic run fills 42 slots / ≈ 14.4 t with its more conservative
-  isolated-span statics). The rest are listed as needing new steel.
-- **Carbon:** the matched reuse saves **≈ 39.3 t CO₂e** on the honest *avoided-new* basis (the new
+  crossing, not a support). The rest are listed as needing new steel: the stock genuinely runs out
+  of adequate long pieces (most of the 212 reclaimed W18X55s are under the 7.6 m the design needs).
+- **Carbon:** the matched reuse saves **≈ 60.6 t CO₂e** on the honest *avoided-new* basis (the new
   section each slot would otherwise have required), cleanly separated from the **≈ 315 t** total
   embodied carbon held in the whole donor stock (the theoretical ceiling if everything were reused).
+- **Objective trade-off (`--pareto`):** the same feasible pairs solved under every goal give 71
+  reused / 60.6 t under both net-CO₂ and members-reused, and 71 / 51.0 t (but 81.6 t of steel
+  placed) under reclaimed-mass. With `--no-cut` the goals diverge (50 / 39.3 t vs 54 / 44.1 t) —
+  that gap is the one-piece off-cut stewardship preference at work, not carbon physics.
 
 ## Limitations this run surfaced (honest reporting)
 
@@ -99,6 +112,7 @@ Narrative source: deterministic
 ## Takeaway
 
 On a real 1000-member building the tool runs end-to-end in seconds, assembles and solves a global
-frame of the two-way floor system, maps the in-scope steel without guessing, finds a structurally-valid
-set of reuse matches, books a defensible ≈ 39 t CO₂e saving, and is candid about what it cannot yet do
+frame of the two-way floor system, maps the in-scope steel without guessing, finds a solver-proven
+optimal set of reuse matches (71 of 181 slots, cutting donors to length as a stockist would), books
+a defensible ≈ 60.6 t CO₂e saving, and is candid about what it cannot yet do
 (non-W shapes, and the missing roof-storey columns that need re-extraction).

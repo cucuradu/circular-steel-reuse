@@ -51,10 +51,14 @@ def result(tmp_path_factory):
     donor.save(donor_p)
     demand.save(demand_p)
     # Defaults spelled out so the doc's hand chain and this run can never drift apart silently.
+    # Whole-member mode pinned: the documented narrative books each donor's off-cut per
+    # assignment, which only exists when a donor is reused as one piece (cutting is the product
+    # default but tracks leftover per donor instead).
     loads = AreaLoadModel(dead_kpa=3.5, live_kpa=3.0, gamma_g=1.35, gamma_q=1.5,
                           beam_tributary_width_m=3.0, column_tributary_area_m2=9.0,
                           column_floors=1.0)
-    return run_pipeline(str(donor_p), str(demand_p), loads=loads, steel_only_demand=True)
+    return run_pipeline(str(donor_p), str(demand_p), loads=loads, steel_only_demand=True,
+                        allow_cutting=False)
 
 
 def _assignment(result, slot_id):
