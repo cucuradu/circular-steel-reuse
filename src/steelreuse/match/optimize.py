@@ -514,6 +514,105 @@ def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> 
     return chosen
 
 
+def _cells_from_weights(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    factor: CarbonFactor,
+    weights: dict,
+) -> list[_Cell]:
+    """Re-derive the feasibility/economics cells a solve saw from its recorded ``weights``.
+
+    Every parameter that changes cell economics travels on :attr:`MatchResult.weights`, so any
+    post-solve consumer (:func:`verify_match`, :func:`stock_disposition`) regenerates *identical*
+    cells — same EN checks, same carbon arithmetic — instead of trusting the stored result.
+    """
+    policy = ConnectionPolicy() if weights.get("connection_screen") else None
+    return _build_cells(supply, slots, catalog, factor,
+                        weights.get("w_offcut", 0.3), weights.get("connection_penalty_kg", 5.0),
+                        weights.get("new_build_grade", "S355"),
+                        bool(weights.get("allow_cutting")), policy)
+
+
+# Minimum straight stock length for the direct re-rolling fate (A2): below this, handling and
+# end-cropping losses make re-rolling impractical — the pilot literature works with member-scale
+# feedstock. A parameter, not physics; override per call.
+REROLL_MIN_LENGTH_MM = 3000.0
+
+
+def stock_disposition(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    result: MatchResult,
+    factors: dict[str, CarbonFactor] | None = None,
+    reroll_min_length_mm: float = REROLL_MIN_LENGTH_MM,
+) -> list[dict]:
+    """Per-unused-donor end-of-fate advisory: store, re-roll, or recycle — with numbers.
+
+    For every donor in ``result.unused_supply`` this compares its three realistic fates:
+
+    * **store** — could it still serve *this* project? The feasibility cells are re-derived for the
+      (unused donor, unfilled slot) sub-matrix with the run's own economics (``result.weights``,
+      counterfactual basis included), and the best score is reported. Advice is "store" when a
+      feasible cell with a strictly positive score exists. Note that in an unconstrained
+      proven-optimal run such a pair would have been an improving move (``verify_match`` clause 3)
+      and cannot exist; positive store cases arise when stewardship knobs (utilization floor,
+      section-variety cap) or a later stock review changed the picture — exactly when the advice
+      is worth having.
+    * **re-roll** — direct re-rolling without re-melting (pilot-scale; see
+      :class:`~steelreuse.core.carbon.CarbonFactor`): credited at ``mass x reroll_credit`` when the
+      donor maps to a catalog section and its stock length is at least ``reroll_min_length_mm``
+      (straightness/prismatic condition is assumed for mapped catalog stock — surveyed damage is
+      the pre-demolition audit's job and quarantined stock never reaches this list).
+    * **recycle** — conventional EAF scrap route: ``mass x recycle_credit`` (always available).
+
+    The advice is the argmax: "store" if feasible at positive score, else "re-roll" vs "recycle"
+    by credit. Returns one dict per unused donor (id, section, length, mass, the three numbers,
+    flags, and ``advice``); pure function — no behavior change to any solve.
+    """
+    factor = (factors or load_factors())["steel"]
+    unused = set(result.unused_supply)
+    unfilled = set(result.unmatched_slots)
+    sub_supply = [s for s in supply if s.id in unused]
+    sub_slots = [s for s in slots if s.id in unfilled]
+    cells = _cells_from_weights(sub_supply, sub_slots, catalog, factor, result.weights or {})
+    best: dict[str, _Cell] = {}
+    for c in cells:
+        sid = sub_supply[c.si].id
+        if sid not in best or c.score > best[sid].score:
+            best[sid] = c
+    rows: list[dict] = []
+    for s in sub_supply:
+        sec = catalog.get(s.section)
+        mass = sec.mass_kgm * s.length_mm / 1000.0 if sec else 0.0
+        b = best.get(s.id)
+        feasible = b is not None
+        reroll_ok = sec is not None and s.length_mm >= reroll_min_length_mm
+        reroll_credit_kg = mass * factor.reroll_credit if reroll_ok else 0.0
+        recycle_credit_kg = mass * factor.recycle_credit
+        if feasible and b.score > 0:
+            advice = "store"
+        elif reroll_credit_kg > recycle_credit_kg:
+            advice = "re-roll"
+        else:
+            advice = "recycle"
+        rows.append({
+            "supply_id": s.id,
+            "section": s.section,
+            "length_mm": round(s.length_mm, 1),
+            "mass_kg": round(mass, 1),
+            "feasible_for_unfilled": feasible,
+            "store_slot": sub_slots[b.sj].id if b is not None else None,
+            "store_score_kg": round(b.score, 2) if b is not None else None,
+            "reroll_eligible": reroll_ok,
+            "reroll_credit_kg": round(reroll_credit_kg, 2),
+            "recycle_credit_kg": round(recycle_credit_kg, 2),
+            "advice": advice,
+        })
+    return rows
+
+
 def verify_match(
     supply: list[SupplyItem],
     slots: list[DemandSlot],
@@ -541,10 +640,7 @@ def verify_match(
     factor = (factors or load_factors())["steel"]
     w = result.weights or {}
     allow_cutting = bool(w.get("allow_cutting"))
-    policy = ConnectionPolicy() if w.get("connection_screen") else None
-    cells = _build_cells(supply, slots, catalog, factor,
-                         w.get("w_offcut", 0.3), w.get("connection_penalty_kg", 5.0),
-                         w.get("new_build_grade", "S355"), allow_cutting, policy)
+    cells = _cells_from_weights(supply, slots, catalog, factor, w)
     # Judge "improving move" by the PRIMARY value of the objective the result was solved for (it
     # travels on weights): under "members"/"mass" an unfilled slot with any free feasible donor is
     # already a violation, CO2-negative or not. The CO2 tie-break is deliberately ignored here —

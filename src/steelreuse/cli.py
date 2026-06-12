@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -107,6 +108,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
                          "feasibility, and confirm no improving single move exists")
+    ap.add_argument("--disposition", action="store_true",
+                    help="stock disposition advisory: for every UNUSED donor compare its fates — "
+                         "store (still feasible for an unfilled slot here?), re-roll (pilot-scale "
+                         "direct re-rolling credit), recycle (EAF credit) — and advise one "
+                         "(summary line + report section)")
+    ap.add_argument("--disposition-csv",
+                    help="also write the per-donor disposition advisory rows to this CSV "
+                         "(implies --disposition)")
     ap.add_argument("--connections", action="store_true",
                     help="enable the connection feasibility screen: exclude donors geometrically "
                          "incompatible with the slot's design section (wrong shape family, too deep "
@@ -178,6 +187,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         frame_analysis=args.frame_analysis, second_order=args.pdelta,
         wind_kpa=args.wind, seismic_cs=args.seismic, objective=args.objective,
         pareto=args.pareto,
+        disposition=args.disposition or bool(args.disposition_csv),
     )
 
     ctx = build_report_context(res)
@@ -261,6 +271,21 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     if args.cut and res.match.donor_leftover_mm:
         print(f"Cut donors: {len(res.match.donor_leftover_mm)} | reusable remainder "
               f"{res.match.total_donor_leftover_mm / 1000.0:.1f} m")
+    if res.disposition is not None:
+        n_store = sum(1 for r in res.disposition if r["advice"] == "store")
+        n_reroll = sum(1 for r in res.disposition if r["advice"] == "re-roll")
+        n_recycle = sum(1 for r in res.disposition if r["advice"] == "recycle")
+        print(f"Stock disposition: {n_store} store / {n_reroll} re-roll / {n_recycle} recycle "
+              f"of {len(res.disposition)} unused donor(s)")
+        if args.disposition_csv:
+            dpath = Path(args.disposition_csv)
+            dpath.parent.mkdir(parents=True, exist_ok=True)
+            with dpath.open("w", newline="", encoding="utf-8") as fh:
+                if res.disposition:
+                    w = csv.DictWriter(fh, fieldnames=list(res.disposition[0]))
+                    w.writeheader()
+                    w.writerows(res.disposition)
+            print(f"Disposition advisory written -> {dpath}")
     if res.match.unmatched_slots:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
     print(f"Narrative source: {source}")

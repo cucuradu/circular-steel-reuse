@@ -22,7 +22,14 @@ from .core.sections import (
     load_default_catalog,
     resolve_members,
 )
-from .match.optimize import OBJECTIVES, DemandSlot, MatchResult, SupplyItem, match
+from .match.optimize import (
+    OBJECTIVES,
+    DemandSlot,
+    MatchResult,
+    SupplyItem,
+    match,
+    stock_disposition,
+)
 from .schema import ExtractedModel
 
 
@@ -306,6 +313,10 @@ class PipelineResult:
     # objective, one row per goal — {objective, n_reused, co2_saved_kg, mass_reused_kg,
     # proven_optimal, selected}. The shipped assignments (match) always follow `objective`.
     pareto: list[dict] | None = None
+    # Stock disposition advisory (opt-in, A2): one row per UNUSED donor comparing its end-of-life
+    # fates (store for an unfilled slot / re-roll / recycle) with credit figures — see
+    # :func:`steelreuse.match.optimize.stock_disposition`. Advisory only: never changes the match.
+    disposition: list[dict] | None = None
 
 
 def run_pipeline(
@@ -329,6 +340,7 @@ def run_pipeline(
     seismic_cs: float = 0.0,
     objective: str = "co2",
     pareto: bool = False,
+    disposition: bool = False,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -416,8 +428,16 @@ def run_pipeline(
                 "selected": obj == objective,
             })
 
+    # Stock disposition advisory (opt-in): what should happen to each UNUSED donor — store for an
+    # unfilled slot, re-roll, or recycle. Purely advisory (the match is already fixed); re-derives
+    # the (unused x unfilled) feasibility cells with the run's own economics (result.weights).
+    disposition_rows: list[dict] | None = None
+    if disposition:
+        disposition_rows = stock_disposition(supply, slots, catalog, result)
+
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
         donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
+        disposition=disposition_rows,
     )

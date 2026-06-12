@@ -90,6 +90,12 @@ def main() -> None:
                 help="Exclude donors geometrically incompatible with the slot's design section "
                      "(wrong shape family, too deep for the detailed zone); milder mismatches are "
                      "flagged 'review' either way.")
+            disposition = st.checkbox(
+                "Stock disposition advisory", value=False,
+                help="For every UNUSED donor, compare its fates with numbers: store (still "
+                     "feasible for an unfilled slot here?), direct re-rolling (pilot-scale "
+                     "research-grade credit), or EAF recycling — and advise one. Advisory only; "
+                     "never changes the match.")
             all_demand = st.checkbox("Include non-steel demand", value=False)
             include_unverified = st.checkbox(
                 "Admit unverified donor stock (pre-demolition audit)", value=False,
@@ -112,6 +118,7 @@ def main() -> None:
             allow_cutting=allow_cutting, connection_screen=connection_screen,
             frame_analysis=frame_analysis,
             wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
+            disposition=disposition,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")
@@ -162,6 +169,19 @@ def main() -> None:
         st.warning(f"{ctx['unknown']} donor member(s) across {ctx['unknown_kinds']} type(s) "
                    "unidentified and excluded (not in the steel catalog):")
         st.dataframe(pd.DataFrame(ctx["unknown_breakdown"]), use_container_width=True)
+
+    if res.disposition is not None:
+        n_store = sum(1 for r in res.disposition if r["advice"] == "store")
+        n_reroll = sum(1 for r in res.disposition if r["advice"] == "re-roll")
+        n_recycle = sum(1 for r in res.disposition if r["advice"] == "recycle")
+        with st.expander(
+            f"Stock disposition — {n_store} store / {n_reroll} re-roll / {n_recycle} recycle "
+            f"of {len(res.disposition)} unused donor(s)"
+        ):
+            st.caption("Advised fate per unused donor. Re-rolling is a pilot-scale route "
+                       "(research-grade credit); recycling is the conventional EAF counterfactual. "
+                       "Advisory only — the match above is unchanged.")
+            st.dataframe(pd.DataFrame(res.disposition), use_container_width=True)
 
     st.subheader("Material passport (donor)")
     st.dataframe(pd.DataFrame([e.__dict__ for e in res.passport.entries]), use_container_width=True)

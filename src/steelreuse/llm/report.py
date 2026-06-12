@@ -105,6 +105,35 @@ def build_report_context(res: PipelineResult) -> dict:
             dict(p, label=_OBJECTIVE_LABEL.get(p["objective"], p["objective"]))
             for p in res.pareto
         ]
+    # Stock disposition advisory (only when run_pipeline(disposition=True) computed it):
+    # summarized BY SECTION so a 300-donor stock yields a short table, not 300 rows.
+    if res.disposition is not None:
+        by_sec: dict[str, dict] = {}
+        for r in res.disposition:
+            row = by_sec.setdefault(r["section"], {
+                "section": r["section"], "n": 0, "store": 0, "reroll": 0, "recycle": 0,
+                "reroll_credit_kg": 0.0, "recycle_credit_kg": 0.0,
+            })
+            row["n"] += 1
+            key = {"store": "store", "re-roll": "reroll", "recycle": "recycle"}[r["advice"]]
+            row[key] += 1
+            row["reroll_credit_kg"] += r["reroll_credit_kg"]
+            row["recycle_credit_kg"] += r["recycle_credit_kg"]
+        for row in by_sec.values():
+            row["reroll_credit_kg"] = round(row["reroll_credit_kg"], 1)
+            row["recycle_credit_kg"] = round(row["recycle_credit_kg"], 1)
+        ctx["disposition_present"] = True
+        ctx["disposition_by_section"] = sorted(by_sec.values(), key=lambda r: -r["n"])
+        ctx["disposition_totals"] = {
+            "n": len(res.disposition),
+            "store": sum(1 for r in res.disposition if r["advice"] == "store"),
+            "reroll": sum(1 for r in res.disposition if r["advice"] == "re-roll"),
+            "recycle": sum(1 for r in res.disposition if r["advice"] == "recycle"),
+            "reroll_credit_kg": round(sum(r["reroll_credit_kg"] for r in res.disposition), 1),
+            "recycle_credit_kg": round(sum(r["recycle_credit_kg"] for r in res.disposition), 1),
+        }
+    else:
+        ctx["disposition_present"] = False
     # Pre-demolition-audit provenance summary (only shown when the donor model carried audit data).
     if res.audit and res.audit.present:
         a = res.audit
@@ -287,6 +316,22 @@ policy choice, and this table shows what each choice costs in the other currenci
  <td>{{ '★' if p.selected else '' }}</td><td>{{ p.label }}</td><td>{{ p.n_reused }}</td>
  <td>{{ p.co2_saved_kg }}</td><td>{{ p.mass_reused_kg }}</td>
  <td>{{ 'proven optimal' if p.proven_optimal else 'heuristic — not proven' }}</td></tr>{% endfor %}
+</table>{% endif %}
+{% if ctx.disposition_present %}<h2>Stock disposition (unused donors)</h2>
+<p class="note">What should happen to the {{ ctx.disposition_totals.n }} unused donor(s):
+<b>{{ ctx.disposition_totals.store }}</b> worth storing (still feasible for an unfilled slot here at a
+positive saving), <b>{{ ctx.disposition_totals.reroll }}</b> advised for direct re-rolling
+(pilot-scale route — research-grade credit), <b>{{ ctx.disposition_totals.recycle }}</b> for
+conventional EAF recycling. Potential end-of-life credits if none were stored:
+{{ ctx.disposition_totals.reroll_credit_kg }} kg CO2e via re-rolling (eligible stock) plus
+{{ ctx.disposition_totals.recycle_credit_kg }} kg CO2e via recycling (all stock — the two are
+alternatives per member, not additive). Summarized by section; per-donor rows via
+<code>--disposition-csv</code>.</p>
+<table><tr><th>Section</th><th>Donors</th><th>Store</th><th>Re-roll</th><th>Recycle</th>
+<th>Re-roll credit (kg CO2e)</th><th>Recycle credit (kg CO2e)</th></tr>
+{% for d in ctx.disposition_by_section %}<tr>
+ <td>{{ d.section }}</td><td>{{ d.n }}</td><td>{{ d.store }}</td><td>{{ d.reroll }}</td>
+ <td>{{ d.recycle }}</td><td>{{ d.reroll_credit_kg }}</td><td>{{ d.recycle_credit_kg }}</td></tr>{% endfor %}
 </table>{% endif %}
 <p>Mapped {{ ctx.mapped }} · fuzzy {{ ctx.fuzzy }} · unknown {{ ctx.unknown }} ·
  {{ ctx.match_optimality }} (solver: {{ ctx.solver_status }})</p>
