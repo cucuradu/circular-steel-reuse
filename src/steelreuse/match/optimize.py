@@ -146,6 +146,11 @@ class _Cell:
 
 OBJECTIVES = ("co2", "members", "mass")
 
+# End-of-life counterfactual modes (A1ii): what the donor steel consumed by a reuse would otherwise
+# have done. "none" books plain avoided-new (the historical behavior); the others subtract the
+# foregone credit (see core/carbon.CarbonFactor) from every booked saving.
+COUNTERFACTUALS = ("none", "recycling", "rerolling")
+
 
 def _coeff(cell: _Cell) -> float:
     return cell.score if cell.objective_coeff is None else cell.objective_coeff
@@ -271,6 +276,7 @@ def _feasible_cell(
     baseline_mass_kg: float | None,
     allow_cutting: bool = False,
     connection_policy: ConnectionPolicy | None = None,
+    counterfactual_credit: float = 0.0,
 ) -> _Cell | None:
     """Return an economics cell if the pair is feasible, else ``None``."""
     # Skip degenerate geometry (garbage rows) before any EN check that could divide by zero; such
@@ -313,6 +319,12 @@ def _feasible_cell(
     # headline "CO2 saved" matches the basis the optimiser actually used (no silent over-count).
     avoided_new = (baseline_mass_kg if baseline_mass_kg is not None else mass_used) * factor.a1a3
     co2_saved = avoided_new - mass_used * factor.reuse_process - connection_penalty_kg
+    # Counterfactual booking (A1ii, opt-in): the donor steel consumed here can no longer take its
+    # realistic end-of-life fate (EAF recycling / pilot-scale re-rolling), so the FOREGONE credit of
+    # that fate is subtracted from the booked saving — answering the standard LCA critique that
+    # avoided-new accounting implicitly assumes the unused donor would have evaporated. The credit
+    # is 0.0 by default ("none"), keeping results byte-identical unless asked.
+    co2_saved -= mass_used * counterfactual_credit
     if allow_cutting:
         # Cutting-stock: one donor can serve several slots, so the remainder is genuinely reusable
         # (tracked per donor after the solve, not per piece). Don't penalise off-cut here — that bias
@@ -343,6 +355,7 @@ def _build_cells(
     new_build_grade: str,
     allow_cutting: bool,
     connection_policy: ConnectionPolicy | None,
+    counterfactual_credit: float = 0.0,
 ) -> list[_Cell]:
     """All feasible (supply, slot) cells with their economics — shared by :func:`match` (to solve)
     and :func:`verify_match` (to independently re-derive what the solver saw)."""
@@ -353,7 +366,8 @@ def _build_cells(
         for j, slot in enumerate(slots):
             cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
                                   connection_penalty_kg, baselines[j], allow_cutting,
-                                  connection_policy)
+                                  connection_policy,
+                                  counterfactual_credit=counterfactual_credit)
             if cell is not None:
                 cells.append(cell)
     return cells
@@ -371,6 +385,7 @@ def match(
     allow_cutting: bool = False,
     connection_policy: ConnectionPolicy | None = None,
     objective: str = "co2",
+    counterfactual: str = "none",
 ) -> MatchResult:
     """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
 
@@ -389,17 +404,32 @@ def match(
     geometrically incompatible (donor, slot) pairs — wrong shape family, donor too deep for the
     detailed zone — are excluded; milder mismatches surface as ``connection_status = "review"``.
     With the default ``None`` nothing is gated, but every assignment is still annotated.
+
+    ``counterfactual`` selects the end-of-life fate the donor steel is assumed to forego by being
+    reused (A1ii): ``"none"`` (default — byte-identical to before), ``"recycling"`` (EAF scrap
+    credit) or ``"rerolling"`` (pilot-scale direct re-rolling credit). When set, every booked
+    ``co2_saved`` (and hence score) is reduced by ``mass_used x credit`` — the saving is then *net
+    of what the steel would have saved the wider system anyway*. The mode AND the credit value
+    travel on ``MatchResult.weights`` so :func:`verify_match` and :func:`stock_disposition`
+    regenerate identical economics.
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
+    if counterfactual not in COUNTERFACTUALS:
+        raise ValueError(
+            f"unknown counterfactual {counterfactual!r}; expected one of {COUNTERFACTUALS}")
     factor = (factors or load_factors())["steel"]
+    cf_credit = {"none": 0.0, "recycling": factor.recycle_credit,
+                 "rerolling": factor.reroll_credit}[counterfactual]
     weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg,
                "allow_cutting": allow_cutting,
                "connection_screen": connection_policy is not None,
-               "new_build_grade": new_build_grade, "objective": objective}
+               "new_build_grade": new_build_grade, "objective": objective,
+               "counterfactual": counterfactual, "counterfactual_credit": cf_credit}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
-                         new_build_grade, allow_cutting, connection_policy)
+                         new_build_grade, allow_cutting, connection_policy,
+                         counterfactual_credit=cf_credit)
     _apply_objective(cells, objective)
 
     if not cells:
@@ -531,7 +561,8 @@ def _cells_from_weights(
     return _build_cells(supply, slots, catalog, factor,
                         weights.get("w_offcut", 0.3), weights.get("connection_penalty_kg", 5.0),
                         weights.get("new_build_grade", "S355"),
-                        bool(weights.get("allow_cutting")), policy)
+                        bool(weights.get("allow_cutting")), policy,
+                        counterfactual_credit=weights.get("counterfactual_credit", 0.0))
 
 
 # Minimum straight stock length for the direct re-rolling fate (A2): below this, handling and

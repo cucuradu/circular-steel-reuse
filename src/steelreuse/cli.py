@@ -104,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="also solve the match under every objective (co2, members, mass) and "
                          "print/report the trade-off table; the shipped assignments still follow "
                          "--objective")
+    ap.add_argument("--counterfactual", choices=("none", "recycling", "rerolling"), default="none",
+                    help="book reuse savings NET of the donor steel's foregone end-of-life fate: "
+                         "'recycling' subtracts the EAF scrap credit, 'rerolling' the pilot-scale "
+                         "direct re-rolling credit (research-grade), per kg of donor steel "
+                         "consumed. Default 'none' books plain avoided-new (results unchanged)")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -188,6 +193,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         wind_kpa=args.wind, seismic_cs=args.seismic, objective=args.objective,
         pareto=args.pareto,
         disposition=args.disposition or bool(args.disposition_csv),
+        counterfactual=args.counterfactual,
     )
 
     ctx = build_report_context(res)
@@ -266,6 +272,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     if args.connections or conn_review:
         print(f"Connections: screen {'on' if args.connections else 'off (annotate only)'} | "
               f"{conn_review} assignment(s) flagged for connection review")
+    if args.counterfactual != "none":
+        credit = res.match.weights.get("counterfactual_credit", 0.0)
+        print(f"Carbon basis: savings booked NET of the foregone {args.counterfactual} credit "
+              f"({credit:g} kg CO2e per kg of donor steel consumed)"
+              + (" [pilot-scale research-grade factor]" if args.counterfactual == "rerolling" else ""))
     print(f"CO2e saved by matches: {res.match.total_co2_saved_kg:.1f} kg "
           f"(full donor stock potential: {res.passport.total_saved_kgco2e:.1f} kg)")
     if args.cut and res.match.donor_leftover_mm:

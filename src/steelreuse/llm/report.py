@@ -97,6 +97,8 @@ def build_report_context(res: PipelineResult) -> dict:
         "connection_screen_on": bool(m.weights.get("connection_screen")),
         "cut_donors": len(m.donor_leftover_mm),
         "reusable_remainder_m": round(m.total_donor_leftover_mm / 1000.0, 1),
+        # End-of-life counterfactual basis the savings were booked on ("none" = plain avoided-new).
+        "counterfactual": (m.weights or {}).get("counterfactual", "none"),
         "disclaimer": SCOPE_DISCLAIMER,
     }
     # Objective trade-off rows (only when run_pipeline(pareto=True) re-solved every goal).
@@ -275,6 +277,12 @@ design itself remains outside this tool's scope.</p>{% endif %}
 {% if ctx.connection_screen_on %}<p class="note">The connection feasibility screen was ON: donors
 geometrically incompatible with a slot's design section (wrong shape family, or too deep for the
 detailed zone) were excluded before matching.</p>{% endif %}
+{% if ctx.counterfactual != 'none' %}<p class="note"><b>Carbon basis:</b> savings are booked NET of
+the foregone <b>{{ ctx.counterfactual }}</b> credit — each reuse is charged for the end-of-life
+benefit the consumed donor steel would have delivered anyway{% if ctx.counterfactual == 'rerolling' %}
+(direct re-rolling is a pilot-scale route; its credit is a research-grade figure){% endif %}. This is
+deliberately harsher than plain avoided-new accounting; reuses that no longer save carbon on this
+basis were not selected.</p>{% endif %}
 {% if ctx.audit_present %}<h2>Pre-demolition audit</h2>
 <p>{{ ctx.audit_audited }} donor member(s) carried audit data: {{ ctx.audit_admitted }} admitted to
  supply, {{ ctx.audit_quarantined }} quarantined. Average f<sub>y</sub> knockdown on admitted members:

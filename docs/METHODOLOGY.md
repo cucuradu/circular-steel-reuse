@@ -336,6 +336,38 @@ per mapped member, mass, volume, new-build embodied carbon, reuse process carbon
 (when audited) the member's **verification basis and condition grade** (§3.1) — the provenance a
 material passport is meant to carry.
 
+### 6.1 End-of-life counterfactuals (`--counterfactual`, default off)
+
+The default accounting books `avoided-new − reuse process − connection refab` per reuse. The standard
+LCA critique of that basis is that it implicitly treats the non-reused donor as **disappearing**: in
+reality structural steel is recycled at ~99 %, so even without this project the donor steel would have
+displaced some primary production via the **EAF scrap route**. Whether to charge reuse for that
+foregone benefit is a genuine methodological debate, not a settled rule:
+
+* **Plain avoided-new (default, `none`)** is the basis most reuse studies and EPD module-D comparisons
+  report, and the one a client asking "what did *this project* avoid buying?" means. It is also the
+  convention under which the recycling system keeps its own credit (no double counting *within one
+  declared unit* — but the system-wide sum over both lives double-counts the displaced primary
+  production once).
+* **Net-of-recycling (`recycling`)** answers the system-expansion critique head-on: every booked saving
+  is reduced by `mass_used × recycle_credit` (CSV value 0.55 kgCO₂e/kg, mid value of the 0.4–0.7
+  literature range — worldsteel LCI module-D scrap credit, SCI P427, EN 15804/15978 module D). This is
+  the **harsher, more defensible figure** for policy claims: it is reuse's benefit *over and above*
+  what the scrap market would have delivered anyway. Pairs that are no longer net-positive on this
+  basis are not selected (CO₂ objective).
+* **Net-of-re-rolling (`rerolling`)** subtracts `mass_used × reroll_credit` (CSV 1.00 kgCO₂e/kg,
+  conservative pick of a ~0.9–1.4 range). Direct re-rolling of reclaimed sections without re-melting
+  (Cambridge/Allwood line of work) is **pilot-scale**: the factor is research-grade and flagged as such
+  everywhere it is used. It approximates an upper bound on the counterfactual — if a re-rolling route
+  existed locally, reuse would only be worth its margin over it.
+
+The chosen mode and the credit value travel on the result (`MatchResult.weights`), so the independent
+verifier, the Pareto table, and the disposition advisory all use the same basis as the run. The credits
+are **data, not code** (CSV columns `recycle_credit_kgco2e_per_kg` / `reroll_credit_kgco2e_per_kg`;
+older factor files without the columns load with 0.0). The report and CLI state the basis whenever it
+is not the default. Honest residual: the counterfactual is applied as a flat per-kg credit — recovery
+rates, transport to the scrap/re-rolling facility, and yield losses are not modelled separately.
+
 ## 7. The matcher  (`match/optimize.py`)
 
 1. **Sparse feasibility mask.** A (supply, slot) pair is admissible only if the reclaimed member is long

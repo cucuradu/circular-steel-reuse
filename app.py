@@ -81,6 +81,16 @@ def main() -> None:
                 help="Also solve the match under every goal (CO₂ / members / mass) and show what "
                      "each policy choice costs in the other currencies. The assignments shown "
                      "still follow the objective selected above.")
+            counterfactual = st.selectbox(
+                "End-of-life counterfactual", ("none", "recycling", "rerolling"), index=0,
+                format_func=lambda v: {
+                    "none": "None — book plain avoided-new (default)",
+                    "recycling": "EAF recycling (subtract scrap credit)",
+                    "rerolling": "Direct re-rolling (pilot-scale, research-grade)"}[v],
+                help="Book reuse savings NET of what the consumed donor steel would have saved "
+                     "the wider system anyway via its realistic end-of-life fate. Answers the "
+                     "standard LCA critique of avoided-new accounting; default 'none' keeps "
+                     "results unchanged.")
             allow_cutting = st.checkbox(
                 "Cutting-stock (1 donor → many cuts)", value=True,
                 help="Default: reclamation practice cuts members to length routinely. Untick for "
@@ -118,7 +128,7 @@ def main() -> None:
             allow_cutting=allow_cutting, connection_screen=connection_screen,
             frame_analysis=frame_analysis,
             wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
-            disposition=disposition,
+            disposition=disposition, counterfactual=counterfactual,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")

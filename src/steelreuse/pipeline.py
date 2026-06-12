@@ -341,6 +341,7 @@ def run_pipeline(
     objective: str = "co2",
     pareto: bool = False,
     disposition: bool = False,
+    counterfactual: str = "none",
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -399,7 +400,8 @@ def run_pipeline(
     passport = build_passport(donor.members, catalog)
     policy = ConnectionPolicy() if connection_screen else None
     result = match(supply, slots, catalog, allow_cutting=allow_cutting,
-                   connection_policy=policy, objective=objective)
+                   connection_policy=policy, objective=objective,
+                   counterfactual=counterfactual)
 
     # Objective trade-off (opt-in): re-solve the SAME feasible pairs under each goal so the user
     # sees what each policy choice costs in the other currencies. The shipped assignments stay on
@@ -418,7 +420,8 @@ def run_pipeline(
         for obj in OBJECTIVES:
             r = result if obj == objective else match(
                 supply, slots, catalog, allow_cutting=allow_cutting,
-                connection_policy=policy, objective=obj)
+                connection_policy=policy, objective=obj,
+                counterfactual=counterfactual)  # same carbon basis as the shipped result
             pareto_rows.append({
                 "objective": obj,
                 "n_reused": r.n_reused,

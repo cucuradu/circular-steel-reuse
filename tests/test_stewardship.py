@@ -88,6 +88,71 @@ def test_disposition_known_answer_store_reroll_recycle(cat):
     assert stub["recycle_credit_kg"] == pytest.approx(mass_stub * f.recycle_credit, abs=0.01)
 
 
+# ---------------------------------------------------------------------------
+# A1(ii) — counterfactual booking (opt-in)
+# ---------------------------------------------------------------------------
+
+def test_counterfactual_shifts_booking_by_exactly_mass_times_credit(cat):
+    # A donor that stays net-positive under every basis: the booked saving must drop by exactly
+    # mass_used x credit between bases, and verify_match must stay clean (the mode + credit travel
+    # on weights).
+    from steelreuse.match.optimize import verify_match
+
+    slot = _beam_slot(4000, 8.0)
+    supply = [SupplyItem(id="d", section="IPE240", grade="S355", length_mm=4200)]
+    f = load_factors()["steel"]
+    mass_used = cat["IPE240"].mass_kgm * 4.0
+
+    base = match(supply, [slot], cat)
+    rec = match(supply, [slot], cat, counterfactual="recycling")
+    assert base.n_reused == rec.n_reused == 1
+    shift = base.assignments[0].co2_saved_kg - rec.assignments[0].co2_saved_kg
+    assert shift == pytest.approx(mass_used * f.recycle_credit, abs=0.02)
+    # the score shifts identically (the same subtraction flows through)
+    assert base.assignments[0].score - rec.assignments[0].score == pytest.approx(shift, abs=0.02)
+    assert rec.weights["counterfactual"] == "recycling"
+    assert rec.weights["counterfactual_credit"] == pytest.approx(f.recycle_credit)
+    assert verify_match(supply, [slot], cat, rec) == []
+
+
+def test_counterfactual_recycling_skips_a_pair_that_is_only_positive_gross(cat):
+    # A heavily over-spec donor: net-positive under plain avoided-new, net-NEGATIVE once the
+    # foregone recycling credit of all that consumed steel is charged -> the co2 objective must
+    # leave the slot unfilled. Under 'rerolling' (a larger credit) it stays skipped too.
+    slot = _beam_slot(4000, 8.0)
+    supply = [SupplyItem(id="big", section="IPE500", grade="S355", length_mm=4200)]
+
+    base = match(supply, [slot], cat)
+    assert base.n_reused == 1 and base.assignments[0].co2_saved_kg > 0
+
+    rec = match(supply, [slot], cat, counterfactual="recycling")
+    assert rec.n_reused == 0
+    assert rec.unmatched_slots == [slot.id] and rec.unused_supply == ["big"]
+
+    rr = match(supply, [slot], cat, counterfactual="rerolling")
+    assert rr.n_reused == 0
+
+
+def test_counterfactual_unknown_mode_rejected(cat):
+    with pytest.raises(ValueError, match="counterfactual"):
+        match([], [], cat, counterfactual="landfill")
+
+
+def test_counterfactual_flows_through_pipeline_and_report():
+    res = run_pipeline(str(DATA / "samples" / "donor.json"), str(DATA / "samples" / "demand.json"),
+                       counterfactual="recycling")
+    assert res.match.weights["counterfactual"] == "recycling"
+    base = run_pipeline(str(DATA / "samples" / "donor.json"), str(DATA / "samples" / "demand.json"))
+    # the netted total can only be lower
+    assert res.match.total_co2_saved_kg < base.match.total_co2_saved_kg
+
+    from steelreuse.llm.report import build_report_context, render_html
+    ctx = build_report_context(res)
+    assert ctx["counterfactual"] == "recycling"
+    assert "Carbon basis" in render_html(ctx, "n")
+    assert "Carbon basis" not in render_html(build_report_context(base), "n")
+
+
 def test_disposition_is_advisory_only_and_runs_through_the_pipeline():
     # run_pipeline(disposition=True) computes one row per unused donor without changing the match;
     # the default (off) leaves the field None.
