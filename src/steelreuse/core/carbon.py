@@ -25,10 +25,39 @@ class CarbonFactor:
     a1a3: float            # kgCO2e/kg to produce new (A1-A3)
     reuse_process: float   # kgCO2e/kg to recover/refabricate for reuse
     source: str = ""
+    # --- End-of-life counterfactual credits (kgCO2e per kg of steel sent to that fate) -----------
+    # What one kg of donor steel would have saved the wider system had it NOT been reused here.
+    # These are parameters, not constants — the literature ranges are wide and the CSV is the place
+    # to localize them. Representative defaults shipped in factors.csv:
+    #
+    #   recycle_credit — conventional EAF scrap recycling (~99 % recovery for structural steel).
+    #     Net system benefit of recycling one kg = avoided primary production minus the EAF
+    #     re-melting/re-rolling burden. Literature range ~ 0.4-0.7 kgCO2e/kg (worldsteel LCI
+    #     methodology scrap/module-D credit; SCI P427 reuse-protocol discussion; EN 15804/15978
+    #     module D avoided-burden convention). Shipped mid value: 0.55.
+    #
+    #   reroll_credit — direct re-rolling of reclaimed sections WITHOUT re-melting
+    #     (Cambridge/Allwood line of work, "Sustainable Materials: with both eyes open" —
+    #     reuse-without-melting chapter). PILOT-SCALE only: flagged research-grade, not an
+    #     established industrial route. It avoids the melt but pays re-heating/rolling/logistics,
+    #     so the credit sits between recycling and full reuse. Documented range ~ 0.9-1.4;
+    #     shipped conservative value: 1.0 (vs this dataset's full-reuse saving of
+    #     a1a3 - reuse_process = 1.45).
+    #
+    # Sanity ordering the defaults respect: 0 < recycle_credit < reroll_credit < saved_per_kg —
+    # reuse beats re-rolling beats recycling, which is the premise of the tool.
+    recycle_credit: float = 0.0
+    reroll_credit: float = 0.0
 
     @property
     def saved_per_kg(self) -> float:
         return self.a1a3 - self.reuse_process
+
+
+def _opt_float(row: dict, key: str) -> float:
+    """Optional CSV column: a missing column or empty cell -> 0.0 (old factor files keep working)."""
+    v = row.get(key)
+    return float(v) if v not in (None, "") else 0.0
 
 
 def load_factors(path: str | Path = DEFAULT_FACTORS) -> dict[str, CarbonFactor]:
@@ -39,6 +68,8 @@ def load_factors(path: str | Path = DEFAULT_FACTORS) -> dict[str, CarbonFactor]:
                 a1a3=float(row["a1a3_kgco2e_per_kg"]),
                 reuse_process=float(row["reuse_process_kgco2e_per_kg"]),
                 source=row.get("source", ""),
+                recycle_credit=_opt_float(row, "recycle_credit_kgco2e_per_kg"),
+                reroll_credit=_opt_float(row, "reroll_credit_kgco2e_per_kg"),
             )
     return out
 

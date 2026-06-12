@@ -34,6 +34,40 @@ def test_carbon_saved_ipe300(cat):
     assert mass * f.saved_per_kg == pytest.approx(261.64 * 1.45, rel=1e-3)
 
 
+def test_end_of_life_credits_load_and_are_ordered():
+    # A1(i): the factor table carries the end-of-life counterfactual credits as data. The shipped
+    # values must respect the fate ordering the methodology rests on: full reuse saves more than
+    # direct re-rolling (pilot-scale, avoids the melt) which saves more than EAF recycling.
+    f = load_factors()["steel"]
+    assert f.recycle_credit == pytest.approx(0.55)   # mid of the 0.4-0.7 literature range
+    assert f.reroll_credit == pytest.approx(1.00)    # conservative, pilot-scale (Allwood-line)
+    assert 0.0 < f.recycle_credit < f.reroll_credit < f.saved_per_kg
+
+
+def test_old_factor_csv_without_credit_columns_still_loads(tmp_path):
+    # Backward compatibility: a pre-A1 factors.csv (no credit columns) must load with credits 0.0,
+    # and an empty cell must behave like a missing column.
+    old = tmp_path / "factors_old.csv"
+    old.write_text(
+        "material,a1a3_kgco2e_per_kg,reuse_process_kgco2e_per_kg,source\n"
+        'steel,1.55,0.10,"legacy file"\n',
+        encoding="utf-8",
+    )
+    f = load_factors(old)["steel"]
+    assert f.recycle_credit == 0.0 and f.reroll_credit == 0.0
+    assert f.saved_per_kg == pytest.approx(1.45)
+
+    empty = tmp_path / "factors_empty_cells.csv"
+    empty.write_text(
+        "material,a1a3_kgco2e_per_kg,reuse_process_kgco2e_per_kg,"
+        "recycle_credit_kgco2e_per_kg,reroll_credit_kgco2e_per_kg,source\n"
+        'steel,1.55,0.10,,,"empty cells"\n',
+        encoding="utf-8",
+    )
+    f = load_factors(empty)["steel"]
+    assert f.recycle_credit == 0.0 and f.reroll_credit == 0.0
+
+
 def test_passport_skips_unknown_sections(cat):
     model = ExtractedModel.load(DATA / "samples" / "donor.json")
     resolve_members(model.members, cat)

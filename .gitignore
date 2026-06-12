@@ -30,6 +30,9 @@ THESIS*.pdf
 # Scratch
 _commitmsg.txt
 
+# Claude Code harness state (agent worktrees, local settings)
+.claude/
+
 # Editor / OS
 .vscode/
 .idea/

@@ -42,6 +42,8 @@ packages = ["src/steelreuse"]
 line-length = 110
 target-version = "py311"
 src = ["src", "tests"]
+# Agent-harness artifacts (.claude/ isolated worktrees etc.) are not project code.
+extend-exclude = [".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
