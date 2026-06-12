@@ -92,6 +92,11 @@ def main() -> None:
                 help="Hard stewardship gate: refuse pairs whose governing utilization is below "
                      "the floor, keeping grossly over-spec donors in stock. Can leave slots "
                      "unfilled — that is the point.")
+            max_distinct = st.number_input(
+                "Max distinct donor sections (0 = no cap)", 0, 50, 0, 1,
+                help="Anti-Frankenstein cap: the result may use at most N distinct donor "
+                     "sections — variety has fabrication, QA, detailing and procurement costs "
+                     "no carbon term sees.")
             counterfactual = st.selectbox(
                 "End-of-life counterfactual", ("none", "recycling", "rerolling"), index=0,
                 format_func=lambda v: {
@@ -141,6 +146,7 @@ def main() -> None:
             wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
             disposition=disposition, counterfactual=counterfactual,
             w_overspec=w_overspec, min_util=min_util,
+            max_distinct_sections=max_distinct or None,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")

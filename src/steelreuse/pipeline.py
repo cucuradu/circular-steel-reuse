@@ -344,6 +344,7 @@ def run_pipeline(
     counterfactual: str = "none",
     w_overspec: float = 0.0,
     min_util: float = 0.0,
+    max_distinct_sections: int | None = None,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -403,7 +404,8 @@ def run_pipeline(
     policy = ConnectionPolicy() if connection_screen else None
     result = match(supply, slots, catalog, allow_cutting=allow_cutting,
                    connection_policy=policy, objective=objective,
-                   counterfactual=counterfactual, w_overspec=w_overspec, min_util=min_util)
+                   counterfactual=counterfactual, w_overspec=w_overspec, min_util=min_util,
+                   max_distinct_sections=max_distinct_sections)
 
     # Objective trade-off (opt-in): re-solve the SAME feasible pairs under each goal so the user
     # sees what each policy choice costs in the other currencies. The shipped assignments stay on
@@ -425,7 +427,7 @@ def run_pipeline(
                 connection_policy=policy, objective=obj,
                 counterfactual=counterfactual,  # same carbon basis as the shipped result
                 w_overspec=w_overspec,          # and the same stewardship economics
-                min_util=min_util)
+                min_util=min_util, max_distinct_sections=max_distinct_sections)
             pareto_rows.append({
                 "objective": obj,
                 "n_reused": r.n_reused,

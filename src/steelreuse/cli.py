@@ -119,6 +119,11 @@ def main(argv: list[str] | None = None) -> int:
                          "governing utilization is below this, keeping grossly over-spec donors "
                          "in stock for slots that actually need them; a hard gate, so the floor "
                          "can leave slots unfilled")
+    ap.add_argument("--max-distinct-sections", type=int, default=None, metavar="N",
+                    help="cap the number of distinct donor sections the result may use "
+                         "(default: no cap). Anti-Frankenstein: section variety has fabrication, "
+                         "QA, connection-detailing and procurement costs no carbon term sees; "
+                         "the MILP consolidates onto at most N section families")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -204,7 +209,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         pareto=args.pareto,
         disposition=args.disposition or bool(args.disposition_csv),
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
-        min_util=args.min_util,
+        min_util=args.min_util, max_distinct_sections=args.max_distinct_sections,
     )
 
     ctx = build_report_context(res)
@@ -252,6 +257,10 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     print(f"Mapping: {res.validation.summary()}")
     print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
           f"{' (cutting-stock)' if args.cut else ' (whole-member only)'}")
+    n_distinct = len({a.section for a in res.match.assignments})
+    cap = res.match.weights.get("max_distinct_sections")
+    print(f"Distinct donor sections used: {n_distinct}"
+          + (f" (cap {cap})" if cap is not None else ""))
     goal = {"co2": "net-CO2", "members": "members-reused",
             "mass": "reclaimed-mass"}[args.objective]
     if res.match.proven_optimal:

@@ -408,6 +408,7 @@ def match(
     counterfactual: str = "none",
     w_overspec: float = 0.0,
     min_util: float = 0.0,
+    max_distinct_sections: int | None = None,
 ) -> MatchResult:
     """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
 
@@ -444,12 +445,21 @@ def match(
     utilization falls below it are refused outright, keeping grossly over-spec donors in stock.
     A hard gate (unlike ``w_overspec``); the report's what-it-costs comparison is simply a run
     with and without the floor.
+
+    ``max_distinct_sections`` (B3, default None = off) caps the number of **distinct donor section
+    families** the result may use (anti-Frankenstein: section variety has real fabrication, QA,
+    connection-detailing and procurement costs no carbon term sees). In the MILP this is one
+    binary ``y_f`` per usable donor section with ``x_ij <= y_f(i)`` and ``sum(y_f) <= N``; the
+    greedy fallback refuses to open an (N+1)-th family. The objective can only get worse under
+    the cap — what it costs is exactly the point of comparing runs.
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
     if counterfactual not in COUNTERFACTUALS:
         raise ValueError(
             f"unknown counterfactual {counterfactual!r}; expected one of {COUNTERFACTUALS}")
+    if max_distinct_sections is not None and max_distinct_sections < 1:
+        raise ValueError("max_distinct_sections must be a positive integer (or None = no cap)")
     factor = (factors or load_factors())["steel"]
     cf_credit = {"none": 0.0, "recycling": factor.recycle_credit,
                  "rerolling": factor.reroll_credit}[counterfactual]
@@ -458,7 +468,8 @@ def match(
                "connection_screen": connection_policy is not None,
                "new_build_grade": new_build_grade, "objective": objective,
                "counterfactual": counterfactual, "counterfactual_credit": cf_credit,
-               "w_overspec": w_overspec, "min_util": min_util}
+               "w_overspec": w_overspec, "min_util": min_util,
+               "max_distinct_sections": max_distinct_sections}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
                          new_build_grade, allow_cutting, connection_policy,
@@ -471,13 +482,19 @@ def match(
                            weights)
 
     caps = [s.length_mm for s in supply] if allow_cutting else None
+    # Donor section family per supply index, for the variety cap (only materialized when capping).
+    fams = [s.section for s in supply] if max_distinct_sections is not None else None
     try:
-        chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s, caps)
+        chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s, caps,
+                                     families=fams, max_families=max_distinct_sections)
         if not _is_optimal(status):  # timeout / "Not Solved" -> don't trust a partial MILP result
-            chosen, status = _solve_greedy(cells, len(supply), len(slots), caps), \
+            chosen, status = _solve_greedy(cells, len(supply), len(slots), caps,
+                                           families=fams,
+                                           max_families=max_distinct_sections), \
                 f"greedy_fallback ({status})"
     except Exception:  # pragma: no cover - solver edge cases -> graceful fallback
-        chosen, status = _solve_greedy(cells, len(supply), len(slots), caps), \
+        chosen, status = _solve_greedy(cells, len(supply), len(slots), caps,
+                                       families=fams, max_families=max_distinct_sections), \
             "greedy_fallback (solver error)"
 
     assignments = [
@@ -520,7 +537,9 @@ def _is_optimal(status: str) -> bool:
 
 
 def _solve_milp(cells, n_supply, n_slots, time_limit_s,
-                caps: list[float] | None = None) -> tuple[list[_Cell], str]:
+                caps: list[float] | None = None,
+                families: list[str] | None = None,
+                max_families: int | None = None) -> tuple[list[_Cell], str]:
     prob = pulp.LpProblem("reuse_matching", pulp.LpMaximize)
     x = {(c.si, c.sj): pulp.LpVariable(f"x_{c.si}_{c.sj}", cat="Binary") for c in cells}
     prob += pulp.lpSum(_coeff(c) * x[(c.si, c.sj)] for c in cells)
@@ -540,13 +559,24 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s,
                 (c.used_len_mm + CUT_TOLERANCE_MM) * x[(c.si, c.sj)] for c in cells_i
             ) <= caps[i]
 
+    # Section-variety cap (B3): one binary y_f per donor SECTION FAMILY actually usable, x_ij <= y_f
+    # and sum(y_f) <= N — variety has fabrication/QA/detailing/procurement costs no carbon term sees.
+    if max_families is not None and families is not None:
+        usable = sorted({families[c.si] for c in cells})
+        y = {f: pulp.LpVariable(f"y_{k}", cat="Binary") for k, f in enumerate(usable)}
+        for c in cells:
+            prob += x[(c.si, c.sj)] <= y[families[c.si]]
+        prob += pulp.lpSum(y.values()) <= max_families
+
     prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=time_limit_s))
     status = pulp.LpStatus[prob.status]
     chosen = [c for c in cells if x[(c.si, c.sj)].value() and x[(c.si, c.sj)].value() > 0.5]
     return chosen, status
 
 
-def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> list[_Cell]:
+def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None,
+                  families: list[str] | None = None,
+                  max_families: int | None = None) -> list[_Cell]:
     """Take highest-coefficient feasible pairs first, respecting the use constraints.
 
     Only objective-positive pairs are taken: the MILP leaves a negative-coefficient x_ij at 0, so
@@ -554,16 +584,22 @@ def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> 
     reuse whose net benefit is negative just to fill a slot (under "members"/"mass" every feasible
     pair has a positive coefficient by construction). Cells are sorted by descending coefficient,
     so the first non-positive one ends the scan. Each slot is filled once; a donor is either used
-    once (default) or packed up to its length (cutting-stock).
+    once (default) or packed up to its length (cutting-stock). With a section-variety cap (B3),
+    a cell whose donor family would open an (N+1)-th family is skipped.
     """
     used_j, chosen = set(), []
     remaining = list(caps) if caps is not None else None  # per-donor remaining length (cutting mode)
     used_s: set[int] = set()
+    open_families: set[str] = set()
     for c in sorted(cells, key=_coeff, reverse=True):
         if _coeff(c) <= 0:
             break
         if c.sj in used_j:
             continue
+        if max_families is not None and families is not None:
+            fam = families[c.si]
+            if fam not in open_families and len(open_families) >= max_families:
+                continue
         if remaining is None:
             if c.si in used_s:
                 continue
@@ -575,6 +611,8 @@ def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> 
         chosen.append(c)
         used_j.add(c.sj)
         used_s.add(c.si)
+        if families is not None:
+            open_families.add(families[c.si])
     return chosen
 
 
@@ -761,7 +799,17 @@ def verify_match(
             if n > 1:
                 issues.append(f"donor {sid} is used {n} times (one piece per donor)")
 
-    # 3: no improving single move among donors that still have capacity.
+    # Section-variety cap (B3): the result may not use more distinct donor sections than allowed.
+    max_fams = w.get("max_distinct_sections")
+    used_families = {a.section for a in result.assignments}
+    if max_fams is not None and len(used_families) > max_fams:
+        issues.append(f"section-variety cap violated: {len(used_families)} distinct donor "
+                      f"sections used, cap is {max_fams}")
+
+    # 3: no improving single move among donors that still have capacity. Under a saturated
+    # section-variety cap, a donor whose family is not already open is NOT free — using it would
+    # open an (N+1)-th family, which is not a single-move improvement but a constraint violation.
+    cap_saturated = max_fams is not None and len(used_families) >= max_fams
     used_ids = set(uses_per_donor)
     assigned_slots = {a.slot_id for a in result.assignments}
     remaining = {s.id: s.length_mm - consumed_mm.get(s.id, 0.0) for s in supply}
@@ -770,6 +818,8 @@ def verify_match(
         donor_free = (remaining[sid] >= c.used_len_mm + CUT_TOLERANCE_MM) if allow_cutting \
             else (sid not in used_ids)
         if not donor_free:
+            continue
+        if cap_saturated and supply[c.si].section not in used_families:
             continue
         if jid not in assigned_slots:
             if _primary(c) > 1e-9:

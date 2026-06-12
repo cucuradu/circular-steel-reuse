@@ -99,6 +99,9 @@ def build_report_context(res: PipelineResult) -> dict:
         "reusable_remainder_m": round(m.total_donor_leftover_mm / 1000.0, 1),
         # End-of-life counterfactual basis the savings were booked on ("none" = plain avoided-new).
         "counterfactual": (m.weights or {}).get("counterfactual", "none"),
+        # Section variety of the result (anti-Frankenstein metric, always shown; cap when set).
+        "distinct_sections": len({a.section for a in m.assignments}),
+        "max_distinct_sections": (m.weights or {}).get("max_distinct_sections"),
         "disclaimer": SCOPE_DISCLAIMER,
     }
     # Objective trade-off rows (only when run_pipeline(pareto=True) re-solved every goal).
@@ -342,6 +345,8 @@ alternatives per member, not additive). Summarized by section; per-donor rows vi
  <td>{{ d.recycle }}</td><td>{{ d.reroll_credit_kg }}</td><td>{{ d.recycle_credit_kg }}</td></tr>{% endfor %}
 </table>{% endif %}
 <p>Mapped {{ ctx.mapped }} · fuzzy {{ ctx.fuzzy }} · unknown {{ ctx.unknown }} ·
+ {{ ctx.distinct_sections }} distinct donor section(s) used{% if ctx.max_distinct_sections is not none %}
+ (cap {{ ctx.max_distinct_sections }}){% endif %} ·
  {{ ctx.match_optimality }} (solver: {{ ctx.solver_status }})</p>
 <p class="disc">{{ ctx.disclaimer }}</p>
 </body></html>"""

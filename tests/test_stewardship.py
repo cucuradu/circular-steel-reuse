@@ -139,6 +139,86 @@ def test_w_overspec_default_keeps_results_identical(cat):
 
 
 # ---------------------------------------------------------------------------
+# B3 — section-variety cap (opt-in, anti-Frankenstein)
+# ---------------------------------------------------------------------------
+
+def test_max_distinct_sections_forces_consolidation(cat):
+    # Three identical 4 m slots. Unlimited (cutting mode), the proven optimum uses three different
+    # cheap single-piece donors -> 3 distinct sections. Capped at 2, the solver must consolidate:
+    # one cheap donor + the long heavy donor cut into two pieces (2 sections, all slots still
+    # filled) at a PROVEN lower objective. verify_match must pass the capped result (a free donor
+    # of a third family offering a better score is NOT an improving move under a saturated cap).
+    from steelreuse.match.optimize import verify_match
+
+    slots = [_beam_slot(4000, 8.0, f"S{i}") for i in range(3)]
+    supply = [
+        SupplyItem(id="big", section="IPE600", grade="S355", length_mm=9000),   # 2 pieces max
+        SupplyItem(id="c300", section="IPE300", grade="S355", length_mm=4200),
+        SupplyItem(id="c360", section="IPE360", grade="S355", length_mm=4200),
+        SupplyItem(id="c400", section="IPE400", grade="S355", length_mm=4200),
+    ]
+
+    free = match(supply, slots, cat, allow_cutting=True)
+    assert free.proven_optimal and free.n_reused == 3
+    assert len({a.section for a in free.assignments}) == 3      # the three cheap singles
+    assert "big" in free.unused_supply
+
+    capped = match(supply, slots, cat, allow_cutting=True, max_distinct_sections=2)
+    assert capped.proven_optimal and capped.n_reused == 3       # still fills everything
+    assert len({a.section for a in capped.assignments}) <= 2
+    # consolidation costs carbon — the cap is a buildability trade, and the numbers say how much
+    assert capped.total_co2_saved_kg < free.total_co2_saved_kg
+    assert capped.weights["max_distinct_sections"] == 2
+    assert verify_match(supply, slots, cat, capped) == []
+
+    # the displaced cheap donors are exactly the disposition advisory's audience now
+    rows = stock_disposition(supply, slots, cat, capped)
+    assert {r["supply_id"] for r in rows} == set(capped.unused_supply)
+
+
+def test_max_distinct_sections_greedy_respects_the_cap():
+    # The greedy fallback must refuse to open an (N+1)-th family even when a third-family cell
+    # scores higher than anything else left.
+    from steelreuse.match.optimize import _Cell, _solve_greedy
+
+    cells = [
+        _Cell(si=0, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=10, score=10.0,
+              used_len_mm=4000.0),
+        _Cell(si=1, sj=1, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=9, score=9.0,
+              used_len_mm=4000.0),
+        _Cell(si=2, sj=2, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=8, score=8.0,
+              used_len_mm=4000.0),
+        _Cell(si=0, sj=2, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=2, score=2.0,
+              used_len_mm=4000.0),
+    ]
+    fams = ["A", "B", "C"]
+    caps = [9000.0, 9000.0, 9000.0]   # cutting mode, so the family-A donor can serve two slots
+    unlimited = _solve_greedy(cells, n_supply=3, n_slots=3, caps=caps,
+                              families=fams, max_families=None)
+    assert {(c.si, c.sj) for c in unlimited} == {(0, 0), (1, 1), (2, 2)}
+    capped = _solve_greedy(cells, n_supply=3, n_slots=3, caps=caps,
+                           families=fams, max_families=2)
+    # family C is never opened; slot 2 falls back to the lower-scoring family-A cell
+    assert {(c.si, c.sj) for c in capped} == {(0, 0), (1, 1), (0, 2)}
+
+
+def test_max_distinct_sections_validation_and_verify_flags_violation(cat):
+    with pytest.raises(ValueError, match="max_distinct_sections"):
+        match([], [], cat, max_distinct_sections=0)
+
+    # a tampered result that uses more sections than its own cap must be flagged
+    from steelreuse.match.optimize import verify_match
+    slots = [_beam_slot(6000, 20.0, "s1"), _beam_slot(6000, 15.0, "s2")]
+    supply = [SupplyItem(id="d1", section="IPE360", grade="S275", length_mm=7000),
+              SupplyItem(id="d2", section="IPE400", grade="S275", length_mm=7000)]
+    res = match(supply, slots, cat)
+    assert len({a.section for a in res.assignments}) == 2
+    tampered = dataclasses.replace(res, weights=dict(res.weights, max_distinct_sections=1))
+    assert any("section-variety cap violated" in i
+               for i in verify_match(supply, slots, cat, tampered))
+
+
+# ---------------------------------------------------------------------------
 # A2 — stock disposition advisory
 # ---------------------------------------------------------------------------
 
