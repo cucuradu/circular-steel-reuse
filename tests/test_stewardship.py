@@ -37,6 +37,69 @@ def _beam_slot(span_mm, udl, slot_id="S0"):
 
 
 # ---------------------------------------------------------------------------
+# B2 — over-spec soft penalty (opt-in)
+# ---------------------------------------------------------------------------
+
+def test_w_overspec_breaks_an_exact_tie_toward_the_lighter_donor(cat):
+    # Two adequate donors of EQUAL length whose raw scores tie EXACTLY (a custom factor table with
+    # reuse_process = 0 removes the existing mild light-donor preference; cutting mode removes the
+    # off-cut term). With w_overspec = 0 the solver may pick either; with w_overspec > 0 the
+    # lighter donor must win — and the booked CO2 of the assignment must be unchanged by the knob
+    # (the penalty lives in the score only).
+    from steelreuse.core.carbon import CarbonFactor
+
+    flat = {"steel": CarbonFactor(a1a3=1.55, reuse_process=0.0)}
+    slot = _beam_slot(6000, 20.0)
+    supply = [SupplyItem(id="heavy", section="IPE550", grade="S275", length_mm=7000),
+              SupplyItem(id="light", section="IPE360", grade="S275", length_mm=7000)]
+
+    tie = match(supply, [slot], cat, factors=flat, allow_cutting=True)
+    assert tie.n_reused == 1   # one slot -> one winner, whichever of the tied pair it is
+
+    steered = match(supply, [slot], cat, factors=flat, allow_cutting=True, w_overspec=0.3)
+    assert steered.n_reused == 1
+    a = steered.assignments[0]
+    assert a.supply_id == "light"
+    # booked CO2 is NOT reduced by the penalty: identical to the no-knob booking for this donor
+    light_only = match([supply[1]], [slot], cat, factors=flat, allow_cutting=True)
+    assert a.co2_saved_kg == pytest.approx(light_only.assignments[0].co2_saved_kg, abs=0.01)
+    # ...but the score is (the penalty is real): strictly below the booked saving
+    assert a.score < a.co2_saved_kg
+    assert steered.weights["w_overspec"] == 0.3
+
+
+def test_w_overspec_flips_a_default_heavy_choice(cat):
+    # One-piece mode, default economics: a short heavy donor beats a long light donor on raw score
+    # (the light one drags a big off-cut penalty). The over-spec knob must flip the choice to the
+    # lighter section — the "Frankenstein receiver" fix — and verify_match must stay clean because
+    # w_overspec travels on weights.
+    from steelreuse.match.optimize import verify_match
+
+    slot = _beam_slot(4000, 8.0)
+    supply = [SupplyItem(id="heavy", section="IPE500", grade="S355", length_mm=4100),
+              SupplyItem(id="light", section="IPE240", grade="S355", length_mm=8000)]
+
+    default = match(supply, [slot], cat)
+    assert default.assignments[0].supply_id == "heavy"   # off-cut penalty buries the light donor
+
+    steered = match(supply, [slot], cat, w_overspec=0.3)
+    assert steered.n_reused == 1
+    assert steered.assignments[0].supply_id == "light"
+    assert verify_match(supply, [slot], cat, steered) == []
+
+
+def test_w_overspec_default_keeps_results_identical(cat):
+    # Explicit 0.0 must produce the exact same assignments and scores as not passing it at all.
+    slot = _beam_slot(6000, 20.0)
+    supply = [SupplyItem(id="a", section="IPE400", grade="S275", length_mm=7000),
+              SupplyItem(id="b", section="IPE360", grade="S275", length_mm=6500)]
+    base = match(supply, [slot], cat)
+    explicit = match(supply, [slot], cat, w_overspec=0.0)
+    assert [dataclasses.asdict(x) for x in base.assignments] == \
+        [dataclasses.asdict(x) for x in explicit.assignments]
+
+
+# ---------------------------------------------------------------------------
 # A2 — stock disposition advisory
 # ---------------------------------------------------------------------------
 

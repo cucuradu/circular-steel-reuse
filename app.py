@@ -81,6 +81,12 @@ def main() -> None:
                 help="Also solve the match under every goal (CO₂ / members / mass) and show what "
                      "each policy choice costs in the other currencies. The assignments shown "
                      "still follow the objective selected above.")
+            w_overspec = st.number_input(
+                "Over-spec penalty weight (0 = off)", 0.0, 2.0, 0.0, 0.1,
+                help="Stewardship knob: softly penalize a donor's excess mass-per-metre over the "
+                     "slot's avoided-new baseline, so the lightest adequate donor wins ties — the "
+                     "capacity analogue of the off-cut preference. Selection only; booked CO₂ "
+                     "unchanged.")
             counterfactual = st.selectbox(
                 "End-of-life counterfactual", ("none", "recycling", "rerolling"), index=0,
                 format_func=lambda v: {
@@ -129,6 +135,7 @@ def main() -> None:
             frame_analysis=frame_analysis,
             wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
             disposition=disposition, counterfactual=counterfactual,
+            w_overspec=w_overspec,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")

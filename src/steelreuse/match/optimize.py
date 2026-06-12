@@ -277,6 +277,7 @@ def _feasible_cell(
     allow_cutting: bool = False,
     connection_policy: ConnectionPolicy | None = None,
     counterfactual_credit: float = 0.0,
+    w_overspec: float = 0.0,
 ) -> _Cell | None:
     """Return an economics cell if the pair is feasible, else ``None``."""
     # Skip degenerate geometry (garbage rows) before any EN check that could divide by zero; such
@@ -335,6 +336,15 @@ def _feasible_cell(
         # off-cut is a *soft preference* that steers away from wasting long stock — not booked CO2.
         cell_offcut = offcut_mm
         score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg
+    # Over-spec soft penalty (B2, opt-in): the CAPACITY analogue of the off-cut preference. Charge
+    # the score (never the booked CO2) for the donor's excess mass-per-metre over the slot's
+    # avoided-new baseline — "don't waste the solid column on a slot a thin section could serve".
+    # Same kg-CO2 currency as the score (via saved_per_kg), like the off-cut term; applies in both
+    # length modes (capacity waste is orthogonal to length waste). Default 0 = off.
+    if w_overspec > 0 and baseline_mass_kg is not None and slot.required_length_mm > 0:
+        baseline_kgm = baseline_mass_kg / (slot.required_length_mm / 1000.0)
+        over_kgm = max(0.0, sec.mass_kgm - baseline_kgm)
+        score -= w_overspec * over_kgm * (used_len / 1000.0) * factor.saved_per_kg
     # Surface the LTB factor for the report: chi_LT used, and what it would be if unrestrained.
     bending = next((c for c in res.checks if c.name == "bending_y"), None)
     chi_lt = bending.detail.get("chi_LT") if bending else None
@@ -356,6 +366,7 @@ def _build_cells(
     allow_cutting: bool,
     connection_policy: ConnectionPolicy | None,
     counterfactual_credit: float = 0.0,
+    w_overspec: float = 0.0,
 ) -> list[_Cell]:
     """All feasible (supply, slot) cells with their economics — shared by :func:`match` (to solve)
     and :func:`verify_match` (to independently re-derive what the solver saw)."""
@@ -367,7 +378,8 @@ def _build_cells(
             cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
                                   connection_penalty_kg, baselines[j], allow_cutting,
                                   connection_policy,
-                                  counterfactual_credit=counterfactual_credit)
+                                  counterfactual_credit=counterfactual_credit,
+                                  w_overspec=w_overspec)
             if cell is not None:
                 cells.append(cell)
     return cells
@@ -386,6 +398,7 @@ def match(
     connection_policy: ConnectionPolicy | None = None,
     objective: str = "co2",
     counterfactual: str = "none",
+    w_overspec: float = 0.0,
 ) -> MatchResult:
     """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
 
@@ -412,6 +425,11 @@ def match(
     of what the steel would have saved the wider system anyway*. The mode AND the credit value
     travel on ``MatchResult.weights`` so :func:`verify_match` and :func:`stock_disposition`
     regenerate identical economics.
+
+    ``w_overspec`` (B2, default 0 = off) is the **capacity analogue of the off-cut preference**: a
+    soft score penalty of ``w_overspec x (donor_kg/m − baseline_kg/m)+ x used_length_m x
+    saved_per_kg`` steering the optimiser toward the lightest adequate donor. Booked CO2 is
+    unchanged (like the off-cut term, it is stewardship, not emissions).
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
@@ -425,11 +443,12 @@ def match(
                "allow_cutting": allow_cutting,
                "connection_screen": connection_policy is not None,
                "new_build_grade": new_build_grade, "objective": objective,
-               "counterfactual": counterfactual, "counterfactual_credit": cf_credit}
+               "counterfactual": counterfactual, "counterfactual_credit": cf_credit,
+               "w_overspec": w_overspec}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
                          new_build_grade, allow_cutting, connection_policy,
-                         counterfactual_credit=cf_credit)
+                         counterfactual_credit=cf_credit, w_overspec=w_overspec)
     _apply_objective(cells, objective)
 
     if not cells:
@@ -562,7 +581,8 @@ def _cells_from_weights(
                         weights.get("w_offcut", 0.3), weights.get("connection_penalty_kg", 5.0),
                         weights.get("new_build_grade", "S355"),
                         bool(weights.get("allow_cutting")), policy,
-                        counterfactual_credit=weights.get("counterfactual_credit", 0.0))
+                        counterfactual_credit=weights.get("counterfactual_credit", 0.0),
+                        w_overspec=weights.get("w_overspec", 0.0))
 
 
 # Minimum straight stock length for the direct re-rolling fate (A2): below this, handling and

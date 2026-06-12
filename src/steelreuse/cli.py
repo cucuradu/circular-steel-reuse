@@ -109,6 +109,11 @@ def main(argv: list[str] | None = None) -> int:
                          "'recycling' subtracts the EAF scrap credit, 'rerolling' the pilot-scale "
                          "direct re-rolling credit (research-grade), per kg of donor steel "
                          "consumed. Default 'none' books plain avoided-new (results unchanged)")
+    ap.add_argument("--w-overspec", type=float, default=0.0,
+                    help="over-spec stewardship penalty weight (default 0 = off): softly penalize "
+                         "a donor's excess mass-per-metre over the slot's avoided-new baseline so "
+                         "the lightest adequate donor wins ties — the capacity analogue of the "
+                         "off-cut preference; affects selection only, never the booked CO2")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -193,7 +198,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         wind_kpa=args.wind, seismic_cs=args.seismic, objective=args.objective,
         pareto=args.pareto,
         disposition=args.disposition or bool(args.disposition_csv),
-        counterfactual=args.counterfactual,
+        counterfactual=args.counterfactual, w_overspec=args.w_overspec,
     )
 
     ctx = build_report_context(res)
