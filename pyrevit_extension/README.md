@@ -3,7 +3,8 @@
 Adds a **SteelReuse** ribbon tab in Revit with an **Extract Steel** button that exports the active
 model's structural steel (framing + columns) to JSON for the matcher, plus a **Match** panel that
 writes the results back: **Apply Matches** (colours + schedulable reuse parameters),
-**Reuse Schedule** (native Revit passport schedule) and **Clear Matches** (undo).
+**Reuse Schedule** (native Revit passport schedule), **Trace Match** (jump from a matched element
+to its partner in the other model) and **Clear Matches** (undo).
 
 ## Install (one time)
 
@@ -67,6 +68,15 @@ schedule named **"SteelReuse Passport"**: Family and Type | Reuse Status | Reuse
 Reuse CO2 Saved (kg) | Reuse Note — filtered to elements that carry a reuse status, sorted by
 status, with a grand total on the CO₂ column. The model itself answers "how much did reuse save".
 
+## Use: Trace Match
+
+After Apply Matches (on either side): select a matched element and hit **SteelReuse tab →
+Trace Match** — it reads the element's **Reuse Paired With** parameter, finds the partner
+element(s) in the open documents (a donor's slot(s) in the new design, or the donor member(s)
+filling a demand element), **activates the paired model and selects + zooms** to them. Works in
+both directions; with nothing selected it asks you to pick. The paired model must be open in the
+same Revit session — otherwise the partner ids are printed so you can open it and re-run.
+
 ## Use: Clear Matches
 
 Undoes an Apply Matches run on the open model: **SteelReuse tab → Clear Matches**. It finds the
@@ -93,6 +103,9 @@ pyrevit_extension/                         <- register THIS as a custom extensio
          │  └─ bundle.yaml
          ├─ ReuseSchedule.pushbutton/
          │  ├─ script.py      # creates/opens the "SteelReuse Passport" schedule
+         │  └─ bundle.yaml
+         ├─ TraceMatch.pushbutton/
+         │  ├─ script.py      # jump from a matched element to its partner(s) in the other model
          │  └─ bundle.yaml
          └─ ClearMatches.pushbutton/
             ├─ script.py      # undoes Apply Matches (reset overrides, empty reuse parameters)

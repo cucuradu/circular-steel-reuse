@@ -1,0 +1,9 @@
+title: |-
+  Trace
+  Match
+tooltip: >-
+  Follow a reuse pairing across models: select a matched element (donor or demand side) and this
+  jumps to its partner(s) — a donor's slot(s) in the new design, or the donor member(s) that fill a
+  demand element. Reads the "Reuse Paired With" parameter written by Apply Matches; the paired model
+  must be open in this Revit session (it is activated, and the partner elements are selected and
+  zoomed to).

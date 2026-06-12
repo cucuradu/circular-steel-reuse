@@ -399,12 +399,13 @@ with an owner and a fix sketch.
   empties the parameters (bindings/schedule survive) and still handles legacy comments.
 - **Write-back follow-up (planned)**: apply overrides to a dedicated duplicated view
   ("SteelReuse — Matches") instead of the active view.
-- ★ **"Trace Match" button (donor ↔ receiver follow-link)** — user idea 2026-06-11: select an
-  element, read its "Reuse Paired With" parameter, and if the paired model is open in the same Revit
-  session, activate that document and select/zoom the matched element(s) (works both directions:
-  donor → where it is used; receiver → where its donors come from). When the paired document isn't
-  open, fall back to printing the element ids as text + a prompt to open it. Needs the writeback
-  JSON (or the shared parameter) to carry the *element id*, not just the human-readable label.
+- ✅ **"Trace Match" button (donor ↔ receiver follow-link)** — user idea 2026-06-11, DONE: select a
+  matched element → its partners are parsed from the "Reuse Paired With" parameter (donor side
+  stores slot ids `<demand element id>#k`, demand side stores donor element ids, so no schema
+  change was needed), the open documents are searched for them (preferring one whose elements
+  reference the source back), and the paired model is **activated with the partner element(s)
+  selected + zoomed**. Works both directions; with the paired model not open, the ids are printed
+  with a prompt to open it.
 - **2-D match card per assignment** (report and/or a "Show Match" popup in Revit): side-by-side
   donor vs receiver elevation drawn from data we already have (lengths, section depth/width, cut
   position for cutting-stock, connection-screen note) — lets an engineer eyeball the fit without

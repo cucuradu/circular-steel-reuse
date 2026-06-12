@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Trace Match button** (`pyrevit_extension/.../Match.panel/TraceMatch.pushbutton`): select a
+  matched element on either side and jump to its partner(s) — a donor's slot(s) in the new design,
+  or the donor member(s) filling a demand element. Partner ids are parsed from the "Reuse Paired
+  With" parameter Apply Matches wrote, the open documents are searched for them (preferring one
+  whose elements reference the source back), and the paired model is activated with the partner
+  element(s) selected and zoomed to. Both models must be open in the same Revit session.
+
 ### Fixed
 - **Analytic path: span joints are now verified against column geometry** (`pipeline._verified_spans`).
   The extractor splits a demand beam at *every* crossing member endpoint (the frame solver needs those
