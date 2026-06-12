@@ -104,6 +104,13 @@ def build_report_context(res: PipelineResult) -> dict:
         "max_distinct_sections": (m.weights or {}).get("max_distinct_sections"),
         "disclaimer": SCOPE_DISCLAIMER,
     }
+    # Portfolio (C1): per-project breakdown of the combined allocation across demand models.
+    if res.projects:
+        ctx["projects"] = [
+            {"tag": p["tag"], "slot_count": p["slot_count"], "n_reused": p["n_reused"],
+             "co2_saved_kg": p["co2_saved_kg"], "n_unmatched": p["n_unmatched"]}
+            for p in res.projects
+        ]
     # Objective trade-off rows (only when run_pipeline(pareto=True) re-solved every goal).
     if res.pareto:
         ctx["pareto"] = [
@@ -258,6 +265,16 @@ _TEMPLATE = """<!doctype html>
  <div class="kpi"><b>{{ ctx.donor_saved_co2_kg }}</b>kg CO2e in full donor stock</div>
  <div class="kpi"><b>{{ ctx.unmatched_slots|length }}</b>slots need new steel</div>
 </div>
+{% if ctx.projects %}<h2>Portfolio — projects sharing one donor stock</h2>
+<p class="note">One optimization allocated the donor stock across all the projects below at once —
+a donor goes wherever it saves the most, so "save the heavy sections for the project that needs
+them" is an optimization outcome, not a hunch. Slot ids are prefixed with the project tag.</p>
+<table><tr><th>Project</th><th>Slots</th><th>Reused</th><th>CO2e saved (kg)</th>
+<th>Slots needing new steel</th></tr>
+{% for p in ctx.projects %}<tr>
+ <td>{{ p.tag }}</td><td>{{ p.slot_count }}</td><td>{{ p.n_reused }}</td>
+ <td>{{ p.co2_saved_kg }}</td><td>{{ p.n_unmatched }}</td></tr>{% endfor %}
+</table>{% endif %}
 <h2>Assignments</h2>
 <table><tr><th>Demand slot</th><th>Reclaimed member</th><th>Section</th><th>Utilization</th>
 <th>Gov. load case</th><th>Status</th><th>&chi;<sub>LT</sub></th><th>Connection</th>

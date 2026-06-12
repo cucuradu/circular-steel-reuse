@@ -7,6 +7,7 @@ the (optional) LLM narrative is added downstream from these results.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 
 from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
 from .core.carbon import Passport, build_passport
@@ -317,11 +318,29 @@ class PipelineResult:
     # fates (store for an unfilled slot / re-roll / recycle) with credit figures — see
     # :func:`steelreuse.match.optimize.stock_disposition`. Advisory only: never changes the match.
     disposition: list[dict] | None = None
+    # Portfolio matching (C1): per-project breakdown when SEVERAL demand models shared one donor
+    # stock — {tag, path, slot_count, n_reused, co2_saved_kg, n_unmatched, frame_ok}. None for the
+    # ordinary single-demand run (whose behavior is unchanged). Slot ids are then namespaced
+    # "tag::slotid"; `demand` holds the FIRST model only (write-back is single-demand only).
+    projects: list[dict] | None = None
+
+
+def _project_tags(paths: list[str]) -> list[str]:
+    """Short, unique tag per demand model for namespacing slot ids: the file stem, deduplicated
+    with a numeric suffix when two models share a name (a.json + b/a.json -> a, a-2)."""
+    tags: list[str] = []
+    seen: dict[str, int] = {}
+    for p in paths:
+        stem = Path(p).stem or "demand"
+        n = seen.get(stem, 0) + 1
+        seen[stem] = n
+        tags.append(stem if n == 1 else f"{stem}-{n}")
+    return tags
 
 
 def run_pipeline(
     donor_path: str,
-    demand_path: str,
+    demand_path: str | list[str],
     loads: LoadModel | AreaLoadModel | None = None,
     knockdown: float = 1.0,
     include_unverified: bool = False,
@@ -361,7 +380,15 @@ def run_pipeline(
                 "AreaLoadModel (or drop --beam-udl/--column-axial on the CLI)"
             )
     donor = ExtractedModel.load(donor_path)
-    demand = ExtractedModel.load(demand_path)
+
+    # Portfolio matching (C1): --demand may carry SEVERAL demand models. Each is loaded, analyzed
+    # (frame solve per model) and slotted independently; slot ids are namespaced "tag::slotid" to
+    # avoid collisions and ONE match then allocates the donor stock across all projects at once.
+    # A single path (the overwhelmingly common case) takes exactly the historical code path:
+    # un-namespaced slot ids, PipelineResult.projects = None.
+    demand_paths = [demand_path] if isinstance(demand_path, (str, Path)) \
+        else [str(p) for p in demand_path]
+    portfolio = len(demand_paths) > 1
 
     # Merge an external pre-demolition-audit CSV onto the donor members (condition / verification),
     # if one is supplied — the audit may live alongside the BIM export rather than in it.
@@ -369,37 +396,57 @@ def run_pipeline(
         apply_audit(donor.members, load_audit_csv(pda_csv))
 
     supply, report, audit = build_supply(donor, catalog, knockdown, include_unverified)
-    # Map the new-design sections too, so each slot carries its design grade/section for the
-    # avoided-new CO2 baseline (A1/A6). Matching itself stays force-based, not section-based.
-    resolve_members(demand.members, catalog)
-    _fill_default_grades(demand.members)
 
-    # Optionally refine per-member loads from the model geometry: beam tributary widths, and column
-    # tributary areas + floor counts (each falls back to the configured default where the geometry is
-    # insufficient — an isolated beam/column, too little grid to size a bay, etc.).
-    if tributary_from_geometry and isinstance(loads, AreaLoadModel):
-        loads.tributary_overrides = estimate_tributary_widths(
-            demand.members, default_m=loads.beam_tributary_width_m
-        )
-        loads.column_area_overrides, loads.column_floor_overrides = estimate_column_loads(
-            demand.members, default_area_m2=loads.column_tributary_area_m2
-        )
-
-    # Optionally derive member forces from a global frame analysis instead of per-member closed forms.
-    # Beam tributary widths (above) still set the floor load; column axials then come from the solved
-    # load path. Falls back per member to the analytic path wherever the frame can't be built/solved.
     frame_result: FrameResult | None = None
-    frame_slots = None
-    if frame_analysis:
-        # Route the sway imperfection (--phi) to the frame-level EHF treatment (not the member-level
-        # notional moment); P-Delta is auto-enabled there whenever phi > 0.
-        opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
-                            wind_kpa=wind_kpa, seismic_cs=seismic_cs)
-        frame_result = analyze_frame(demand.members, loads, catalog, options=opts)
-        frame_slots = frame_result.slots_by_member if frame_result.ok else None
+    slots: list[DemandSlot] = []
+    demand_models: list[ExtractedModel] = []
+    project_rows: list[dict] | None = [] if portfolio else None
+    tags = _project_tags(demand_paths) if portfolio else [None]
+    for path, tag in zip(demand_paths, tags, strict=True):
+        demand = ExtractedModel.load(path)
+        # Map the new-design sections too, so each slot carries its design grade/section for the
+        # avoided-new CO2 baseline (A1/A6). Matching itself stays force-based, not section-based.
+        resolve_members(demand.members, catalog)
+        _fill_default_grades(demand.members)
 
-    slots = build_slots(demand, loads, steel_only=steel_only_demand,
-                        frame_slots=frame_slots)
+        # Optionally refine per-member loads from the model geometry: beam tributary widths, and
+        # column tributary areas + floor counts (each falls back to the configured default where the
+        # geometry is insufficient); per demand model, since the overrides are member-keyed.
+        if tributary_from_geometry and isinstance(loads, AreaLoadModel):
+            loads.tributary_overrides = estimate_tributary_widths(
+                demand.members, default_m=loads.beam_tributary_width_m
+            )
+            loads.column_area_overrides, loads.column_floor_overrides = estimate_column_loads(
+                demand.members, default_area_m2=loads.column_tributary_area_m2
+            )
+
+        # Optionally derive member forces from a global frame analysis instead of per-member closed
+        # forms — run per demand model (each project is its own structure). Falls back per member to
+        # the analytic path wherever the frame can't be built/solved.
+        fr: FrameResult | None = None
+        frame_slots = None
+        if frame_analysis:
+            # Route the sway imperfection (--phi) to the frame-level EHF treatment (not the
+            # member-level notional moment); P-Delta is auto-enabled there whenever phi > 0.
+            opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
+                                wind_kpa=wind_kpa, seismic_cs=seismic_cs)
+            fr = analyze_frame(demand.members, loads, catalog, options=opts)
+            frame_slots = fr.slots_by_member if fr.ok else None
+
+        model_slots = build_slots(demand, loads, steel_only=steel_only_demand,
+                                  frame_slots=frame_slots)
+        if tag is not None:
+            for s in model_slots:
+                s.id = f"{tag}::{s.id}"
+        slots.extend(model_slots)
+        demand_models.append(demand)
+        if portfolio:
+            project_rows.append({"tag": tag, "path": str(path),
+                                 "slot_count": len(model_slots), "_frame": fr})
+        else:
+            frame_result = fr
+    demand = demand_models[0]
+
     passport = build_passport(donor.members, catalog)
     policy = ConnectionPolicy() if connection_screen else None
     result = match(supply, slots, catalog, allow_cutting=allow_cutting,
@@ -444,9 +491,20 @@ def run_pipeline(
     if disposition:
         disposition_rows = stock_disposition(supply, slots, catalog, result)
 
+    # Portfolio: per-project outcome of the combined allocation (slot ids carry "tag::" prefixes).
+    if project_rows is not None:
+        for row in project_rows:
+            prefix = row["tag"] + "::"
+            row["n_reused"] = sum(1 for a in result.assignments if a.slot_id.startswith(prefix))
+            row["co2_saved_kg"] = round(
+                sum(a.co2_saved_kg for a in result.assignments if a.slot_id.startswith(prefix)), 1)
+            row["n_unmatched"] = sum(1 for sid in result.unmatched_slots if sid.startswith(prefix))
+            fr = row.pop("_frame")
+            row["frame_ok"] = fr.ok if fr is not None else None
+
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
         donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
-        disposition=disposition_rows,
+        disposition=disposition_rows, projects=project_rows,
     )

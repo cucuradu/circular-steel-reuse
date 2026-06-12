@@ -37,6 +37,95 @@ def _beam_slot(span_mm, udl, slot_id="S0"):
 
 
 # ---------------------------------------------------------------------------
+# C1 — portfolio matching (multiple demand models, one donor stock)
+# ---------------------------------------------------------------------------
+
+def _save_model(tmp_path, name, members, kind="demand"):
+    from steelreuse.schema import ExtractedMember, ExtractedModel
+    model = ExtractedModel(kind=kind, members=[ExtractedMember(**m) for m in members])
+    p = tmp_path / name
+    model.save(p)
+    return str(p)
+
+
+def test_portfolio_donor_goes_to_the_project_where_it_saves_more(tmp_path):
+    # Two single-slot projects compete for ONE good donor (no cutting: 7 m donor, both slots need
+    # most of it). Project B's span is longer -> bigger avoided-new baseline -> more CO2 saved
+    # there, so the combined optimization must allocate the donor to B and leave A unfilled.
+    donor = _save_model(tmp_path, "donor.json", [
+        {"id": "D1", "role": "beam", "raw_section": "IPE360",
+         "material_grade": "S275", "length_mm": 7000},
+    ], kind="donor")
+    proj_a = _save_model(tmp_path, "proj_a.json", [
+        {"id": "A1", "role": "beam", "raw_section": "IPE300",
+         "material_grade": "S275", "spans_mm": [4000]},
+    ])
+    proj_b = _save_model(tmp_path, "proj_b.json", [
+        {"id": "B1", "role": "beam", "raw_section": "IPE360",
+         "material_grade": "S275", "spans_mm": [6000]},
+    ])
+
+    res = run_pipeline(donor, [proj_a, proj_b], allow_cutting=False)
+    assert res.slot_count == 2
+    assert res.match.n_reused == 1
+    a = res.match.assignments[0]
+    assert a.slot_id == "proj_b::B1#0"          # the donor went where it saves more
+    assert "proj_a::A1#0" in res.match.unmatched_slots
+
+    # per-project breakdown
+    assert res.projects is not None and [p["tag"] for p in res.projects] == ["proj_a", "proj_b"]
+    by_tag = {p["tag"]: p for p in res.projects}
+    assert by_tag["proj_a"]["n_reused"] == 0 and by_tag["proj_a"]["n_unmatched"] == 1
+    assert by_tag["proj_b"]["n_reused"] == 1 and by_tag["proj_b"]["n_unmatched"] == 0
+    assert by_tag["proj_b"]["co2_saved_kg"] == pytest.approx(a.co2_saved_kg, abs=0.1)
+
+    # sanity: alone, project A would happily take the donor — only the portfolio view says no
+    solo = run_pipeline(donor, proj_a, allow_cutting=False)
+    assert solo.match.n_reused == 1
+
+
+def test_portfolio_single_demand_path_is_unchanged(tmp_path):
+    # A single path (str) and a one-element list must both behave exactly like the historical
+    # single-demand run: no namespacing, projects None.
+    donor = str(DATA / "samples" / "donor.json")
+    demand = str(DATA / "samples" / "demand.json")
+    res_str = run_pipeline(donor, demand)
+    res_list = run_pipeline(donor, [demand])
+    assert res_str.projects is None and res_list.projects is None
+    assert all("::" not in s.id for s in res_str.slots)
+    assert [dataclasses.asdict(a) for a in res_str.match.assignments] == \
+        [dataclasses.asdict(a) for a in res_list.match.assignments]
+
+
+def test_portfolio_duplicate_stems_get_unique_tags(tmp_path):
+    # Two demand models with the same file name must not collide in the namespace.
+    donor = _save_model(tmp_path, "donor.json", [
+        {"id": "D1", "role": "beam", "raw_section": "IPE360",
+         "material_grade": "S275", "length_mm": 7000},
+    ], kind="donor")
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    m1 = _save_model(tmp_path, "site.json", [
+        {"id": "X1", "role": "beam", "raw_section": "IPE300",
+         "material_grade": "S275", "spans_mm": [4000]},
+    ])
+    m2 = _save_model(sub, "site.json", [
+        {"id": "X1", "role": "beam", "raw_section": "IPE300",
+         "material_grade": "S275", "spans_mm": [5000]},
+    ])
+    res = run_pipeline(donor, [m1, m2])
+    tags = [p["tag"] for p in res.projects]
+    assert tags == ["site", "site-2"]
+    assert {s.id for s in res.slots} == {"site::X1#0", "site-2::X1#0"}
+
+    # the report context carries the per-project rows
+    from steelreuse.llm.report import build_report_context, render_html
+    ctx = build_report_context(res)
+    assert [p["tag"] for p in ctx["projects"]] == ["site", "site-2"]
+    assert "Portfolio" in render_html(ctx, "n")
+
+
+# ---------------------------------------------------------------------------
 # B1 — utilization floor (opt-in)
 # ---------------------------------------------------------------------------
 

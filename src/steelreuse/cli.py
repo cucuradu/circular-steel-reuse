@@ -47,7 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--debug", action="store_true",
                     help="show the full Python traceback on error (default: a short message)")
     ap.add_argument("--donor", help="donor (supply) extraction JSON")
-    ap.add_argument("--demand", help="new-design (demand) extraction JSON")
+    ap.add_argument("--demand", nargs="+", metavar="JSON",
+                    help="new-design (demand) extraction JSON; pass SEVERAL paths for portfolio "
+                         "matching (one optimization allocates the donor stock across all the "
+                         "projects at once, with a per-project breakdown)")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
     ap.add_argument("--apply-matches-out",
                     help="write a per-element status JSON (donor: reused/available/quarantined/"
@@ -160,12 +163,15 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     # Resolve the input models: --demo uses the bundled samples, otherwise both paths are required.
+    # A single demand path is passed as a plain string (the historical case); several paths flow
+    # through as a list and switch run_pipeline into portfolio mode.
     if args.demo:
         donor, demand = str(sample_path("donor.json")), str(sample_path("demand.json"))
         if args.out == "reports/report.html":
             args.out = "reports/demo_report.html"
     elif args.donor and args.demand:
-        donor, demand = args.donor, args.demand
+        donor = args.donor
+        demand = args.demand[0] if len(args.demand) == 1 else args.demand
     else:
         ap.error("provide --donor and --demand (or use --demo to run the bundled sample models)")
 
@@ -182,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
-def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
+def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> int:
     load_dotenv()  # pick up GEMINI_API_KEY etc. from a .env in the working directory
 
     if args.beam_udl is not None or args.column_axial is not None:
@@ -220,10 +226,17 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
 
+    # Write-back maps per-element statuses onto ONE demand model; emitting a file that silently
+    # covers only the first project of a portfolio would be misleading — refuse instead.
+    wb_path = None
     if args.apply_matches_out:
-        wb_path = Path(args.apply_matches_out)
-        wb_path.parent.mkdir(parents=True, exist_ok=True)
-        wb_path.write_text(json.dumps(build_writeback(res), indent=2), encoding="utf-8")
+        if res.projects:
+            print("Note: --apply-matches-out supports a single demand model only; "
+                  "skipped for this portfolio run (no file written)")
+        else:
+            wb_path = Path(args.apply_matches_out)
+            wb_path.parent.mkdir(parents=True, exist_ok=True)
+            wb_path.write_text(json.dumps(build_writeback(res), indent=2), encoding="utf-8")
 
     if isinstance(loads, AreaLoadModel):
         trib = "geometry-estimated" if args.trib_from_geometry else f"{args.trib_width:g} m"
@@ -261,6 +274,14 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     cap = res.match.weights.get("max_distinct_sections")
     print(f"Distinct donor sections used: {n_distinct}"
           + (f" (cap {cap})" if cap is not None else ""))
+    if res.projects:
+        print(f"Portfolio: one donor stock allocated across {len(res.projects)} demand models")
+        for p in res.projects:
+            frame_note = ""
+            if p["frame_ok"] is not None:
+                frame_note = " | frame solved" if p["frame_ok"] else " | frame fell back to analytic"
+            print(f"  {p['tag']}: {p['slot_count']} slots | reused {p['n_reused']} | "
+                  f"{p['co2_saved_kg']:.1f} kg CO2e | unfilled {p['n_unmatched']}{frame_note}")
     goal = {"co2": "net-CO2", "members": "members-reused",
             "mass": "reclaimed-mass"}[args.objective]
     if res.match.proven_optimal:
@@ -321,7 +342,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
     print(f"Narrative source: {source}")
     print(f"Report written -> {out}")
-    if args.apply_matches_out:
+    if wb_path is not None:
         print(f"Apply-matches data written -> {wb_path}")
     return 0
 
