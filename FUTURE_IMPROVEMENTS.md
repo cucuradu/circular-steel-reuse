@@ -427,7 +427,10 @@ with an owner and a fix sketch.
   approve/reject buttons → writes the override CSV. Closes the only human loop that today lives in
   a bare CSV.
 - **3-D model viewer** (plotly line segments from the coordinates we already carry) coloured
-  reused / new / unknown — instant comprehension of the result.
+  reused / new / unknown. *Downgraded 2026-06-12 (user call):* the Revit write-back already colours
+  the real model for anyone with Revit, which is strictly better; a viewer only earns its keep for
+  the no-Revit audiences — the public web demo / thesis defence — so build it only if/when the
+  Streamlit demo goes public.
 - **Per-assignment calc sheet**: expandable full trace — every combination, every check, the
   numbers and the clause references. What a reviewing engineer actually wants to see.
 - **Scenario compare**: run ±cutting / ±construction / ±connection-screen side by side in the app
@@ -436,6 +439,15 @@ with an owner and a fix sketch.
   (what was checked, what was not, what to verify manually before fabrication).
 
 ### I-8. Software quality & distribution
+- ✅ **Match optimality surfaced + independent verification — DONE (2026-06-12, user question
+  "is the matcher actually matching the best options?").** A proven-`Optimal` CBC solve is a solver
+  certificate of the best assignment for the net-CO₂ objective; the result now *says so*
+  (`MatchResult.proven_optimal`, CLI "Matching:" line, report footer) and plainly flags the greedy
+  fallback as unproven. New `verify_match` (CLI `--verify-match`) independently re-derives every
+  feasible cell and checks constraints, per-assignment feasibility, and that **no improving single
+  move** exists. On the real case study: proven optimal, audit clean. (In dev the audit immediately
+  caught a re-check run against the EU-only catalog instead of the merged one — the exact drift
+  class it exists for.) *Residual:* "best" is single-objective; see multi-objective (I-4).
 - ★ **Property-based tests** (`hypothesis`): encode invariants — a strictly bigger section never
   *increases* utilisation; knockdown scales f_y linearly; `χ ≤ 1`; the governing combination's
   utilisation ≥ every individual combination's. Catches bug classes example-based tests cannot.
@@ -524,9 +536,10 @@ Picked from a "make this real software / a complete thesis project" brainstorm. 
 - ★ **REST API (FastAPI)** wrapping `run_pipeline`. Lets pyRevit, a future PDA mobile app, or a
   marketplace tool call the matcher without a Python install; also the natural seam for a future
   Revit "Apply Matches" write-back.
-- ★ **Interactive 3-D model viewer** (plotly line segments from the coordinates already extracted):
-  donor + demand side by side, colored reused/new/unknown/quarantined. Highest-impact visual for a
-  thesis defense; nothing like it exists yet.
+- **Interactive 3-D model viewer** (plotly line segments from the coordinates already extracted):
+  donor + demand side by side, colored reused/new/unknown/quarantined. *De-starred 2026-06-12 (user
+  call): superseded for Revit users by the write-back colouring; only worth building together with
+  the public web demo above (the no-Revit audience).*
 - **Per-member calc-sheet drill-down** in the app: click a matched pair → full EC3 check trace with
   clause references. Turns the report from "trust me" into "verify me."
 - **Madaster / EPD-format passport export.** The carbon passport already exists; map it to an actual

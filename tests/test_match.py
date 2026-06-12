@@ -317,6 +317,65 @@ def test_cutting_stock_greedy_packs_by_length():
     assert len(chosen) == 2     # only two 4050-mm pieces fit a 9000-mm donor
 
 
+def test_milp_finds_the_global_optimum_where_greedy_cannot():
+    # The classic crossing case: donor 0 fits both slots, donor 1 only slot 0. Taking the single
+    # best pair first (greedy: 0->0, score 10) strands slot 1; the global optimum crosses them
+    # (1->0 + 0->1 = 17). The production path ships the MILP solution and only falls back to greedy
+    # when optimality could NOT be proven — so "reused" really is the best attainable selection.
+    from steelreuse.match.optimize import _Cell, _solve_greedy, _solve_milp
+
+    cells = [
+        _Cell(si=0, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=10, score=10.0),
+        _Cell(si=0, sj=1, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=9, score=9.0),
+        _Cell(si=1, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=8, score=8.0),
+    ]
+    greedy = _solve_greedy(cells, n_supply=2, n_slots=2)
+    assert sum(c.score for c in greedy) == pytest.approx(10.0)   # local choice strands slot 1
+    chosen, status = _solve_milp(cells, n_supply=2, n_slots=2, time_limit_s=30)
+    assert status == "Optimal"
+    assert {(c.si, c.sj) for c in chosen} == {(0, 1), (1, 0)}
+    assert sum(c.score for c in chosen) == pytest.approx(17.0)   # proven global optimum
+
+
+def test_verify_match_certifies_the_result_and_catches_corruption(cat):
+    # The independent audit re-derives every feasible pair and must (a) pass a genuine MILP result
+    # and (b) flag a tampered one — both a missed improving move and a violated use constraint.
+    from steelreuse.match.optimize import verify_match
+
+    supply = [SupplyItem(id="d1", section="IPE360", grade="S275", length_mm=7000),
+              SupplyItem(id="d2", section="IPE300", grade="S275", length_mm=7000)]
+    slots = [_beam_slot(6000, 20.0, "s1"), _beam_slot(6000, 15.0, "s2")]
+    res = match(supply, slots, cat)
+    assert res.proven_optimal
+    assert len(res.assignments) == 2
+    assert verify_match(supply, slots, cat, res) == []
+
+    # dropping an assignment frees a (donor, slot) pair the audit must rediscover
+    broken = dataclasses.replace(res, assignments=res.assignments[1:])
+    assert any("improving" in i for i in verify_match(supply, slots, cat, broken))
+
+    # doubling one donor onto both slots violates one-piece-per-donor
+    a0, a1 = res.assignments
+    doubled = dataclasses.replace(
+        res, assignments=[a0, dataclasses.replace(a1, supply_id=a0.supply_id)])
+    assert any("used 2 times" in i for i in verify_match(supply, slots, cat, doubled))
+
+
+def test_pipeline_result_carries_supply_and_verifies_end_to_end():
+    # run_pipeline now exposes the admitted supply so the CLI --verify-match audit (and anyone
+    # downstream) can re-check the shipped assignment without re-running the pipeline. The audit
+    # must use the SAME catalog the run used (the merged default one) — re-checking against the
+    # EU-only catalog flags pairs whose donor section only exists in the merged catalog, which is
+    # exactly the input-drift class of defect verify_match exists to catch.
+    from steelreuse.core.sections import load_default_catalog
+    from steelreuse.match.optimize import verify_match
+
+    res = run_pipeline(str(DATA / "samples" / "donor.json"), str(DATA / "samples" / "demand.json"))
+    assert res.supply and len(res.supply) == res.supply_count
+    assert res.match.proven_optimal
+    assert verify_match(res.supply, res.slots, load_default_catalog(), res.match) == []
+
+
 def test_wind_uplift_governs_and_can_reject_a_slender_roof_beam(cat):
     # Load-reversal end to end: a light roof (g_k = 0.5 kPa) under strong net suction (8 kPa).
     # Net upward w = (1.5*8 - 0.5)*3 = 34.5 N/mm -> M = 155.25 kNm with the BOTTOM flange in

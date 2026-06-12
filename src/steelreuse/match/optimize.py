@@ -106,6 +106,13 @@ class MatchResult:
     def n_reused(self) -> int:
         return len(self.assignments)
 
+    @property
+    def proven_optimal(self) -> bool:
+        """True when the MILP solver *proved* this assignment optimal for the stated objective
+        (max total net CO2 score under the use constraints). False means the greedy heuristic
+        produced it (solver timeout/failure) — feasible and verified, but not guaranteed best."""
+        return self.solver_status == "Optimal"
+
 
 @dataclass
 class _Cell:
@@ -287,6 +294,32 @@ def _feasible_cell(
                  connection_status=conn.status, connection_note=conn.note)
 
 
+def _build_cells(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    factor: CarbonFactor,
+    w_offcut: float,
+    connection_penalty_kg: float,
+    new_build_grade: str,
+    allow_cutting: bool,
+    connection_policy: ConnectionPolicy | None,
+) -> list[_Cell]:
+    """All feasible (supply, slot) cells with their economics — shared by :func:`match` (to solve)
+    and :func:`verify_match` (to independently re-derive what the solver saw)."""
+    # Avoided-new baseline per slot (lightest adequate section), computed once — see A1.
+    baselines = [baseline_new_mass_kg(slot, catalog, new_build_grade) for slot in slots]
+    cells: list[_Cell] = []
+    for i, sup in enumerate(supply):
+        for j, slot in enumerate(slots):
+            cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
+                                  connection_penalty_kg, baselines[j], allow_cutting,
+                                  connection_policy)
+            if cell is not None:
+                cells.append(cell)
+    return cells
+
+
 def match(
     supply: list[SupplyItem],
     slots: list[DemandSlot],
@@ -315,19 +348,11 @@ def match(
     factor = (factors or load_factors())["steel"]
     weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg,
                "allow_cutting": allow_cutting,
-               "connection_screen": connection_policy is not None}
+               "connection_screen": connection_policy is not None,
+               "new_build_grade": new_build_grade}
 
-    # Avoided-new baseline per slot (lightest adequate section), computed once — see A1.
-    baselines = [baseline_new_mass_kg(slot, catalog, new_build_grade) for slot in slots]
-
-    cells: list[_Cell] = []
-    for i, sup in enumerate(supply):
-        for j, slot in enumerate(slots):
-            cell = _feasible_cell(sup, slot, i, j, catalog, factor, w_offcut,
-                                  connection_penalty_kg, baselines[j], allow_cutting,
-                                  connection_policy)
-            if cell is not None:
-                cells.append(cell)
+    cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
+                         new_build_grade, allow_cutting, connection_policy)
 
     if not cells:
         return MatchResult([], [s.id for s in slots], [s.id for s in supply], "no_feasible_pairs",
@@ -437,3 +462,95 @@ def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> 
         used_j.add(c.sj)
         used_s.add(c.si)
     return chosen
+
+
+def verify_match(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    result: MatchResult,
+    factors: dict[str, CarbonFactor] | None = None,
+) -> list[str]:
+    """Independent post-solve audit of a :class:`MatchResult`; returns problems (empty = verified).
+
+    Re-derives the same feasibility/economics cells the solver saw (same EN checks, same carbon
+    arithmetic — the economic parameters travel on ``result.weights``) and checks:
+
+    1. **Constraints** — every assignment refers to a known donor and slot; no slot is filled twice;
+       a donor is used once (default) or within its length cap (cutting-stock).
+    2. **Feasibility** — every assignment re-validates as a feasible pair with the same score.
+    3. **No improving single move** (a *necessary* condition for optimality): no donor with capacity
+       left could fill an unfilled slot at a positive score, and no such donor offers a strictly
+       higher score on a filled slot than the donor chosen for it. A proven-optimal MILP result can
+       never violate this, and the greedy fallback satisfies it by construction — so any violation
+       indicates a real defect (stale result, mutated inputs, solver/economics drift).
+
+    This is a certificate *check*, not a proof of global optimality by itself — global optimality is
+    the MILP solver's job (``MatchResult.proven_optimal``); this guards the chain around it.
+    """
+    factor = (factors or load_factors())["steel"]
+    w = result.weights or {}
+    allow_cutting = bool(w.get("allow_cutting"))
+    policy = ConnectionPolicy() if w.get("connection_screen") else None
+    cells = _build_cells(supply, slots, catalog, factor,
+                         w.get("w_offcut", 0.3), w.get("connection_penalty_kg", 5.0),
+                         w.get("new_build_grade", "S355"), allow_cutting, policy)
+    by_pair = {(supply[c.si].id, slots[c.sj].id): c for c in cells}
+    sup_by_id = {s.id: s for s in supply}
+    slot_ids = {s.id for s in slots}
+    issues: list[str] = []
+
+    # 1+2: constraints and per-assignment feasibility (against the regenerated cells).
+    chosen_by_slot: dict[str, _Cell] = {}
+    uses_per_donor: dict[str, int] = {}
+    consumed_mm: dict[str, float] = {}
+    for a in result.assignments:
+        pair = f"{a.supply_id} -> {a.slot_id}"
+        if a.supply_id not in sup_by_id:
+            issues.append(f"{pair}: unknown donor id")
+            continue
+        if a.slot_id not in slot_ids:
+            issues.append(f"{pair}: unknown slot id")
+            continue
+        if a.slot_id in chosen_by_slot:
+            issues.append(f"slot {a.slot_id} is filled more than once")
+        c = by_pair.get((a.supply_id, a.slot_id))
+        if c is None:
+            issues.append(f"{pair}: not a feasible pair on independent re-check")
+            continue
+        if abs(c.score - a.score) > 0.06:   # stored scores are rounded to 2 dp
+            issues.append(f"{pair}: score drift (stored {a.score}, recomputed {c.score:.2f})")
+        chosen_by_slot[a.slot_id] = c
+        uses_per_donor[a.supply_id] = uses_per_donor.get(a.supply_id, 0) + 1
+        consumed_mm[a.supply_id] = (consumed_mm.get(a.supply_id, 0.0)
+                                    + c.used_len_mm + CUT_TOLERANCE_MM)
+    if allow_cutting:
+        for sid, used in consumed_mm.items():
+            if used > sup_by_id[sid].length_mm + 1e-6:
+                issues.append(f"donor {sid}: cut pieces exceed its length "
+                              f"({used:.0f} > {sup_by_id[sid].length_mm:.0f} mm)")
+    else:
+        for sid, n in uses_per_donor.items():
+            if n > 1:
+                issues.append(f"donor {sid} is used {n} times (one piece per donor)")
+
+    # 3: no improving single move among donors that still have capacity.
+    used_ids = set(uses_per_donor)
+    assigned_slots = {a.slot_id for a in result.assignments}
+    remaining = {s.id: s.length_mm - consumed_mm.get(s.id, 0.0) for s in supply}
+    for c in cells:
+        sid, jid = supply[c.si].id, slots[c.sj].id
+        donor_free = (remaining[sid] >= c.used_len_mm + CUT_TOLERANCE_MM) if allow_cutting \
+            else (sid not in used_ids)
+        if not donor_free:
+            continue
+        if jid not in assigned_slots:
+            if c.score > 1e-9:
+                issues.append(f"improving move missed: free donor {sid} could fill unfilled "
+                              f"slot {jid} (score {c.score:.2f} > 0)")
+        else:
+            cur = chosen_by_slot.get(jid)   # None = the slot's own cell failed re-check (reported)
+            if cur is not None and c.score > cur.score + 1e-9:
+                issues.append(f"improving replacement missed: free donor {sid} scores "
+                              f"{c.score:.2f} on slot {jid}, above the chosen {cur.score:.2f}")
+    return issues

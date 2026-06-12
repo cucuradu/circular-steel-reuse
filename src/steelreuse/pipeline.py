@@ -301,6 +301,7 @@ class PipelineResult:
     donor: ExtractedModel | None = None    # resolved donor model (m.section/audit fields populated)
     demand: ExtractedModel | None = None   # resolved demand model (m.section populated)
     slots: list[DemandSlot] = field(default_factory=list)
+    supply: list[SupplyItem] = field(default_factory=list)  # admitted reclaimed stock (post-audit)
 
 
 def run_pipeline(
@@ -368,5 +369,5 @@ def run_pipeline(
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
-        donor=donor, demand=demand, slots=slots,
+        donor=donor, demand=demand, slots=slots, supply=supply,
     )

@@ -89,6 +89,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cut", action="store_true",
                     help="cutting-stock: allow one donor to be cut into several pieces for several "
                          "slots (default: one piece per donor)")
+    ap.add_argument("--verify-match", action="store_true",
+                    help="independently audit the matching result after the solve: re-derive every "
+                         "feasible (donor, slot) pair, re-check constraints and assignment "
+                         "feasibility, and confirm no improving single move exists")
     ap.add_argument("--connections", action="store_true",
                     help="enable the connection feasibility screen: exclude donors geometrically "
                          "incompatible with the slot's design section (wrong shape family, too deep "
@@ -206,6 +210,23 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     print(f"Mapping: {res.validation.summary()}")
     print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
           f"{' (cutting-stock)' if args.cut else ''}")
+    if res.match.proven_optimal:
+        print("Matching: MILP proven optimal (CBC) — best possible net-CO2 assignment "
+              "under the use constraints")
+    elif res.match.solver_status != "no_feasible_pairs":
+        print(f"Matching: heuristic — {res.match.solver_status}; result is feasible but "
+              f"NOT guaranteed optimal")
+    if args.verify_match:
+        from .core.sections import load_default_catalog
+        from .match.optimize import verify_match
+        issues = verify_match(res.supply, res.slots, load_default_catalog(), res.match)
+        if issues:
+            print(f"Match verification: {len(issues)} issue(s) found!")
+            for issue in issues:
+                print(f"  - {issue}")
+        else:
+            print("Match verification: constraints hold, every assignment re-validates, "
+                  "and no improving single move exists")
     conn_review = sum(1 for a in res.match.assignments if a.connection_status == "review")
     if args.connections or conn_review:
         print(f"Connections: screen {'on' if args.connections else 'off (annotate only)'} | "

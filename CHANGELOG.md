@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Match optimality surfaced + independent verification** (`MatchResult.proven_optimal`,
+  `verify_match`, CLI `--verify-match`): a proven-`Optimal` CBC solve is reported as exactly that —
+  the best possible net-CO₂ assignment under the use constraints — in the CLI ("Matching:" line) and
+  the report footer, while a greedy-fallback result is plainly labelled "not proven optimal". The
+  new audit independently re-derives every feasible (donor, slot) cell and checks the use
+  constraints, re-validates each assignment's feasibility and score, and confirms no improving
+  single move exists (free donor → unfilled slot, or beating a chosen donor on its slot). The
+  pipeline result now carries the admitted supply (`PipelineResult.supply`) so the audit runs
+  without re-running the pipeline. Verified clean + proven optimal on the real case-study run.
 - **Wind-uplift load-reversal case** (`--wind-uplift q`, CLI + app): net upward EN 1991-1-4 roof
   suction adds an envelope entry for roof beams (top framing level, located from coordinates) with
   the net upward line load `γ_Q·W_up − 1.0·g_k` (EN 1990 6.10, permanent favourable, imposed absent)

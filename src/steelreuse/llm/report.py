@@ -77,6 +77,10 @@ def build_report_context(res: PipelineResult) -> dict:
         "unmatched_slots": m.unmatched_slots,
         "unused_supply": m.unused_supply,
         "solver_status": m.solver_status,
+        # Human-readable optimality claim for the footer: a proven-optimal MILP result is the best
+        # possible assignment for the net-CO2 objective; the greedy fallback is feasible but unproven.
+        "match_optimality": ("matching proven optimal (MILP)" if m.proven_optimal
+                             else "matching heuristic — not proven optimal"),
         "assignments": assignments,
         "ltb_restraint_reliant": ltb_restraint_reliant,
         "n_imperfection_governed": n_imperfection_governed,
@@ -261,7 +265,7 @@ detailed zone) were excluded before matching.</p>{% endif %}
  {% for b in ctx.unknown_breakdown %}<tr><td>{{ b.name }}</td><td>{{ b.count }}</td></tr>{% endfor %}
  </table></div>{% endif %}
 <p>Mapped {{ ctx.mapped }} · fuzzy {{ ctx.fuzzy }} · unknown {{ ctx.unknown }} ·
- solver: {{ ctx.solver_status }}</p>
+ {{ ctx.match_optimality }} (solver: {{ ctx.solver_status }})</p>
 <p class="disc">{{ ctx.disclaimer }}</p>
 </body></html>"""
 

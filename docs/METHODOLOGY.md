@@ -378,6 +378,17 @@ material passport is meant to carry.
    the off-cut-as-waste limitation); the objective books each filled slot's avoided-new saving, and each
    cut donor's leftover is reported as reusable remainder (`MatchResult.donor_leftover_mm`). The greedy
    fallback packs donors first-fit by descending score under the same length cap.
+6. **Optimality claim & independent verification.** A CBC status of `Optimal` is a **solver-proved
+   certificate**: no other assignment satisfying the constraints scores higher on the stated objective
+   — "best" is guaranteed *relative to that objective* (net CO₂; cost or other criteria would need the
+   multi-objective extension). The result carries the claim (`MatchResult.proven_optimal`, the report
+   footer, and a CLI "Matching:" line that says plainly when the greedy heuristic produced the result
+   instead). `verify_match` (`match/optimize.py`, CLI `--verify-match`) additionally **audits the
+   shipped result independently**: it re-derives every feasible (donor, slot) cell from scratch, then
+   checks the use constraints, re-validates each assignment (same score), and confirms **no improving
+   single move** exists (a free donor filling an unfilled slot at positive score, or beating a chosen
+   donor on its slot) — a necessary condition of optimality that both solve paths must satisfy, so any
+   violation exposes input drift or a solver/economics mismatch rather than a judgement call.
 
 ## 8. Reporting & the LLM guardrail  (`llm/`)
 
