@@ -31,6 +31,12 @@ All notable changes to this project are documented here. The format is based on
   element(s) selected and zoomed to. Both models must be open in the same Revit session.
 
 ### Fixed
+- **`run_pipeline(frame_analysis=True)` no longer silently skips the frame solve when no load model
+  is passed.** The frame gate required an `AreaLoadModel` instance, so an API caller omitting
+  `loads` fell back to analytic forces without any indication and got different results than the
+  CLI (which always passes one). Now `frame_analysis` defaults the loads to `AreaLoadModel()` (the
+  CLI default), and an explicit legacy flat `LoadModel` raises a clear `ValueError` instead of
+  being ignored — a frame solve has no floor pressure to distribute from a flat per-member UDL.
 - **Analytic path: span joints are now verified against column geometry** (`pipeline._verified_spans`).
   The extractor splits a demand beam at *every* crossing member endpoint (the frame solver needs those
   nodes), so a girder receiving joists arrived as e.g. five 1.5 m "spans". The analytic path then

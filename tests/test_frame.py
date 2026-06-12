@@ -22,7 +22,7 @@ from steelreuse.core.frame import (
 )
 from steelreuse.core.loads import AreaLoadModel
 from steelreuse.core.sections import load_default_catalog
-from steelreuse.pipeline import run_pipeline
+from steelreuse.pipeline import LoadModel, run_pipeline
 from steelreuse.schema import ExtractedMember, ExtractedModel
 
 
@@ -186,6 +186,16 @@ def test_run_pipeline_with_frame_analysis(tmp_path):
     assert res.slot_count == 3                 # one slot per solved element (no per-span split)
     assert res.match.n_reused >= 1
     assert res.match.total_co2_saved_kg > 0
+
+    # frame_analysis without an explicit load model defaults to the area model (the CLI default)
+    # instead of silently skipping the frame solve and answering from analytic forces.
+    res_default = run_pipeline(str(dp), str(mp), frame_analysis=True)
+    assert res_default.frame is not None and res_default.frame.ok
+    assert res_default.match.n_reused == res.match.n_reused
+
+    # ...and an explicit legacy flat LoadModel is refused (it has no floor pressure to distribute).
+    with pytest.raises(ValueError, match="AreaLoadModel"):
+        run_pipeline(str(dp), str(mp), loads=LoadModel(), frame_analysis=True)
 
 
 # ---------------------------------------------------------------------------

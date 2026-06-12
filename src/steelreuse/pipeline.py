@@ -322,6 +322,19 @@ def run_pipeline(
     seismic_cs: float = 0.0,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
+    # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
+    # solved load path distributes). Default it like the CLI does; an explicit legacy flat
+    # LoadModel cannot drive a frame solve, and silently falling back to analytic forces gave a
+    # different answer than the caller asked for — refuse instead.
+    if frame_analysis:
+        if loads is None:
+            loads = AreaLoadModel()
+        elif not isinstance(loads, AreaLoadModel):
+            raise ValueError(
+                "frame_analysis requires the area-based load model (AreaLoadModel); the legacy "
+                "flat LoadModel has no floor pressure to distribute through the frame — pass an "
+                "AreaLoadModel (or drop --beam-udl/--column-axial on the CLI)"
+            )
     donor = ExtractedModel.load(donor_path)
     demand = ExtractedModel.load(demand_path)
 
@@ -352,7 +365,7 @@ def run_pipeline(
     # load path. Falls back per member to the analytic path wherever the frame can't be built/solved.
     frame_result: FrameResult | None = None
     frame_slots = None
-    if frame_analysis and isinstance(loads, AreaLoadModel):
+    if frame_analysis:
         # Route the sway imperfection (--phi) to the frame-level EHF treatment (not the member-level
         # notional moment); P-Delta is auto-enabled there whenever phi > 0.
         opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
