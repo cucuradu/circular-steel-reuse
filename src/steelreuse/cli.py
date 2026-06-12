@@ -114,6 +114,11 @@ def main(argv: list[str] | None = None) -> int:
                          "a donor's excess mass-per-metre over the slot's avoided-new baseline so "
                          "the lightest adequate donor wins ties — the capacity analogue of the "
                          "off-cut preference; affects selection only, never the booked CO2")
+    ap.add_argument("--min-util", type=float, default=0.0,
+                    help="utilization floor (default 0 = off): refuse (donor, slot) pairs whose "
+                         "governing utilization is below this, keeping grossly over-spec donors "
+                         "in stock for slots that actually need them; a hard gate, so the floor "
+                         "can leave slots unfilled")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -199,6 +204,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         pareto=args.pareto,
         disposition=args.disposition or bool(args.disposition_csv),
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
+        min_util=args.min_util,
     )
 
     ctx = build_report_context(res)

@@ -37,6 +37,45 @@ def _beam_slot(span_mm, udl, slot_id="S0"):
 
 
 # ---------------------------------------------------------------------------
+# B1 — utilization floor (opt-in)
+# ---------------------------------------------------------------------------
+
+def test_min_util_refuses_a_grossly_overspec_donor(cat):
+    # A lightly loaded 4 m slot (M = 16 kNm) and a massive IPE500 donor: accepted by default at a
+    # tiny utilization, refused under --min-util 0.3 (the slot goes unfilled and the donor stays in
+    # stock), and verify_match stays clean on the floored result because min_util travels on
+    # weights. The disposition advisory on the floored run must NOT call it a store candidate
+    # (the same floor applies to its re-derived cells).
+    from steelreuse.match.optimize import verify_match
+
+    slot = _beam_slot(4000, 8.0)
+    supply = [SupplyItem(id="big", section="IPE500", grade="S355", length_mm=4200)]
+
+    default = match(supply, [slot], cat)
+    assert default.n_reused == 1
+    assert default.assignments[0].utilization < 0.3   # grossly over-spec
+
+    floored = match(supply, [slot], cat, min_util=0.3)
+    assert floored.n_reused == 0
+    assert floored.unmatched_slots == [slot.id] and floored.unused_supply == ["big"]
+    assert floored.weights["min_util"] == 0.3
+    assert verify_match(supply, [slot], cat, floored) == []
+
+    rows = stock_disposition(supply, [slot], cat, floored)
+    assert len(rows) == 1 and not rows[0]["feasible_for_unfilled"]
+    assert rows[0]["advice"] in ("re-roll", "recycle")
+
+
+def test_min_util_keeps_adequately_utilized_pairs(cat):
+    # The floor must not reject a donor whose governing utilization clears it.
+    slot = _beam_slot(6000, 20.0)
+    supply = [SupplyItem(id="s", section="IPE360", grade="S275", length_mm=7000)]
+    res = match(supply, [slot], cat, min_util=0.3)   # IPE360 sits at ~0.32 here
+    assert res.n_reused == 1
+    assert res.assignments[0].utilization >= 0.3
+
+
+# ---------------------------------------------------------------------------
 # B2 — over-spec soft penalty (opt-in)
 # ---------------------------------------------------------------------------
 

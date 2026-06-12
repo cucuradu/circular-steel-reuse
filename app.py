@@ -87,6 +87,11 @@ def main() -> None:
                      "slot's avoided-new baseline, so the lightest adequate donor wins ties — the "
                      "capacity analogue of the off-cut preference. Selection only; booked CO₂ "
                      "unchanged.")
+            min_util = st.number_input(
+                "Utilization floor (0 = off)", 0.0, 1.0, 0.0, 0.05,
+                help="Hard stewardship gate: refuse pairs whose governing utilization is below "
+                     "the floor, keeping grossly over-spec donors in stock. Can leave slots "
+                     "unfilled — that is the point.")
             counterfactual = st.selectbox(
                 "End-of-life counterfactual", ("none", "recycling", "rerolling"), index=0,
                 format_func=lambda v: {
@@ -135,7 +140,7 @@ def main() -> None:
             frame_analysis=frame_analysis,
             wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
             disposition=disposition, counterfactual=counterfactual,
-            w_overspec=w_overspec,
+            w_overspec=w_overspec, min_util=min_util,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")

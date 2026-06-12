@@ -278,6 +278,7 @@ def _feasible_cell(
     connection_policy: ConnectionPolicy | None = None,
     counterfactual_credit: float = 0.0,
     w_overspec: float = 0.0,
+    min_util: float = 0.0,
 ) -> _Cell | None:
     """Return an economics cell if the pair is feasible, else ``None``."""
     # Skip degenerate geometry (garbage rows) before any EN check that could divide by zero; such
@@ -307,6 +308,12 @@ def _feasible_cell(
             return None
         if res is None or r.utilization > res.utilization:
             res, governing_name = r, name
+    # Utilization floor (B1, opt-in): refuse pairs whose GOVERNING utilization sits below the
+    # floor, so grossly over-spec donors stay in stock for a slot that actually needs them
+    # ("don't spend the solid column on a 0.1-util slot"). A hard gate, judged on the worst
+    # combination like everything else; default 0.0 admits every passing pair (unchanged).
+    if res.utilization < min_util:
+        return None
 
     used_len = slot.required_length_mm
     offcut_mm = supply.length_mm - used_len
@@ -367,6 +374,7 @@ def _build_cells(
     connection_policy: ConnectionPolicy | None,
     counterfactual_credit: float = 0.0,
     w_overspec: float = 0.0,
+    min_util: float = 0.0,
 ) -> list[_Cell]:
     """All feasible (supply, slot) cells with their economics — shared by :func:`match` (to solve)
     and :func:`verify_match` (to independently re-derive what the solver saw)."""
@@ -379,7 +387,7 @@ def _build_cells(
                                   connection_penalty_kg, baselines[j], allow_cutting,
                                   connection_policy,
                                   counterfactual_credit=counterfactual_credit,
-                                  w_overspec=w_overspec)
+                                  w_overspec=w_overspec, min_util=min_util)
             if cell is not None:
                 cells.append(cell)
     return cells
@@ -399,6 +407,7 @@ def match(
     objective: str = "co2",
     counterfactual: str = "none",
     w_overspec: float = 0.0,
+    min_util: float = 0.0,
 ) -> MatchResult:
     """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
 
@@ -430,6 +439,11 @@ def match(
     soft score penalty of ``w_overspec x (donor_kg/m − baseline_kg/m)+ x used_length_m x
     saved_per_kg`` steering the optimiser toward the lightest adequate donor. Booked CO2 is
     unchanged (like the off-cut term, it is stewardship, not emissions).
+
+    ``min_util`` (B1, default 0 = off) is a **utilization floor**: pairs whose governing
+    utilization falls below it are refused outright, keeping grossly over-spec donors in stock.
+    A hard gate (unlike ``w_overspec``); the report's what-it-costs comparison is simply a run
+    with and without the floor.
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
@@ -444,11 +458,12 @@ def match(
                "connection_screen": connection_policy is not None,
                "new_build_grade": new_build_grade, "objective": objective,
                "counterfactual": counterfactual, "counterfactual_credit": cf_credit,
-               "w_overspec": w_overspec}
+               "w_overspec": w_overspec, "min_util": min_util}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
                          new_build_grade, allow_cutting, connection_policy,
-                         counterfactual_credit=cf_credit, w_overspec=w_overspec)
+                         counterfactual_credit=cf_credit, w_overspec=w_overspec,
+                         min_util=min_util)
     _apply_objective(cells, objective)
 
     if not cells:
@@ -582,7 +597,8 @@ def _cells_from_weights(
                         weights.get("new_build_grade", "S355"),
                         bool(weights.get("allow_cutting")), policy,
                         counterfactual_credit=weights.get("counterfactual_credit", 0.0),
-                        w_overspec=weights.get("w_overspec", 0.0))
+                        w_overspec=weights.get("w_overspec", 0.0),
+                        min_util=weights.get("min_util", 0.0))
 
 
 # Minimum straight stock length for the direct re-rolling fate (A2): below this, handling and
