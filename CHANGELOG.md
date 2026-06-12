@@ -16,6 +16,12 @@ All notable changes to this project are documented here. The format is based on
   the CLI/report optimality wording all follow the chosen goal. On the real test-4 case study:
   co2 50 reused / 39.3 t, members 54 / 44.1 t (it consumes the long heavy stock the off-cut
   stewardship term conserves), mass 54 / 36.5 t.
+- **Objective trade-off table ("Pareto view", `--pareto`, app checkbox,
+  `run_pipeline(pareto=True)` → `PipelineResult.pareto`):** re-solves the same feasible pairs
+  under every objective and shows members reused / CO₂ booked / steel mass reused per goal in the
+  console and an "Objective trade-off" report section — the shipped assignments still follow
+  `--objective`. On test-4 it surfaces that the CO₂-vs-members tension vanishes under `--cut`
+  (71 reused either way): it is the one-piece-per-donor off-cut preference, not carbon physics.
 - **Match optimality surfaced + independent verification** (`MatchResult.proven_optimal`,
   `verify_match`, CLI `--verify-match`): a proven-`Optimal` CBC solve is reported as exactly that —
   the best possible net-CO₂ assignment under the use constraints — in the CLI ("Matching:" line) and

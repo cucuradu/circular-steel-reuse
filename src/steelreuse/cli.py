@@ -94,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
                          "members reused, or the reclaimed steel mass put back to work (the latter "
                          "two break ties toward CO2 and may select carbon-negative reuses when "
                          "that serves the goal)")
+    ap.add_argument("--pareto", action="store_true",
+                    help="also solve the match under every objective (co2, members, mass) and "
+                         "print/report the trade-off table; the shipped assignments still follow "
+                         "--objective")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -168,6 +172,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         allow_cutting=args.cut, connection_screen=args.connections,
         frame_analysis=args.frame_analysis, second_order=args.pdelta,
         wind_kpa=args.wind, seismic_cs=args.seismic, objective=args.objective,
+        pareto=args.pareto,
     )
 
     ctx = build_report_context(res)
@@ -223,6 +228,14 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     elif res.match.solver_status != "no_feasible_pairs":
         print(f"Matching: heuristic ({goal} objective) — {res.match.solver_status}; result is "
               f"feasible but NOT guaranteed optimal")
+    if res.pareto:
+        print("Objective trade-off (same feasibility, different goals; * = shipped):")
+        for p in res.pareto:
+            mark = "*" if p["selected"] else " "
+            note = "" if p["proven_optimal"] else "  (heuristic - not proven)"
+            print(f"  {mark} {p['objective']:<8} {p['n_reused']:>4} reused | "
+                  f"{p['co2_saved_kg']:>10.1f} kg CO2e | "
+                  f"{p['mass_reused_kg']:>10.1f} kg steel reused{note}")
     if args.verify_match:
         from .core.sections import load_default_catalog
         from .match.optimize import verify_match

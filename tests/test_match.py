@@ -415,6 +415,30 @@ def test_run_pipeline_passes_the_objective_through():
     assert res.match.proven_optimal
 
 
+def test_pareto_view_solves_every_objective_without_changing_the_result():
+    res = run_pipeline(str(DATA / "samples" / "donor.json"), str(DATA / "samples" / "demand.json"),
+                       pareto=True)
+    assert res.pareto is not None
+    assert [p["objective"] for p in res.pareto] == ["co2", "members", "mass"]
+    co2, members, mass = res.pareto
+    # the shipped result IS the selected row — pareto is reporting, not a change of assignment
+    assert co2["selected"] and not members["selected"] and not mass["selected"]
+    assert co2["n_reused"] == res.match.n_reused
+    assert co2["co2_saved_kg"] == pytest.approx(res.match.total_co2_saved_kg, abs=0.1)
+    # dominance in each row's own currency: nothing fills more slots than "members" and nothing
+    # reuses more steel than "mass" (1 kg slack: the CO2 tie-break may trade sub-unit primary).
+    # NOTE no such claim for booked CO2 — the co2 objective maximizes score (CO2 minus the soft
+    # off-cut preference), so another row may legitimately book more headline CO2.
+    assert members["n_reused"] == max(p["n_reused"] for p in res.pareto)
+    assert mass["mass_reused_kg"] >= max(p["mass_reused_kg"] for p in res.pareto) - 1.0
+    assert all(p["proven_optimal"] for p in res.pareto)
+
+    # the report context carries the rows with human labels
+    from steelreuse.llm.report import build_report_context
+    ctx = build_report_context(res)
+    assert len(ctx["pareto"]) == 3 and ctx["pareto"][0]["label"] == "net-CO2"
+
+
 def test_verify_match_certifies_the_result_and_catches_corruption(cat):
     # The independent audit re-derives every feasible pair and must (a) pass a genuine MILP result
     # and (b) flag a tampered one — both a missed improving move and a violated use constraint.

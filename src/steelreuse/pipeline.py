@@ -22,7 +22,7 @@ from .core.sections import (
     load_default_catalog,
     resolve_members,
 )
-from .match.optimize import DemandSlot, MatchResult, SupplyItem, match
+from .match.optimize import OBJECTIVES, DemandSlot, MatchResult, SupplyItem, match
 from .schema import ExtractedModel
 
 
@@ -302,6 +302,10 @@ class PipelineResult:
     demand: ExtractedModel | None = None   # resolved demand model (m.section populated)
     slots: list[DemandSlot] = field(default_factory=list)
     supply: list[SupplyItem] = field(default_factory=list)  # admitted reclaimed stock (post-audit)
+    # Objective trade-off ("Pareto view", opt-in): the same feasible pairs solved under every
+    # objective, one row per goal — {objective, n_reused, co2_saved_kg, mass_reused_kg,
+    # proven_optimal, selected}. The shipped assignments (match) always follow `objective`.
+    pareto: list[dict] | None = None
 
 
 def run_pipeline(
@@ -321,6 +325,7 @@ def run_pipeline(
     wind_kpa: float = 0.0,
     seismic_cs: float = 0.0,
     objective: str = "co2",
+    pareto: bool = False,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -377,12 +382,39 @@ def run_pipeline(
     slots = build_slots(demand, loads, steel_only=steel_only_demand,
                         frame_slots=frame_slots)
     passport = build_passport(donor.members, catalog)
+    policy = ConnectionPolicy() if connection_screen else None
     result = match(supply, slots, catalog, allow_cutting=allow_cutting,
-                   connection_policy=ConnectionPolicy() if connection_screen else None,
-                   objective=objective)
+                   connection_policy=policy, objective=objective)
+
+    # Objective trade-off (opt-in): re-solve the SAME feasible pairs under each goal so the user
+    # sees what each policy choice costs in the other currencies. The shipped assignments stay on
+    # the requested objective; this is reporting, not a change of result.
+    pareto_rows: list[dict] | None = None
+    if pareto:
+        slot_by_id = {s.id: s for s in slots}
+
+        def _mass_reused_kg(r: MatchResult) -> float:
+            return sum(
+                catalog[a.section].mass_kgm * slot_by_id[a.slot_id].required_length_mm / 1000.0
+                for a in r.assignments
+            )
+
+        pareto_rows = []
+        for obj in OBJECTIVES:
+            r = result if obj == objective else match(
+                supply, slots, catalog, allow_cutting=allow_cutting,
+                connection_policy=policy, objective=obj)
+            pareto_rows.append({
+                "objective": obj,
+                "n_reused": r.n_reused,
+                "co2_saved_kg": round(r.total_co2_saved_kg, 1),
+                "mass_reused_kg": round(_mass_reused_kg(r), 1),
+                "proven_optimal": r.proven_optimal,
+                "selected": obj == objective,
+            })
 
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
-        donor=donor, demand=demand, slots=slots, supply=supply,
+        donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
     )

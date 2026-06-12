@@ -99,6 +99,12 @@ def build_report_context(res: PipelineResult) -> dict:
         "reusable_remainder_m": round(m.total_donor_leftover_mm / 1000.0, 1),
         "disclaimer": SCOPE_DISCLAIMER,
     }
+    # Objective trade-off rows (only when run_pipeline(pareto=True) re-solved every goal).
+    if res.pareto:
+        ctx["pareto"] = [
+            dict(p, label=_OBJECTIVE_LABEL.get(p["objective"], p["objective"]))
+            for p in res.pareto
+        ]
     # Pre-demolition-audit provenance summary (only shown when the donor model carried audit data).
     if res.audit and res.audit.present:
         a = res.audit
@@ -271,6 +277,17 @@ detailed zone) were excluded before matching.</p>{% endif %}
  <table><tr><th>Unidentified type</th><th>Count</th></tr>
  {% for b in ctx.unknown_breakdown %}<tr><td>{{ b.name }}</td><td>{{ b.count }}</td></tr>{% endfor %}
  </table></div>{% endif %}
+{% if ctx.pareto %}<h2>Objective trade-off</h2>
+<p class="note">The same feasible donor–slot pairs solved under each goal — what "best" means is a
+policy choice, and this table shows what each choice costs in the other currencies. The row marked
+★ is the objective this report's assignments follow.</p>
+<table><tr><th></th><th>Objective</th><th>Members reused</th><th>CO2e saved (kg)</th>
+<th>Reclaimed steel reused (kg)</th><th>Optimality</th></tr>
+{% for p in ctx.pareto %}<tr>
+ <td>{{ '★' if p.selected else '' }}</td><td>{{ p.label }}</td><td>{{ p.n_reused }}</td>
+ <td>{{ p.co2_saved_kg }}</td><td>{{ p.mass_reused_kg }}</td>
+ <td>{{ 'proven optimal' if p.proven_optimal else 'heuristic — not proven' }}</td></tr>{% endfor %}
+</table>{% endif %}
 <p>Mapped {{ ctx.mapped }} · fuzzy {{ ctx.fuzzy }} · unknown {{ ctx.unknown }} ·
  {{ ctx.match_optimality }} (solver: {{ ctx.solver_status }})</p>
 <p class="disc">{{ ctx.disclaimer }}</p>

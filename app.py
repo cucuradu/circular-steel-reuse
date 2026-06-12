@@ -76,6 +76,11 @@ def main() -> None:
                      "donor) is identical for all goals; under 'members'/'mass' a carbon-negative "
                      "reuse can be selected when it serves the goal, and the booked CO₂ stays "
                      "honest about it.")
+            pareto = st.checkbox(
+                "Objective trade-off table", value=False,
+                help="Also solve the match under every goal (CO₂ / members / mass) and show what "
+                     "each policy choice costs in the other currencies. The assignments shown "
+                     "still follow the objective selected above.")
             allow_cutting = st.checkbox("Cutting-stock (1 donor → many cuts)", value=False)
             connection_screen = st.checkbox(
                 "Connection feasibility screen", value=False,
@@ -103,7 +108,7 @@ def main() -> None:
             steel_only_demand=not all_demand, tributary_from_geometry=trib_from_geometry,
             allow_cutting=allow_cutting, connection_screen=connection_screen,
             frame_analysis=frame_analysis,
-            wind_kpa=wind, seismic_cs=seismic, objective=objective,
+            wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")
@@ -131,6 +136,18 @@ def main() -> None:
     c4.metric("Donor stock potential (kg CO2e)", f"{ctx['donor_saved_co2_kg']:.0f}")
 
     st.info(f"{narrative}  \n*(narrative: {source})*")
+
+    if res.pareto:
+        st.subheader("Objective trade-off")
+        st.caption("The same feasible pairs solved under each goal — what 'best' means is a "
+                   "policy choice. The ★ row is the objective the assignments below follow.")
+        st.dataframe(pd.DataFrame([
+            {"": "★" if p["selected"] else "", "objective": p["objective"],
+             "members reused": p["n_reused"], "CO2e saved (kg)": p["co2_saved_kg"],
+             "steel reused (kg)": p["mass_reused_kg"],
+             "optimality": "proven" if p["proven_optimal"] else "heuristic"}
+            for p in res.pareto
+        ]), use_container_width=True)
 
     st.subheader("Assignments")
     if ctx["assignments"]:
