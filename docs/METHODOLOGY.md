@@ -120,8 +120,12 @@ pre-sizing, with explicit EN 1990 partial factors rather than a single magic num
   isolated-span statics on **both** the analytic and frame paths (the diaphragm/continuity the frame
   assumes is not yet erected); SLS deflection is not re-checked (temporary situation). Columns are
   unchanged (their erection-stage load is lower, never governing in this model).
-- **Continuous beams** are split at supports into `spans_mm` upstream (by the extractor); each span is
-  checked as simply supported (conservative for both moment envelope and deflection).
+- **Continuous beams** are split at member crossings into `spans_mm` upstream (by the extractor — the
+  frame solver needs every crossing as a connection node). On the analytic path a span joint counts as
+  a support **only when a column endpoint sits at the joint** (`pipeline._verified_spans`): a secondary
+  beam framing into a girder *loads* it, it does not support it, so unsupported joints are merged back
+  and the girder is checked simply supported over its true inter-column span. Models whose columns
+  carry no coordinates keep the extracted spans unchanged (legacy behaviour, flagged in the notes).
 
 **Forces** (`core/forces.py`): the default `AnalyticBackend` uses the closed-form simply-supported
 results `M = wL²/8`, `V = wL/2`. An optional `PyNiteBackend` builds and solves the span in PyNiteFEA and
@@ -449,7 +453,7 @@ its own `wL²/8`; `run_pipeline` then yields one slot per span. **Seismic:** `se
 2-storey box gives a base shear `Cs·ΣW` distributed inverted-triangular (roof force = 2× the floor force),
 and `seismic_cs > 0` adds the `seismic X/Y` design situations.
 
-**Whole suite:** 127 tests, ruff clean.
+**Whole suite:** 217 tests, ruff clean.
 
 ## 11. ML modules (exploratory, not in the certified path)
 

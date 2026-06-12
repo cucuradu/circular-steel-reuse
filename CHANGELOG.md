@@ -6,7 +6,36 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **Analytic path: span joints are now verified against column geometry** (`pipeline._verified_spans`).
+  The extractor splits a demand beam at *every* crossing member endpoint (the frame solver needs those
+  nodes), so a girder receiving joists arrived as e.g. five 1.5 m "spans". The analytic path then
+  checked each as an isolated simply-supported span — understating the girder moment (`M ∝ L²`, ~25×
+  on a 7.6 m girder) and emitting short slots no single member could fill. Span joints with no column
+  endpoint at them are now merged back before checking (on the real case-study demand model, all 42
+  multi-span members merge to their true single span). The frame path already verified supports
+  physically and is unchanged; models whose columns carry no coordinates keep the extracted spans.
+
 ### Added
+- **"Apply Matches" Revit write-back** (`steelreuse.writeback.build_writeback`, CLI
+  `--apply-matches-out status.json`): reshapes a `PipelineResult` into a per-element status map
+  (donor: reused/available/quarantined/unmapped; demand: filled/partially_filled/unfilled/non_steel),
+  each with a colour and a one-line note. A new pyRevit **Apply Matches** button
+  (`pyrevit_extension/.../Match.panel/ApplyMatches.pushbutton`) reads this JSON and applies a
+  solid-colour graphic override + a "Comments" summary to the matching elements in the active view.
+- **Write-back QoL**: the status JSON gains a `summary` block (per-status counts, slots filled,
+  CO₂e saved) which Apply Matches prints as a headline inside Revit; the button output lists
+  quarantined / partially-filled / unfilled elements as clickable select-and-zoom links (capped at
+  25 per status); and a new **Clear Matches** button undoes a run — resets the colour overrides in
+  the active view and removes only the SteelReuse data, leaving everything else intact.
+- **Reuse passport in the model (shared parameters + schedule)**: Apply Matches now creates and
+  fills schedulable instance parameters on structural framing/columns — "Reuse Status",
+  "Reuse Paired With", "Reuse CO2 Saved (kg)", "Reuse Note" (definitions in
+  `pyrevit_extension/steelreuse_shared_params.txt` for stable GUIDs; "Comments" is no longer
+  touched). The writeback JSON carries structured `paired_with`/`co2_saved_kg` per element,
+  cutting-stock aware (a cut donor lists every slot it fills, savings summed). A new
+  **Reuse Schedule** button creates the "SteelReuse Passport" multi-category schedule (filtered to
+  reuse-tagged elements, sorted by status, grand total on the CO₂ column).
 - **Sway-stiffness classification (α_cr) + per-member effective-length override**: whenever the EHF
   sway imperfection runs, the frame computes EN 1993-1-1 5.2.1(4)B `α_cr = (H/V)·(h/δ)` per storey
   and direction from the sway drifts (`FrameResult.alpha_cr`); `α_cr ≥ 10` is reported as non-sway

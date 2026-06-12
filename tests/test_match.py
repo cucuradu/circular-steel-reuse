@@ -116,6 +116,45 @@ def test_build_slots_steel_only_drops_unmapped(cat):
     assert {s.member_id for s in build_slots(demand, steel_only=True)} == {"S1"}  # drop the concrete
 
 
+def test_unsupported_span_joints_merge_without_column():
+    # The extractor records a span split at every crossing member endpoint (the frame solver needs
+    # those nodes), but a joist framing into a girder LOADS it, it does not support it. On the
+    # analytic path, joints with no column underneath must merge back so the girder is checked over
+    # its real span (M ~ L^2) and demands a full-length donor, not five short ones.
+    def _model(interior_col_x=None):
+        members = [
+            ExtractedMember(id="G1", role="beam", raw_section="IPE300", length_mm=7620.0,
+                            spans_mm=[1524.0] * 5,
+                            start_xyz=[0.0, 0.0, 3000.0], end_xyz=[7620.0, 0.0, 3000.0]),
+            ExtractedMember(id="C1", role="column", raw_section="HEB200", length_mm=3000.0,
+                            start_xyz=[0.0, 0.0, 0.0], end_xyz=[0.0, 0.0, 3000.0]),
+            ExtractedMember(id="C2", role="column", raw_section="HEB200", length_mm=3000.0,
+                            start_xyz=[7620.0, 0.0, 0.0], end_xyz=[7620.0, 0.0, 3000.0]),
+        ]
+        if interior_col_x is not None:
+            members.append(ExtractedMember(
+                id="C3", role="column", raw_section="HEB200", length_mm=3000.0,
+                start_xyz=[interior_col_x, 0.0, 0.0], end_xyz=[interior_col_x, 0.0, 3000.0]))
+        return ExtractedModel(kind="demand", members=members)
+
+    # Columns at the ends only -> all four interior joints are joist crossings -> one full-span slot.
+    g = [s for s in build_slots(_model()) if s.member_id == "G1"]
+    assert len(g) == 1
+    assert g[0].required_length_mm == pytest.approx(7620.0)
+    assert g[0].demand.My_Ed == pytest.approx(15.0 * 7620.0**2 / 8.0)
+
+    # A column under the second joint (x = 3048) is a real support -> two spans, 3048 + 4572.
+    g = [s for s in build_slots(_model(interior_col_x=3048.0)) if s.member_id == "G1"]
+    assert [s.required_length_mm for s in g] == [pytest.approx(3048.0), pytest.approx(4572.0)]
+
+    # Columns without coordinates -> supports unverifiable -> extracted spans kept (legacy models).
+    legacy = _model()
+    for m in legacy.members:
+        if m.role == "column":
+            m.start_xyz = m.end_xyz = None
+    assert len([s for s in build_slots(legacy) if s.member_id == "G1"]) == 5
+
+
 def test_co2_saved_uses_avoided_new_baseline_not_donor_mass(cat):
     # A1: a hugely oversized donor in a small slot must book the carbon of the *right-sized new
     # member* (the baseline), not the donor's own mass.

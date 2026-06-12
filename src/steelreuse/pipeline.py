@@ -6,7 +6,7 @@ the (optional) LLM narrative is added downstream from these results.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
 from .core.carbon import Passport, build_passport
@@ -115,6 +115,50 @@ def _construction_demand(loads, member_id: str, span_mm: float) -> tuple[str, Me
     ))
 
 
+# How close a column endpoint must be (3-D) to a span joint for the joint to count as a real support.
+# Generous vs the extractor's 50 mm curve-projection tolerance: the joint position is re-derived here by
+# interpolating cumulative span fractions along the member axis, and a column top can sit half a beam
+# depth below the beam centreline.
+_SPAN_SUPPORT_TOL_MM = 300.0
+
+
+def _verified_spans(member, column_pts: list[tuple[float, float, float]]) -> list[float]:
+    """Keep an interior span split only where a column actually supports the joint.
+
+    The extractor splits a demand beam at every member endpoint that lands on its curve — deliberately
+    including *other beams'* endpoints, because the frame solver needs those crossing points as
+    connection nodes (a joist framing into a girder transfers its reaction there). But on the analytic
+    path each span is checked as an isolated simply-supported piece, and a joist *loads* the girder, it
+    does not support it: treating the crossing as a support understates the girder moment (M ~ L^2) and
+    produces short slots no single reusable member could fill. So here, with column geometry available,
+    interior joints with no column endpoint nearby are merged back together. Members without geometry —
+    or models whose columns carry no coordinates — keep their extracted spans unchanged (the frame path
+    is unaffected either way: it verifies supports physically and splits slots only at column nodes).
+    """
+    spans = member.spans_mm or []
+    s, e = member.start_xyz, member.end_xyz
+    if len(spans) <= 1 or not s or not e or not column_pts:
+        return spans
+    total = float(sum(spans))
+    if total <= 0:
+        return spans
+    tol2 = _SPAN_SUPPORT_TOL_MM**2
+    merged = [spans[0]]
+    cum = 0.0
+    for i in range(len(spans) - 1):
+        cum += spans[i]
+        f = cum / total
+        p = [s[a] + (e[a] - s[a]) * f for a in range(3)]
+        supported = any(
+            (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2 <= tol2
+            for q in column_pts)
+        if supported:
+            merged.append(spans[i + 1])
+        else:
+            merged[-1] += spans[i + 1]
+    return merged
+
+
 def build_slots(
     demand: ExtractedModel,
     loads: LoadModel | AreaLoadModel | None = None,
@@ -138,6 +182,8 @@ def build_slots(
     """
     loads = loads or LoadModel()
     backend = backend or AnalyticBackend()
+    column_pts = [tuple(p) for c in demand.members if c.role == "column"
+                  for p in (c.start_xyz, c.end_xyz) if p]
     slots: list[DemandSlot] = []
     for m in demand.members:
         if steel_only and not m.section:
@@ -159,6 +205,15 @@ def build_slots(
                         grade=m.material_grade, design_section=m.section,
                     ))
                 continue
+        # Analytic path: drop span splits that have no column under the joint (a joist crossing is a
+        # load on the girder, not a support) before checking each span as an isolated piece.
+        if m.role == "beam":
+            spans_v = _verified_spans(m, column_pts)
+            if spans_v != (m.spans_mm or []):
+                n_merged = len(m.spans_mm) - len(spans_v)
+                m = replace(m, spans_mm=spans_v,
+                            notes=((m.notes + "; ") if m.notes else "")
+                            + f"merged {n_merged} unsupported span joint(s) — no column at the split")
         # One demand list per load combination (aligned by span index — same member geometry), so
         # every slot carries the full envelope the matcher verifies it against.
         per_combo = [
@@ -194,6 +249,9 @@ class PipelineResult:
     match: MatchResult
     frame: FrameResult | None = None   # set when frame_analysis was used
     audit: AuditSummary | None = None  # pre-demolition-audit provenance (always set by run_pipeline)
+    donor: ExtractedModel | None = None    # resolved donor model (m.section/audit fields populated)
+    demand: ExtractedModel | None = None   # resolved demand model (m.section populated)
+    slots: list[DemandSlot] = field(default_factory=list)
 
 
 def run_pipeline(
@@ -261,4 +319,5 @@ def run_pipeline(
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
+        donor=donor, demand=demand, slots=slots,
     )

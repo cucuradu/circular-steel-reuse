@@ -58,9 +58,11 @@ Narrative source: deterministic
   four marginal gravity matches correctly drop.)
 - **Matching:** the new design resolves to **181 steel slots** (after steel-only filtering, multi-span
   splitting at columns, and merging each continuous girder into a single reused member); **50 are
-  filled by reclaimed members** that pass every EN 1993-1-1 load combination. Fewer but *larger* slots
-  than the old per-span analytic view, because a whole girder is now one reusable element. The rest are
-  listed as needing new steel.
+  filled by reclaimed members** that pass every EN 1993-1-1 load combination. A whole girder is one
+  reusable element: the analytic path now reaches the same 181-slot structure by verifying each span
+  joint against column geometry (all 42 multi-span members merge — every recorded joint is a joist
+  crossing, not a support; the analytic run fills 42 slots / ≈ 14.4 t with its more conservative
+  isolated-span statics). The rest are listed as needing new steel.
 - **Carbon:** the matched reuse saves **≈ 39.3 t CO₂e** on the honest *avoided-new* basis (the new
   section each slot would otherwise have required), cleanly separated from the **≈ 315 t** total
   embodied carbon held in the whole donor stock (the theoretical ceiling if everything were reused).

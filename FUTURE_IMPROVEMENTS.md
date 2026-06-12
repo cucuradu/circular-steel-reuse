@@ -38,6 +38,13 @@ continuous beam (`spans_mm = [s₁, s₂,…]`) into one sub-element per span at
 (interpolated along the member axis so the interior nodes land on the columns below). Each bay is then
 checked over its own length and its reaction routed into the correct interior column (previously the whole
 load dumped at the two far ends, leaving interior columns unloaded); the pipeline makes one slot per span.
+**Support-verified spans (fixed 2026-06-11):** the extractor records a span split at *every* crossing
+member endpoint because the frame solver needs those connection nodes — but a joist framing into a
+girder loads it rather than supporting it. The analytic path now merges back any span joint without a
+column endpoint at it (`pipeline._verified_spans`), so a girder is checked over its true inter-column
+span instead of as a chain of short "spans" (on the real case-study demand model all 42 multi-span
+members merge to a single span — every joint was a joist crossing). The frame path already treated
+only column nodes as slot boundaries and is unchanged.
 
 **Seismic — DONE (lateral force method).** `--seismic Cs` ([core/frame.py](src/steelreuse/core/frame.py)
 `seismic_node_forces`) applies the EN 1998-1 §4.3.3.2 lateral force method: seismic weight per level
@@ -370,9 +377,38 @@ with an owner and a fix sketch.
   (potential → screened → matched → net).
 
 ### I-6. Data & BIM round-trip
-- ★ **Write-back to Revit**: a pyRevit **"Apply Matches"** button that colours reused members and
-  sets `ReusedFrom` / provenance / passport-ID parameters in the new model. The killer
-  thesis-defence demo, and it makes the tool feel like a product.
+- ✅ **Write-back to Revit** (done): `steelreuse --apply-matches-out status.json` writes a
+  per-element status map (`steelreuse.writeback.build_writeback`); the pyRevit **"Apply Matches"**
+  button colours donor/demand elements by reuse status (reused/available/quarantined/unmapped;
+  filled/partially_filled/unfilled/non_steel) and writes a one-line summary to "Comments".
+- ✅ **Write-back QoL batch** (done):
+  - **"Clear Matches" button** — undoes an Apply Matches run: resets the colour overrides (active
+    view) and removes only the `SteelReuse: ...` comments; everything else untouched.
+  - **Clickable element links** — the Apply Matches output lists the attention statuses
+    (quarantined / partially_filled / unfilled) as pyRevit `linkify` links (click = select + zoom),
+    capped at 25 per status.
+  - **Run-summary header** — the status JSON carries a `summary` block (per-status counts, slots
+    filled, CO₂e saved, supply count) which the button prints inside Revit.
+- ✅ **Shared parameters + passport schedule** (done): Apply Matches now creates and fills
+  schedulable instance parameters on framing/columns — "Reuse Status", "Reuse Paired With",
+  "Reuse CO2 Saved (kg)", "Reuse Note" (stable GUIDs via `steelreuse_shared_params.txt`;
+  "Comments" left alone). The writeback JSON carries structured `paired_with` / `co2_saved_kg`
+  per element (cutting-stock aware: a cut donor lists all its slots, savings summed). A new
+  **Reuse Schedule** button builds the "SteelReuse Passport" multi-category schedule (filtered,
+  sorted by status, CO₂ grand total) — the live reuse passport in the model. Clear Matches
+  empties the parameters (bindings/schedule survive) and still handles legacy comments.
+- **Write-back follow-up (planned)**: apply overrides to a dedicated duplicated view
+  ("SteelReuse — Matches") instead of the active view.
+- ★ **"Trace Match" button (donor ↔ receiver follow-link)** — user idea 2026-06-11: select an
+  element, read its "Reuse Paired With" parameter, and if the paired model is open in the same Revit
+  session, activate that document and select/zoom the matched element(s) (works both directions:
+  donor → where it is used; receiver → where its donors come from). When the paired document isn't
+  open, fall back to printing the element ids as text + a prompt to open it. Needs the writeback
+  JSON (or the shared parameter) to carry the *element id*, not just the human-readable label.
+- **2-D match card per assignment** (report and/or a "Show Match" popup in Revit): side-by-side
+  donor vs receiver elevation drawn from data we already have (lengths, section depth/width, cut
+  position for cutting-stock, connection-screen note) — lets an engineer eyeball the fit without
+  opening either model.
 - **IFC coordinate export** (placement transforms) so the IFC path can run frame analysis.
 - **Capture releases + rotation + grade** from Revit (feeds I-3 items directly).
 - **Extractor emits the schedule CSV itself** → `steelreuse-validate --schedule` runs with zero
@@ -429,6 +465,105 @@ with an owner and a fix sketch.
 - **Passport ID / QR per member** in the report — traceability from deconstruction through
   fabrication to the new frame.
 - **Prior-use class** field (crane girder / dynamic loading history → fatigue screening flag).
+
+### I-11. Architectural / geometric fit screen
+A donor passing the structural check can still be the *wrong shape* for its slot — depth, width,
+length, finish, and connection geometry are an architectural concern the matcher doesn't see today.
+- ★ **Depth/width fit gate**: compare donor section `h`/`b` against the design section's `h`/`b`
+  (within a tolerance, e.g. ±10%); flag (non-blocking, like the PDA layer) when a deeper/wider
+  substitute risks clashing with floor-to-floor clearance, services, or cladding/connection details
+  sized for the original profile. Needs no new BIM data — both sections are already in the catalog.
+- **Available-depth input**: optional per-slot "available zone height" (from BIM or a CSV override)
+  to turn the above into a hard pass/fail where headroom is actually constrained.
+- **Length residual handling**: surface a too-long donor's required cut and a too-short donor's
+  shortfall in the report even when the slot is otherwise rejected, so the engineer sees *why* and
+  *by how much*.
+- **Exposed-steel (AESS) flag**: per-member "exposed finish required" field; if set, surface
+  donor surface condition/coating notes from the PDA in the assignment row — purely informational,
+  doesn't gate.
+- **Profile-family change note**: when the matched donor is a different family from the design
+  section (e.g. HEB substituted for IPE), add an explicit report note — same logic as the
+  EU/US standard note in I-3, but for shape family.
+
+### I-12. New feature directions (beyond current scope) — 2026-06-10 brainstorm
+Not refinements of existing features — capabilities the project doesn't touch at all today.
+- **Multi-donor stock / marketplace model.** Match against a *pool* of donor buildings (a regional
+  steel-stock database) instead of one donor → one demand, picking the best donor across sites per
+  slot. Moves the tool from "one-off demolition reuse" toward an actual circular supply chain.
+- **Transport/logistics carbon.** CO₂ accounting currently ignores donor↔demand site distance.
+  Add a distance + transport-mode term (and an optional max-radius cutoff) — increasingly important
+  once multiple donor sites (above) are in play.
+- ★ **Cost / LCC layer.** A parallel "cost saved vs new steel" estimate (reclaimed material + refab/
+  connection cost + transport vs new-build cost), giving a second axis for the multi-objective
+  optimizer and something a QS could actually use.
+- **Design-for-disassembly (DfD) suggestions.** For the *new* structure, suggest demountable/bolted
+  connections over welded ones so the next reuse cycle is easier — closes the loop forward, not just
+  backward (sourcing).
+- **Fabrication output / cut list generator.** Per matched donor member: cut lengths, end-prep, hole
+  locations — bridges from "feasible per the report" to something a fabricator could act on.
+- ★ **Scenario comparison dashboard.** Side-by-side 100% new vs 100% reuse vs the optimized mix,
+  across CO₂, cost, and unique donor sections needed — strong for both thesis defense and client
+  reports.
+- ★ **Uncertainty / sensitivity as a first-class output.** Monte Carlo over knockdown factors, fuzzy-
+  match confidence, and load assumptions → a CO₂-saved range with confidence bands instead of a
+  single number.
+- **GIS layer for donor discovery.** If demolition-permit/building-registry data is ever available,
+  map candidate donor buildings near a demand site — turns the tool from "I already have a donor
+  model" into "help me find a donor."
+
+### I-13. Professionalization & deployment — 2026-06-10 follow-up (user-selected)
+Picked from a "make this real software / a complete thesis project" brainstorm. Not started.
+- ★ **Public web demo.** Deploy `app.py` (with the bundled demo data) to Streamlit Community Cloud or
+  an HF Space. Free, gives a live link for the thesis/CV instead of "clone and run."
+- ★ **REST API (FastAPI)** wrapping `run_pipeline`. Lets pyRevit, a future PDA mobile app, or a
+  marketplace tool call the matcher without a Python install; also the natural seam for a future
+  Revit "Apply Matches" write-back.
+- ★ **Interactive 3-D model viewer** (plotly line segments from the coordinates already extracted):
+  donor + demand side by side, colored reused/new/unknown/quarantined. Highest-impact visual for a
+  thesis defense; nothing like it exists yet.
+- **Per-member calc-sheet drill-down** in the app: click a matched pair → full EC3 check trace with
+  clause references. Turns the report from "trust me" into "verify me."
+- **Madaster / EPD-format passport export.** The carbon passport already exists; map it to an actual
+  ISO 20887 material-passport schema so the tool can claim compatibility with a real CE platform.
+- **Q&A chatbot over the report.** "Why wasn't W12X26 #45 reused?" → retrieve the relevant
+  assignment/quarantine record and feed it (numbers fixed, not invented) to the existing Gemini
+  narrative pipeline — reuses the anti-hallucination guard pattern.
+- **Desktop packaging — open question, NOT PyInstaller.** PyInstaller + Streamlit is notoriously
+  fragile (static-asset bundling, slow startup, large exe). Better: ship a **portable folder**
+  (embeddable Python or the existing signed venv + a `run.bat` that launches `streamlit run app.py`
+  and opens the browser) — far more robust on this WDAC-locked box than a single-file build, and
+  avoids unsigned-binary issues entirely. Revisit `stlite`/Pyodide only if the heavy deps
+  (PyNite/numpy/ortools) ever become optional.
+
+### I-14. CirCoFin / Circular Construction Hub alignment — 2026-06-11
+**Goal:** CirCoFin (Horizon Europe) is building Circular Construction Hubs (CCH) = a Physical
+Material Bank + a Digital Marketplace, across showcase regions (Munich, Greater Copenhagen, Lisbon,
+Scottish Central Lowlands), plus financing mechanisms for them. Those hubs describe *what's in
+stock and where* but have no way to verify *whether a listed item is structurally usable for a given
+new application*. That's exactly what this tool's EN1993 check + audit/passport layer already does.
+The aim isn't "add CirCoFin features" — it's to demonstrate this engine as the **structural
+feasibility/verification layer a CCH is currently missing**, giving the thesis a real, citable
+adoption story (a candidate CCH Toolbox module) instead of a closed academic exercise.
+- ★ **Digital Marketplace listing export.** Reshape unmatched donor stock (sections, lengths,
+  grades, condition/knockdown from the audit, location) from `PassportEntry` into a structured
+  listing format suitable for a CCH Digital Marketplace (e.g. Concular-style). Mostly a data
+  reshaping of values already computed — the most direct interoperability win.
+- ★ **CCH cost / feasibility module.** Add a cost dimension alongside CO₂ — avoided disposal cost,
+  hub storage/handling cost, resale value vs. new-material cost per assignment — mirroring the
+  existing carbon-passport summation. Speaks directly to CirCoFin's financing-mechanism objective
+  (gives cities/financiers a euro figure, not just a carbon figure).
+- ★ **Multi-donor pool matching (regional CCH model).** Generalize the matcher from one donor
+  building → one demand building to a *pool* of donor stock sources → one demand, mirroring how a
+  CCH actually aggregates inflows from many small sources (the Scotland regional showcase: many
+  municipalities, shared infrastructure, critical mass). Largest lift of the four; biggest
+  conceptual shift toward "this models a hub," not a one-off match.
+- **Inventory dwell-time field.** Per donor item, track "date entered stock" vs "date matched" →
+  report an "average days-to-reuse" metric. Cheap addition once the multi-donor pool (above) exists;
+  a real operational metric for a Physical Material Bank operator.
+- *(Deliberately not added as code tasks: DIN/EU reuse-data-standard alignment — too speculative
+  until CirCoFin publishes a schema, just watch for it; "position as CCH Toolbox component" — a
+  thesis-framing decision, not an implementation; showcase-city data outreach — human-only, see
+  Tier 4.)*
 
 ---
 
