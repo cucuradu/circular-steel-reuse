@@ -371,6 +371,15 @@ material passport is meant to carry.
    escalates to a **greedy fallback** that takes highest-score net-positive pairs first (it never books a
    net-negative match, mirroring the MILP). Reclaimed **supply is not standard-restricted** — reusing a
    donor across standards is legitimate.
+   - **Selectable objective** (`--objective`, default `co2`): what "best" means is a policy choice the
+     user makes, not a hidden constant. `members` maximises the **number of slots filled** and `mass`
+     the **reclaimed steel mass put back to work**; both are lexicographic (the primary value dominates,
+     net-CO₂ score breaks ties) and may legitimately select a carbon-negative pair when it serves the
+     goal — the booked CO₂ stays honest and the report names the objective. Feasibility (every EN check,
+     lengths, use constraints) is identical across objectives. Note the default objective maximises the
+     *score* (net CO₂ **minus the soft off-cut preference**), so an alternative objective can book more
+     headline CO₂ by consuming long stock the default deliberately conserves — that difference is the
+     off-cut stewardship term doing its job, not an optimality defect.
 5. **Cutting-stock (optional, `allow_cutting` / `--cut`).** Instead of one piece per donor, a donor may
    be cut into several pieces for several slots, bounded by its length:
    `Σ_j (required_len_j + 50 mm cut tolerance)·x_ij ≤ length_i`. The off-cut penalty is dropped (the

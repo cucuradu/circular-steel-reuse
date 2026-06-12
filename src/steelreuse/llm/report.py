@@ -19,6 +19,9 @@ SCOPE_DISCLAIMER = (
     "(coupon testing, corrosion/fatigue survey) and connection design by an engineer."
 )
 
+# Human wording for the matcher's optimization goal (kept number-free for the LLM guard).
+_OBJECTIVE_LABEL = {"co2": "net-CO2", "members": "members-reused", "mass": "reclaimed-mass"}
+
 
 def build_report_context(res: PipelineResult) -> dict:
     """Flatten a :class:`PipelineResult` into a JSON-ish dict of pre-computed values for the template."""
@@ -78,9 +81,13 @@ def build_report_context(res: PipelineResult) -> dict:
         "unused_supply": m.unused_supply,
         "solver_status": m.solver_status,
         # Human-readable optimality claim for the footer: a proven-optimal MILP result is the best
-        # possible assignment for the net-CO2 objective; the greedy fallback is feasible but unproven.
-        "match_optimality": ("matching proven optimal (MILP)" if m.proven_optimal
-                             else "matching heuristic — not proven optimal"),
+        # possible assignment for the stated objective; the greedy fallback is feasible but unproven.
+        "match_optimality": (
+            f"matching proven optimal (MILP, "
+            f"{_OBJECTIVE_LABEL.get(m.objective, m.objective)} objective)"
+            if m.proven_optimal else
+            f"matching heuristic ({_OBJECTIVE_LABEL.get(m.objective, m.objective)} objective) "
+            f"— not proven optimal"),
         "assignments": assignments,
         "ltb_restraint_reliant": ltb_restraint_reliant,
         "n_imperfection_governed": n_imperfection_governed,

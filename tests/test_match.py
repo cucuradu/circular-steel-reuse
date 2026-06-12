@@ -337,6 +337,84 @@ def test_milp_finds_the_global_optimum_where_greedy_cannot():
     assert sum(c.score for c in chosen) == pytest.approx(17.0)   # proven global optimum
 
 
+def test_objective_members_fills_more_slots_than_co2_when_they_diverge():
+    # Donor 0 fits both slots; donor 1 fits slot 0 only, at a NEGATIVE net CO2. The co2 objective
+    # takes the single best pair (10 beats 9 + nothing, the negative cell is never selected); the
+    # members objective fills BOTH slots (count dominates, CO2 only breaks ties) and honestly
+    # books the negative entry.
+    from steelreuse.match.optimize import _apply_objective, _Cell, _solve_milp
+
+    def cells():
+        return [
+            _Cell(si=0, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=10, score=10.0),
+            _Cell(si=0, sj=1, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=9, score=9.0),
+            _Cell(si=1, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=-2, score=-2.0),
+        ]
+    by_co2 = cells()
+    _apply_objective(by_co2, "co2")
+    chosen, status = _solve_milp(by_co2, n_supply=2, n_slots=2, time_limit_s=30)
+    assert status == "Optimal"
+    assert {(c.si, c.sj) for c in chosen} == {(0, 0)}            # 10 > 9 + (never take -2)
+
+    by_members = cells()
+    _apply_objective(by_members, "members")
+    chosen, status = _solve_milp(by_members, n_supply=2, n_slots=2, time_limit_s=30)
+    assert status == "Optimal"
+    assert {(c.si, c.sj) for c in chosen} == {(0, 1), (1, 0)}    # two filled slots beat one
+
+
+def test_objective_mass_prefers_the_heavier_donor(cat):
+    # Both donors pass the same slot. Net CO2 prefers the lighter one (less recovery/refab carbon
+    # for the same avoided-new baseline); the mass objective puts the most reclaimed steel back
+    # to work and picks the heavier section.
+    slot = _beam_slot(6000, 20.0)
+    supply = [SupplyItem(id="light", section="IPE300", grade="S275", length_mm=7000),
+              SupplyItem(id="heavy", section="IPE550", grade="S275", length_mm=7000)]
+    by_co2 = match(supply, [slot], cat)
+    assert by_co2.proven_optimal and by_co2.objective == "co2"
+    assert by_co2.assignments[0].supply_id == "light"
+    by_mass = match(supply, [slot], cat, objective="mass")
+    assert by_mass.proven_optimal and by_mass.objective == "mass"
+    assert by_mass.assignments[0].supply_id == "heavy"
+
+
+def test_objective_members_admits_a_net_negative_reuse(cat):
+    # A short lightly-loaded slot whose only donor is a long heavy IPE600: the net-CO2 score is
+    # negative (off-cut + recovery carbon dwarf the small avoided-new baseline) so the default
+    # objective leaves the slot empty — but "members" reuses it, because the goal says fill slots.
+    slot = _beam_slot(5000, 5.0, "small")
+    supply = [SupplyItem(id="huge", section="IPE600", grade="S355", length_mm=9000)]
+    assert match(supply, [slot], cat).n_reused == 0
+    res = match(supply, [slot], cat, objective="members")
+    assert res.n_reused == 1
+    assert res.assignments[0].supply_id == "huge"
+
+
+def test_verify_match_judges_by_the_result_objective(cat):
+    # The verifier must use the objective the result was solved for: dropping an assignment from a
+    # members-objective result is an improving move even where the pair's net CO2 is negative.
+    from steelreuse.match.optimize import verify_match
+
+    slot = _beam_slot(5000, 5.0, "small")
+    supply = [SupplyItem(id="huge", section="IPE600", grade="S355", length_mm=9000)]
+    res = match(supply, [slot], cat, objective="members")
+    assert res.n_reused == 1
+    assert verify_match(supply, [slot], cat, res) == []
+    emptied = dataclasses.replace(res, assignments=[])
+    issues = verify_match(supply, [slot], cat, emptied)
+    assert any("improving move missed" in i for i in issues)
+    # ...whereas under the default co2 objective an empty result for this pair is correct.
+    assert verify_match(supply, [slot], cat,
+                        dataclasses.replace(emptied, weights={})) == []
+
+
+def test_run_pipeline_passes_the_objective_through():
+    res = run_pipeline(str(DATA / "samples" / "donor.json"), str(DATA / "samples" / "demand.json"),
+                       objective="members")
+    assert res.match.objective == "members"
+    assert res.match.proven_optimal
+
+
 def test_verify_match_certifies_the_result_and_catches_corruption(cat):
     # The independent audit re-derives every feasible pair and must (a) pass a genuine MILP result
     # and (b) flag a tampered one — both a missed improving move and a violated use constraint.

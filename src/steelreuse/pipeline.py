@@ -320,6 +320,7 @@ def run_pipeline(
     second_order: bool = False,
     wind_kpa: float = 0.0,
     seismic_cs: float = 0.0,
+    objective: str = "co2",
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -377,7 +378,8 @@ def run_pipeline(
                         frame_slots=frame_slots)
     passport = build_passport(donor.members, catalog)
     result = match(supply, slots, catalog, allow_cutting=allow_cutting,
-                   connection_policy=ConnectionPolicy() if connection_screen else None)
+                   connection_policy=ConnectionPolicy() if connection_screen else None,
+                   objective=objective)
 
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),

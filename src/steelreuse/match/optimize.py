@@ -109,9 +109,16 @@ class MatchResult:
     @property
     def proven_optimal(self) -> bool:
         """True when the MILP solver *proved* this assignment optimal for the stated objective
-        (max total net CO2 score under the use constraints). False means the greedy heuristic
+        (see :attr:`objective`) under the use constraints. False means the greedy heuristic
         produced it (solver timeout/failure) — feasible and verified, but not guaranteed best."""
         return self.solver_status == "Optimal"
+
+    @property
+    def objective(self) -> str:
+        """The goal this result was optimized for: "co2" (net CO2 saved, default), "members"
+        (slots filled) or "mass" (reclaimed steel reused) — recorded on the result so reports and
+        the independent verifier judge it against the right yardstick."""
+        return (self.weights or {}).get("objective", "co2")
 
 
 @dataclass
@@ -131,6 +138,37 @@ class _Cell:
     used_len_mm: float = 0.0   # length this piece consumes from the donor (for the cutting-stock cap)
     connection_status: str = "unknown"
     connection_note: str = ""
+    mass_used_kg: float = 0.0  # donor steel this piece actually consumes (the "mass" objective)
+    # Solver coefficient for the chosen objective (set by _apply_objective). None = fall back to
+    # the net-CO2 score, so directly-constructed cells (tests) behave as before.
+    objective_coeff: float | None = None
+
+
+OBJECTIVES = ("co2", "members", "mass")
+
+
+def _coeff(cell: _Cell) -> float:
+    return cell.score if cell.objective_coeff is None else cell.objective_coeff
+
+
+def _apply_objective(cells: list[_Cell], objective: str) -> None:
+    """Set each cell's solver coefficient for the chosen goal.
+
+    ``"co2"`` (default) keeps the net-CO2 score — carbon-negative pairs are then never selected.
+    ``"members"`` (most slots filled) and ``"mass"`` (most reclaimed steel put back to work) are
+    lexicographic: the primary value (1 per assignment / kg of donor steel used) dominates and the
+    net-CO2 score only breaks ties, scaled so its total influence stays below one primary unit.
+    Under these goals a carbon-negative pair CAN be selected when it serves the goal — the booked
+    CO2 stays honest (and the headline can come out negative); the report states the objective.
+    """
+    if objective == "co2":
+        for c in cells:
+            c.objective_coeff = c.score
+        return
+    big = sum(abs(c.score) for c in cells) + 1.0
+    for c in cells:
+        primary = 1.0 if objective == "members" else c.mass_used_kg
+        c.objective_coeff = primary + c.score / big
 
 
 def _passes_all(sec: SectionProps, grade: str, slot: DemandSlot, knockdown: float = 1.0) -> bool:
@@ -291,7 +329,8 @@ def _feasible_cell(
     chi_lt_if_free = bending.detail.get("chi_LT_if_unrestrained", chi_lt) if bending else None
     return _Cell(si, sj, res.utilization, res.status, cell_offcut, co2_saved, score,
                  chi_lt, chi_lt_if_free, governing_name or "ULS gravity", used_len_mm=used_len,
-                 connection_status=conn.status, connection_note=conn.note)
+                 connection_status=conn.status, connection_note=conn.note,
+                 mass_used_kg=mass_used)
 
 
 def _build_cells(
@@ -331,8 +370,14 @@ def match(
     new_build_grade: str = "S355",
     allow_cutting: bool = False,
     connection_policy: ConnectionPolicy | None = None,
+    objective: str = "co2",
 ) -> MatchResult:
-    """Optimal supply->slot assignment maximizing net CO2 saved (with greedy fallback).
+    """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
+
+    ``objective`` selects what "best" means (see :func:`_apply_objective`): ``"co2"`` (default)
+    maximizes net CO2 saved; ``"members"`` maximizes the number of slots filled; ``"mass"``
+    maximizes the reclaimed steel mass put back to work — the latter two break ties toward CO2.
+    Feasibility (every EN check, lengths, use constraints) is identical for all objectives.
 
     ``allow_cutting`` switches on the **cutting-stock** model: one donor may be cut into several pieces
     to fill several slots, bounded by its length (``sum(required_len + cut tolerance) <= donor length``)
@@ -345,14 +390,17 @@ def match(
     detailed zone — are excluded; milder mismatches surface as ``connection_status = "review"``.
     With the default ``None`` nothing is gated, but every assignment is still annotated.
     """
+    if objective not in OBJECTIVES:
+        raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
     factor = (factors or load_factors())["steel"]
     weights = {"w_offcut": w_offcut, "connection_penalty_kg": connection_penalty_kg,
                "allow_cutting": allow_cutting,
                "connection_screen": connection_policy is not None,
-               "new_build_grade": new_build_grade}
+               "new_build_grade": new_build_grade, "objective": objective}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
                          new_build_grade, allow_cutting, connection_policy)
+    _apply_objective(cells, objective)
 
     if not cells:
         return MatchResult([], [s.id for s in slots], [s.id for s in supply], "no_feasible_pairs",
@@ -411,7 +459,7 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s,
                 caps: list[float] | None = None) -> tuple[list[_Cell], str]:
     prob = pulp.LpProblem("reuse_matching", pulp.LpMaximize)
     x = {(c.si, c.sj): pulp.LpVariable(f"x_{c.si}_{c.sj}", cat="Binary") for c in cells}
-    prob += pulp.lpSum(c.score * x[(c.si, c.sj)] for c in cells)
+    prob += pulp.lpSum(_coeff(c) * x[(c.si, c.sj)] for c in cells)
 
     for j in range(n_slots):  # each slot gets at most one supply
         terms = [x[(c.si, c.sj)] for c in cells if c.sj == j]
@@ -435,18 +483,20 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s,
 
 
 def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None) -> list[_Cell]:
-    """Take highest-score feasible pairs first, respecting the use constraints.
+    """Take highest-coefficient feasible pairs first, respecting the use constraints.
 
-    Only net-positive pairs are taken: the MILP leaves a negative-score x_ij at 0, so the greedy
-    fallback must match that — never book a reuse whose net benefit is negative just to fill a slot.
-    Cells are sorted by descending score, so the first non-positive one ends the scan. Each slot is
-    filled once; a donor is either used once (default) or packed up to its length (cutting-stock).
+    Only objective-positive pairs are taken: the MILP leaves a negative-coefficient x_ij at 0, so
+    the greedy fallback must match that — under the net-CO2 objective that means never booking a
+    reuse whose net benefit is negative just to fill a slot (under "members"/"mass" every feasible
+    pair has a positive coefficient by construction). Cells are sorted by descending coefficient,
+    so the first non-positive one ends the scan. Each slot is filled once; a donor is either used
+    once (default) or packed up to its length (cutting-stock).
     """
     used_j, chosen = set(), []
     remaining = list(caps) if caps is not None else None  # per-donor remaining length (cutting mode)
     used_s: set[int] = set()
-    for c in sorted(cells, key=lambda c: c.score, reverse=True):
-        if c.score <= 0:
+    for c in sorted(cells, key=_coeff, reverse=True):
+        if _coeff(c) <= 0:
             break
         if c.sj in used_j:
             continue
@@ -495,6 +545,20 @@ def verify_match(
     cells = _build_cells(supply, slots, catalog, factor,
                          w.get("w_offcut", 0.3), w.get("connection_penalty_kg", 5.0),
                          w.get("new_build_grade", "S355"), allow_cutting, policy)
+    # Judge "improving move" by the PRIMARY value of the objective the result was solved for (it
+    # travels on weights): under "members"/"mass" an unfilled slot with any free feasible donor is
+    # already a violation, CO2-negative or not. The CO2 tie-break is deliberately ignored here —
+    # its epsilon-scale differences sit below the MILP solver's own tolerances, so flagging them
+    # would produce false alarms, and a tie-break swap never changes the primary outcome.
+    objective = result.objective
+
+    def _primary(c: _Cell) -> float:
+        if objective == "members":
+            return 1.0
+        if objective == "mass":
+            return c.mass_used_kg
+        return c.score
+
     by_pair = {(supply[c.si].id, slots[c.sj].id): c for c in cells}
     sup_by_id = {s.id: s for s in supply}
     slot_ids = {s.id for s in slots}
@@ -545,12 +609,13 @@ def verify_match(
         if not donor_free:
             continue
         if jid not in assigned_slots:
-            if c.score > 1e-9:
+            if _primary(c) > 1e-9:
                 issues.append(f"improving move missed: free donor {sid} could fill unfilled "
-                              f"slot {jid} (score {c.score:.2f} > 0)")
+                              f"slot {jid} ({objective} value {_primary(c):.2f} > 0)")
         else:
             cur = chosen_by_slot.get(jid)   # None = the slot's own cell failed re-check (reported)
-            if cur is not None and c.score > cur.score + 1e-9:
-                issues.append(f"improving replacement missed: free donor {sid} scores "
-                              f"{c.score:.2f} on slot {jid}, above the chosen {cur.score:.2f}")
+            if cur is not None and _primary(c) > _primary(cur) + 1e-9:
+                issues.append(f"improving replacement missed: free donor {sid} offers "
+                              f"{objective} value {_primary(c):.2f} on slot {jid}, above the "
+                              f"chosen {_primary(cur):.2f}")
     return issues

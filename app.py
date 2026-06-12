@@ -67,6 +67,15 @@ def main() -> None:
                 help="Net upward EN 1991-1-4 pressure on the roof: adds a load-reversal case for "
                      "roof beams (γ_Q·W with favourable permanent; the BOTTOM flange goes into "
                      "compression, unrestrained). Needs beam coordinates to find the roof level.")
+            objective = st.selectbox(
+                "Matching objective", ("co2", "members", "mass"), index=0,
+                format_func=lambda v: {"co2": "Net CO₂ saved (default)",
+                                       "members": "Members reused (CO₂ tie-break)",
+                                       "mass": "Reclaimed mass reused (CO₂ tie-break)"}[v],
+                help="What the optimizer maximizes. Feasibility (EN checks, lengths, one use per "
+                     "donor) is identical for all goals; under 'members'/'mass' a carbon-negative "
+                     "reuse can be selected when it serves the goal, and the booked CO₂ stays "
+                     "honest about it.")
             allow_cutting = st.checkbox("Cutting-stock (1 donor → many cuts)", value=False)
             connection_screen = st.checkbox(
                 "Connection feasibility screen", value=False,
@@ -94,7 +103,7 @@ def main() -> None:
             steel_only_demand=not all_demand, tributary_from_geometry=trib_from_geometry,
             allow_cutting=allow_cutting, connection_screen=connection_screen,
             frame_analysis=frame_analysis,
-            wind_kpa=wind, seismic_cs=seismic,
+            wind_kpa=wind, seismic_cs=seismic, objective=objective,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")

@@ -89,6 +89,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cut", action="store_true",
                     help="cutting-stock: allow one donor to be cut into several pieces for several "
                          "slots (default: one piece per donor)")
+    ap.add_argument("--objective", choices=("co2", "members", "mass"), default="co2",
+                    help="what the matcher maximizes: net CO2 saved (default), the number of "
+                         "members reused, or the reclaimed steel mass put back to work (the latter "
+                         "two break ties toward CO2 and may select carbon-negative reuses when "
+                         "that serves the goal)")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -162,7 +167,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         steel_only_demand=not args.all_demand, tributary_from_geometry=args.trib_from_geometry,
         allow_cutting=args.cut, connection_screen=args.connections,
         frame_analysis=args.frame_analysis, second_order=args.pdelta,
-        wind_kpa=args.wind, seismic_cs=args.seismic,
+        wind_kpa=args.wind, seismic_cs=args.seismic, objective=args.objective,
     )
 
     ctx = build_report_context(res)
@@ -210,12 +215,14 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     print(f"Mapping: {res.validation.summary()}")
     print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
           f"{' (cutting-stock)' if args.cut else ''}")
+    goal = {"co2": "net-CO2", "members": "members-reused",
+            "mass": "reclaimed-mass"}[args.objective]
     if res.match.proven_optimal:
-        print("Matching: MILP proven optimal (CBC) — best possible net-CO2 assignment "
-              "under the use constraints")
+        print(f"Matching: MILP proven optimal (CBC) — best possible {goal} assignment "
+              f"under the use constraints")
     elif res.match.solver_status != "no_feasible_pairs":
-        print(f"Matching: heuristic — {res.match.solver_status}; result is feasible but "
-              f"NOT guaranteed optimal")
+        print(f"Matching: heuristic ({goal} objective) — {res.match.solver_status}; result is "
+              f"feasible but NOT guaranteed optimal")
     if args.verify_match:
         from .core.sections import load_default_catalog
         from .match.optimize import verify_match

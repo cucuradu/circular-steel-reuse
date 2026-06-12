@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Selectable matching objectives** (`--objective {co2,members,mass}`, `run_pipeline(objective=)`,
+  app selectbox): the matcher can now maximize net CO₂ saved (default, unchanged), the **number of
+  members reused**, or the **reclaimed steel mass put back to work** — the latter two break ties
+  toward CO₂ and may select carbon-negative reuses when that serves the goal (booked CO₂ stays
+  honest). Feasibility is identical across objectives; the MILP optimality proof, the greedy
+  fallback, `verify_match` (which now judges improving moves by the result's own objective) and
+  the CLI/report optimality wording all follow the chosen goal. On the real test-4 case study:
+  co2 50 reused / 39.3 t, members 54 / 44.1 t (it consumes the long heavy stock the off-cut
+  stewardship term conserves), mass 54 / 36.5 t.
 - **Match optimality surfaced + independent verification** (`MatchResult.proven_optimal`,
   `verify_match`, CLI `--verify-match`): a proven-`Optimal` CBC solve is reported as exactly that —
   the best possible net-CO₂ assignment under the use constraints — in the CLI ("Matching:" line) and
