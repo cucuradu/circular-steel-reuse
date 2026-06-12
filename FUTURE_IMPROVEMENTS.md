@@ -313,6 +313,66 @@ flow into the result, not the survey itself. The condition→knockdown factors a
 
 ---
 
+## Stock stewardship & counterfactual fates — plan (2026-06-12)
+
+The "Frankenstein receiver" observation: the matcher will put a very heavy donor into a slot a thin
+section could serve, because it only ever sees **this one project**. A donor it consumes today is
+invisible carbon tomorrow — maybe that solid column saves more CO₂ **stored for a better-matched
+future project**, or even **re-rolled** instead of structurally wasted. What the current model
+already gets right: the avoided-new baseline means a heavy donor in a light slot never *books*
+inflated carbon, and the recovery-process term (`mass_used·reuse_process`) already gives a mild
+preference to the lightest adequate donor. What it cannot see: future demand, alternative
+end-of-life fates, capacity (vs length) waste, and the buildability cost of section variety.
+
+### Phase A — counterfactual fates & honest deltas (accounting first; cheap, thesis-grade)
+- **A1. End-of-life counterfactual option** (`--counterfactual none|recycling|rerolling`): today's
+  saving implicitly assumes the unused donor evaporates. The realistic counterfactual for structural
+  steel is **EAF recycling** (≈0.4–0.7 kgCO₂e/kg, ~100% recovery) or — research-grade — **direct
+  re-rolling** without re-melting (Cambridge/Allwood-line pilots; far lower energy than EAF). Add
+  `recycle_credit` / `reroll_credit` columns to the carbon CSV (cited ranges, parameters not
+  constants) and book reuse savings **net of the foregone counterfactual benefit**. Answers the
+  standard LCA critique of avoided-new accounting head-on. METHODOLOGY §6 extension + tests.
+- **A2. Stock disposition advisory** (report section + CSV): for every **unused** donor, compare its
+  three fates with numbers: (i) *store* — does any unfilled slot here, or a configurable generic
+  demand, have a feasible cell for it? what would it have saved? (ii) *re-roll* — straight, prismatic,
+  above a minimum length → credit estimate; (iii) *recycle* — credit estimate. Cheap: the feasibility
+  cells already exist at solve time. Turns "295 available" into actionable advice.
+
+### Phase B — single-project stewardship knobs (selection quality)
+- **B1. Utilization floor** (`--min-util x`, default 0 = off): refuse pairs below a configurable
+  utilization so grossly over-spec donors stay in stock; report what the floor costs (pareto-style
+  with/without). Crude but immediately expresses "don't waste the solid column on a 0.1-util slot".
+- **B2. Over-spec soft penalty** — the *capacity* analogue of the off-cut term: penalize
+  `(donor_kgm − baseline_kgm)·length·w_overspec` in the score (booked CO₂ unchanged, like the
+  off-cut preference). Strengthens the existing mild light-donor preference into real stewardship;
+  default small or 0 so results stay byte-identical unless asked.
+- **B3. Standardization / anti-Frankenstein option** (`--max-distinct-sections N` per role, or a
+  per-new-section-family binary cost in the MILP): section variety has real fabrication, QA,
+  connection-detailing and procurement costs no carbon term sees. MILP-friendly (binary `y_s` per
+  donor section family used). Report the variety count either way.
+
+### Phase C — beyond one project (the real "store it for a better match")
+- **C1. Portfolio matching** (`--demand a.json b.json …`): one MILP allocating the donor stock
+  across **several** demand models at once — the principled fix; "save the W30s for the warehouse"
+  becomes an optimization outcome, not a hunch. Per-project + global reporting.
+- **C2. Scarcity / option-value weight** (when future demand is unknown): penalize consuming donors
+  whose capacity-length class is rare in stock relative to the slots only they can serve;
+  calibrate against a synthetic demand distribution.
+- **C3. ML option value (thesis chapter):** the dormant `ml/` layer finally gets a non-circular
+  job — estimate each stock item's probability of a better future match (trained on synthetic +
+  case-study demand distributions), feeding C2's weight. Decision support, never a gate.
+
+### Phase D — write-up
+- METHODOLOGY "Stock stewardship & counterfactuals" section; THESIS chapter (the Frankenstein
+  critique, the recycling-counterfactual debate, the storage option value); honest data-quality
+  register for the re-rolling factors (pilot-scale literature, wide ranges).
+
+**Suggested order: A2 → A1 → B2 → C1** (advisory first — zero behavior change, immediate insight;
+then honest counterfactual booking; then the stewardship penalty; portfolio matching as the
+headline feature). B1/B3/C2/C3 as appetite allows. Caveats to respect throughout: storage is not
+free (transport, yard, double handling — make it a parameter), re-rolling factors are
+research-grade, and every new knob defaults OFF so existing results stay reproducible.
+
 ## Ideas backlog — 2026-06-10 brainstorm (all fronts)
 
 A curated, all-sides idea sweep recorded before the next re-extraction. ★ marks the ten items judged
