@@ -62,6 +62,11 @@ def main() -> None:
                 "Construction-stage case (bare steel)", value=False,
                 help="Adds an erection-stage check for every beam: full dead + construction live "
                      "with the compression flange UNRESTRAINED (no slab yet), so χ_LT applies.")
+            uplift = st.number_input(
+                "Roof wind uplift (kN/m², 0 = off)", 0.0, 10.0, 0.0, 0.1,
+                help="Net upward EN 1991-1-4 pressure on the roof: adds a load-reversal case for "
+                     "roof beams (γ_Q·W with favourable permanent; the BOTTOM flange goes into "
+                     "compression, unrestrained). Needs beam coordinates to find the roof level.")
             allow_cutting = st.checkbox("Cutting-stock (1 donor → many cuts)", value=False)
             connection_screen = st.checkbox(
                 "Connection feasibility screen", value=False,
@@ -79,7 +84,7 @@ def main() -> None:
     loads = AreaLoadModel(
         dead_kpa=dead, live_kpa=live, gamma_g=gamma_g, gamma_q=gamma_q,
         beam_tributary_width_m=trib_width, notional_phi=phi,
-        construction_stage=construction,
+        construction_stage=construction, uplift_kpa=uplift,
     )
 
     try:

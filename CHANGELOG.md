@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Wind-uplift load-reversal case** (`--wind-uplift q`, CLI + app): net upward EN 1991-1-4 roof
+  suction adds an envelope entry for roof beams (top framing level, located from coordinates) with
+  the net upward line load `γ_Q·W_up − 1.0·g_k` (EN 1990 6.10, permanent favourable, imposed absent)
+  checked with the **bottom flange in compression and unrestrained** — the load-reversal blind spot
+  of the restrained-flange default. No reversal (net ≤ 0) changes nothing; default off. End-to-end
+  test: an IPE300 donor that passes gravity restrained is rejected for a light 6 m roof slot under
+  8 kN/m² suction (`M = 155.25 kNm > M_b,Rd ≈ 77.7 kNm`).
 - **Trace Match button** (`pyrevit_extension/.../Match.panel/TraceMatch.pushbutton`): select a
   matched element on either side and jump to its partner(s) — a donor's slot(s) in the new design,
   or the donor member(s) filling a demand element. Partner ids are parsed from the "Reuse Paired

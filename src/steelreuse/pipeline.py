@@ -115,6 +115,46 @@ def _construction_demand(loads, member_id: str, span_mm: float) -> tuple[str, Me
     ))
 
 
+def _uplift_demand(loads, member_id: str, span_mm: float) -> tuple[str, MemberDemand] | None:
+    """Wind-uplift load-reversal envelope entry for a ROOF beam span, or ``None`` if off / no reversal.
+
+    Net upward wind (suction) on a light roof reverses the bending: the BOTTOM flange goes into
+    compression, where no slab restrains it — the one situation the restrained-flange default would
+    otherwise miss. The entry uses isolated-span statics with the magnitude of the net upward load
+    (``gamma_Q*W_up - 1.0*g_k``, permanent favourable per EN 1990) and ``chi_LT`` in earnest. When the
+    permanent load wins (net <= 0) there is no reversal and no entry. SLS is not re-checked.
+    """
+    if getattr(loads, "uplift_kpa", 0.0) <= 0 or span_mm <= 0:
+        return None
+    w = loads.uplift_udl_Npmm(member_id)
+    if w <= 0:
+        return None
+    return ("ULS wind uplift", MemberDemand(
+        My_Ed=w * span_mm**2 / 8.0, Vz_Ed=w * span_mm / 2.0, L=span_mm,
+        compression_flange_restrained=False,
+    ))
+
+
+# Beams whose mid-height is within this of the highest beam belong to the roof level (wind uplift).
+_ROOF_LEVEL_TOL_MM = 500.0
+
+
+def _roof_beam_ids(members) -> set[str]:
+    """Ids of beams at the model's top framing level (the only ones wind uplift acts on).
+
+    Needs geometry: members without coordinates can't be placed on a level and are left out —
+    documented limitation (an all-roof single-storey model without coordinates sees no uplift case).
+    """
+    mid_z: dict[str, float] = {}
+    for m in members:
+        if m.role == "beam" and m.start_xyz and m.end_xyz:
+            mid_z[m.id] = (m.start_xyz[2] + m.end_xyz[2]) / 2.0
+    if not mid_z:
+        return set()
+    top = max(mid_z.values())
+    return {i for i, z in mid_z.items() if z >= top - _ROOF_LEVEL_TOL_MM}
+
+
 # How close a column endpoint must be (3-D) to a span joint for the joint to count as a real support.
 # Generous vs the extractor's 50 mm curve-projection tolerance: the joint position is re-derived here by
 # interpolating cumulative span fractions along the member axis, and a column top can sit half a beam
@@ -184,6 +224,7 @@ def build_slots(
     backend = backend or AnalyticBackend()
     column_pts = [tuple(p) for c in demand.members if c.role == "column"
                   for p in (c.start_xyz, c.end_xyz) if p]
+    roof_ids = _roof_beam_ids(demand.members) if getattr(loads, "uplift_kpa", 0.0) > 0 else set()
     slots: list[DemandSlot] = []
     for m in demand.members:
         if steel_only and not m.section:
@@ -198,6 +239,10 @@ def build_slots(
                         extra = _construction_demand(loads, m.id, s.required_length_mm)
                         if extra:
                             envelope.append(extra)
+                        if m.id in roof_ids:
+                            extra = _uplift_demand(loads, m.id, s.required_length_mm)
+                            if extra:
+                                envelope.append(extra)
                     slots.append(DemandSlot(
                         id=s.slot_id, member_id=m.id, role=m.role,
                         required_length_mm=s.required_length_mm,
@@ -231,6 +276,10 @@ def build_slots(
                 extra = _construction_demand(loads, m.id, span or 0.0)
                 if extra:
                     combo_demands.append(extra)
+                if m.id in roof_ids:
+                    extra = _uplift_demand(loads, m.id, span or 0.0)
+                    if extra:
+                        combo_demands.append(extra)
             req_len = m.length_mm if m.role == "column" else span
             slots.append(DemandSlot(
                 id=f"{m.id}#{idx}", member_id=m.id, role=m.role,

@@ -78,6 +78,10 @@ def main(argv: list[str] | None = None) -> int:
                          "live, compression flange UNRESTRAINED (chi_LT applies)")
     ap.add_argument("--construction-live", type=float, default=0.75,
                     help="construction live load q_ca for --construction (kN/m^2, EN 1991-1-6)")
+    ap.add_argument("--wind-uplift", type=float, default=0.0,
+                    help="net upward wind pressure on the roof (kN/m^2, EN 1991-1-4 input): adds a "
+                         "load-reversal case for roof beams (gamma_Q*W with favourable permanent, "
+                         "bottom flange in compression, UNRESTRAINED); needs beam coordinates")
     ap.add_argument("--trib-from-geometry", action="store_true",
                     help="estimate per-beam width AND per-column tributary area/floors from geometry")
     ap.add_argument("--all-demand", action="store_true",
@@ -146,6 +150,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
             column_floors=args.col_floors, column_eccentricity_mm=args.col_ecc,
             notional_phi=args.phi,
             construction_stage=args.construction, construction_live_kpa=args.construction_live,
+            uplift_kpa=args.wind_uplift,
         )
     res = run_pipeline(
         donor, demand, loads=loads, knockdown=args.knockdown,
@@ -176,6 +181,8 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
             parts.append(f"sway imperfection (phi={args.phi:g})")
         if args.construction:
             parts.append(f"construction stage ({args.construction_live:g} kN/m^2, unrestrained)")
+        if args.wind_uplift > 0:
+            parts.append(f"wind uplift ({args.wind_uplift:g} kN/m^2, roof beams, unrestrained)")
         combos = " + ".join(parts) if len(parts) > 1 else "gravity only"
         print(f"Loads: area-based, {args.dead:g}+{args.live:g} kN/m^2 (G+Q), "
               f"ULS {args.gamma_g:g}G+{args.gamma_q:g}Q, tributary {trib}; "

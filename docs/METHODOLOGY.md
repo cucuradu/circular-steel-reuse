@@ -120,6 +120,16 @@ pre-sizing, with explicit EN 1990 partial factors rather than a single magic num
   isolated-span statics on **both** the analytic and frame paths (the diaphragm/continuity the frame
   assumes is not yet erected); SLS deflection is not re-checked (temporary situation). Columns are
   unchanged (their erection-stage load is lower, never governing in this model).
+- **Wind-uplift load reversal (opt-in, `--wind-uplift q`):** net upward suction on a light roof
+  reverses the bending — the **bottom** flange goes into compression where no slab restrains it, the
+  one situation the restrained-flange default would otherwise miss. Every **roof beam** slot (beams at
+  the top framing level, found from coordinates) gains an envelope entry with the net upward line load
+  `γ_Q·W_up − 1.0·g_k` per EN 1990 6.10 with the permanent action *favourable* (Table A1.2(B)
+  `γ_G,fav = 1.0`; imposed load absent), checked unrestrained (`χ_LT` in earnest) over the span. The
+  same `dead_kpa` as gravity is used — set `--dead` to the roof's actual permanent load when checking
+  a light roof, since a heavy floor pressure hides a real reversal. `q` is the user's EN 1991-1-4 net
+  roof pressure (c_pe zoning is the engineer's input, as for `--wind`). No reversal (net ≤ 0) adds no
+  entry; isolated-span statics on both paths.
 - **Continuous beams** are split at member crossings into `spans_mm` upstream (by the extractor — the
   frame solver needs every crossing as a connection node). On the analytic path a span joint counts as
   a support **only when a column endpoint sits at the joint** (`pipeline._verified_spans`): a secondary

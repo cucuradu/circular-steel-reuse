@@ -317,6 +317,38 @@ def test_cutting_stock_greedy_packs_by_length():
     assert len(chosen) == 2     # only two 4050-mm pieces fit a 9000-mm donor
 
 
+def test_wind_uplift_governs_and_can_reject_a_slender_roof_beam(cat):
+    # Load-reversal end to end: a light roof (g_k = 0.5 kPa) under strong net suction (8 kPa).
+    # Net upward w = (1.5*8 - 0.5)*3 = 34.5 N/mm -> M = 155.25 kNm with the BOTTOM flange in
+    # compression (no slab restrains it). An IPE300 donor passes the gravity case restrained
+    # (M = 69.9 kNm << M_c,Rd = 173 kNm) but its unrestrained M_b,Rd(6 m) ~ 77.7 kNm fails the
+    # reversal; a roomy IPE500 passes with the uplift case reported as governing.
+    from steelreuse.core.loads import AreaLoadModel
+    from steelreuse.pipeline import build_slots
+    from steelreuse.schema import ExtractedMember, ExtractedModel
+
+    demand = ExtractedModel(kind="demand", members=[
+        ExtractedMember(id="r1", role="beam", section="IPE300", raw_section="IPE300",
+                        material_grade="S275", length_mm=6000, spans_mm=[6000],
+                        start_xyz=[0, 0, 6000], end_xyz=[6000, 0, 6000]),
+    ])
+    slots = build_slots(demand, AreaLoadModel(dead_kpa=0.5, uplift_kpa=8.0))
+
+    rejected = match([SupplyItem(id="d300", section="IPE300", grade="S275", length_mm=7000)],
+                     slots, cat)
+    assert rejected.assignments == []   # fails the reversal despite passing gravity
+
+    ok = match([SupplyItem(id="d500", section="IPE500", grade="S275", length_mm=7000)], slots, cat)
+    assert len(ok.assignments) == 1
+    assert ok.assignments[0].governing_combination == "ULS wind uplift"
+
+    # without uplift the same IPE300 donor is accepted
+    slots_off = build_slots(demand, AreaLoadModel(dead_kpa=0.5))
+    accepted = match([SupplyItem(id="d300", section="IPE300", grade="S275", length_mm=7000)],
+                     slots_off, cat)
+    assert len(accepted.assignments) == 1
+
+
 def test_construction_stage_governs_and_can_reject_a_slender_beam(cat):
     # #8 construction-stage case, end to end through build_slots + match: an IPE300-design beam slot
     # at 6 m / 3 m tributary. Under gravity (restrained, w = 27.675 N/mm) M_Ed = 124.5 kNm and an

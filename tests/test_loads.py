@@ -174,6 +174,56 @@ def test_construction_stage_adds_unrestrained_beam_entry_to_slots():
         s for s in slots_off if s.member_id == "b1").combinations] == ["ULS gravity"]
 
 
+# ---------------------------------------------------------------------------
+# Wind-uplift (load reversal) case
+# ---------------------------------------------------------------------------
+
+def test_uplift_udl_arithmetic():
+    # net upward w = (gamma_Q*W_up - 1.0*g_k) * width = (1.5*2.0 - 0.5) * 3 = 7.5 N/mm
+    m = AreaLoadModel(dead_kpa=0.5, uplift_kpa=2.0)
+    assert m.uplift_udl_Npmm() == pytest.approx((1.5 * 2.0 - 0.5) * 3.0)
+    # a heavy floor-type permanent load wins -> negative (no reversal)
+    assert AreaLoadModel(dead_kpa=3.5, uplift_kpa=1.0).uplift_udl_Npmm() < 0
+    # per-beam tributary override is honoured
+    m2 = AreaLoadModel(dead_kpa=0.5, uplift_kpa=2.0, tributary_overrides={"b1": 2.0})
+    assert m2.uplift_udl_Npmm("b1") == pytest.approx((1.5 * 2.0 - 0.5) * 2.0)
+
+
+def test_wind_uplift_adds_reversal_entry_for_roof_beams_only():
+    from steelreuse.pipeline import build_slots
+    from steelreuse.schema import ExtractedModel
+
+    def _demand():
+        return ExtractedModel(kind="demand", members=[
+            ExtractedMember(id="roof", role="beam", section="IPE300", raw_section="IPE300",
+                            material_grade="S275", length_mm=6000, spans_mm=[6000],
+                            start_xyz=[0, 0, 6000], end_xyz=[6000, 0, 6000]),
+            ExtractedMember(id="floor", role="beam", section="IPE300", raw_section="IPE300",
+                            material_grade="S275", length_mm=6000, spans_mm=[6000],
+                            start_xyz=[0, 0, 3000], end_xyz=[6000, 0, 3000]),
+        ])
+
+    slots = build_slots(_demand(), AreaLoadModel(dead_kpa=0.5, uplift_kpa=2.0))
+    roof = next(s for s in slots if s.member_id == "roof")
+    assert [n for n, _ in roof.combinations] == ["ULS gravity", "ULS wind uplift"]
+    up = dict(roof.combinations)["ULS wind uplift"]
+    assert not up.compression_flange_restrained    # bottom flange in compression: no slab there
+    w = (1.5 * 2.0 - 0.5) * 3.0
+    assert up.My_Ed == pytest.approx(w * 6000**2 / 8)
+    assert up.Vz_Ed == pytest.approx(w * 6000 / 2)
+    # only the top framing level sees roof suction
+    floor = next(s for s in slots if s.member_id == "floor")
+    assert [n for n, _ in floor.combinations] == ["ULS gravity"]
+    # heavy permanent load -> net downward -> no reversal entry
+    heavy = build_slots(_demand(), AreaLoadModel(dead_kpa=3.5, uplift_kpa=1.0))
+    assert [n for n, _ in next(
+        s for s in heavy if s.member_id == "roof").combinations] == ["ULS gravity"]
+    # default off -> envelope exactly as before
+    off = build_slots(_demand(), AreaLoadModel())
+    assert [n for n, _ in next(
+        s for s in off if s.member_id == "roof").combinations] == ["ULS gravity"]
+
+
 def test_per_member_k_override_in_the_analytic_path():
     from steelreuse.pipeline import build_slots
     from steelreuse.schema import ExtractedModel

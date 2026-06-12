@@ -47,6 +47,7 @@ class AreaLoadModel:
     flange_restrained: bool = True         # a floor slab restrains the beam's compression flange
     construction_stage: bool = False       # add the bare-steel erection-stage case for beams (opt-in)
     construction_live_kpa: float = 0.75    # EN 1991-1-6 q_ca, working personnel (kN/m^2)
+    uplift_kpa: float = 0.0                # net upward roof wind pressure (kN/m^2, EN 1991-1-4; 0 = off)
     tributary_overrides: dict[str, float] = field(default_factory=dict)         # beam id -> width (m)
     column_area_overrides: dict[str, float] = field(default_factory=dict)       # col id -> area (m^2)
     column_floor_overrides: dict[str, float] = field(default_factory=dict)      # col id -> floor count
@@ -79,6 +80,19 @@ class AreaLoadModel:
             member_id and self.tributary_overrides) else None
         width = self.beam_tributary_width_m if trib is None else trib
         return (self.gamma_g * self.dead_kpa + self.gamma_q * self.construction_live_kpa) * width
+
+    def uplift_udl_Npmm(self, member_id: str | None = None) -> float:
+        """Net UPWARD line load for the wind-uplift reversal case (N/mm); <= 0 means no reversal.
+
+        EN 1990 6.10 with the permanent action FAVOURABLE: ``gamma_Q * W_up - 1.0 * g_k`` (Table
+        A1.2(B) gives gamma_G,fav = 1.0; imposed load is favourable too, so it is absent). The same
+        ``dead_kpa`` as the gravity case is used — set ``--dead`` to the roof's actual permanent
+        load when checking a light roof, since a heavy floor pressure hides a real reversal.
+        """
+        trib = self.tributary_overrides.get(member_id) if (
+            member_id and self.tributary_overrides) else None
+        width = self.beam_tributary_width_m if trib is None else trib
+        return (self.gamma_q * self.uplift_kpa - 1.0 * self.dead_kpa) * width
 
     def column_axial_N(self, tributary_area_m2: float | None = None,
                        floors: float | None = None) -> float:

@@ -336,9 +336,14 @@ with an owner and a fix sketch.
 - **Floor-vibration screen**: `f₁ ≈ 18/√δ_perm`; flag floors below ~4 Hz. Cheap and very professional.
 
 ### I-2. Actions & combinations
-- ★ **Load reversal / wind-uplift case** (`1.0·G + 1.5·W`): hogging puts the **bottom** flange in
-  compression where no slab restrains it — the one remaining non-conservative blind spot of the
-  restrained-flange default. Needs the wind path + a reversed-restraint LTB check.
+- ✅ **Load reversal / wind-uplift case — DONE** (`--wind-uplift q`, app input): roof beams (top
+  framing level, from coordinates) gain a `γ_Q·W_up − 1.0·g_k` envelope entry (EN 1990 favourable
+  permanent) checked with the compression (bottom) flange UNRESTRAINED — closing the
+  restrained-flange default's blind spot. Net ≤ 0 (permanent wins) adds nothing; `q` is the user's
+  EN 1991-1-4 net roof pressure. *Residual:* a separate roof permanent load (today the floor
+  `dead_kpa` is reused — set `--dead` to the roof's value for a light-roof check), and uplift on
+  the frame path as a real reversed load case (today an isolated-span envelope entry, like the
+  construction stage).
 - **Pattern live load** for continuous beams in the frame path (alternate-span DL/LL cases).
 - **ψ-factors by occupancy category** (EN 1990 Table A1.1) instead of the fixed 0.7/0.3.
 - **Snow** (EN 1991-1-3) for roof members (detectable: highest-level beams).
