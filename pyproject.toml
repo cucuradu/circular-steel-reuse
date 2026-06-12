@@ -52,7 +52,7 @@ ignore = ["SIM108"]
 # The pyRevit extractor + extension buttons may run under IronPython inside Revit: keep the coding
 # declaration and %-formatting, and don't enforce the line length on their docstrings.
 "extractor/*" = ["UP009", "UP031", "E501"]
-"pyrevit_extension/*" = ["UP009", "UP031", "E501"]
+"pyrevit_extension/*" = ["UP009", "UP031", "E501", "SIM105"]
 # Embedded HTML/CSS template strings are unavoidably long.
 "src/steelreuse/inventory.py" = ["E501"]
 "src/steelreuse/llm/report.py" = ["E501"]

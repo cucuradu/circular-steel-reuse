@@ -76,13 +76,16 @@ Revit ──(pyRevit extractor)──> donor.json / demand.json
 | 5 | MILP matching (the flagship) | ✅ |
 | 6 | Report (Jinja2 HTML) + provider-agnostic LLM narrative | ✅ (Gemini verified live; Ollama optional) |
 | 7 | Real LTB (χ_LT), IFC extractor, Streamlit dashboard, trained-model artifacts | ✅ |
-| 7+ | Cutting-stock (1 member → many cuts, `--cut`) ✅ · **Global frame analysis** (`--frame-analysis`: gravity load path + EN 5.3.2 sway EHF + `--wind` + EN 1998 `--seismic` lateral force + P-Δ via PyNite) ✅ · **Pre-demolition audit** (`--pda`: per-member condition/verification → knockdown + quarantine) ✅ · **HSS catalog + hollow-section checks** (388 AISC rect/square HSS) ✅ · **Connection feasibility screen** (`--connections`: geometric donor-vs-design-section compatibility) ✅ · **Geometry confirmation** of fuzzy/unknown section names from measured dimensions ✅ · SAP2000 backend, modal-spectrum seismic, multi-objective ⬜ | ◑ partial |
+| 7+ | Cutting-stock (1 member → many cuts, `--cut`) ✅ · **Global frame analysis** (`--frame-analysis`: gravity load path + EN 5.3.2 sway EHF + `--wind` + EN 1998 `--seismic` lateral force + P-Δ via PyNite) ✅ · **Pre-demolition audit** (`--pda`: per-member condition/verification → knockdown + quarantine) ✅ · **HSS catalog + hollow-section checks** (388 AISC rect/square HSS) ✅ · **Connection feasibility screen** (`--connections`: geometric donor-vs-design-section compatibility) ✅ · **Geometry confirmation** of fuzzy/unknown section names from measured dimensions ✅ · **"Apply Matches" Revit write-back** (`--apply-matches-out`: per-element status JSON + pyRevit button colours donor/demand elements by reuse status) ✅ · SAP2000 backend, modal-spectrum seismic, multi-objective ⬜ | ◑ partial |
 
 Entry points (once installed, the `steelreuse` command is on your PATH):
 
 ```powershell
 steelreuse --demo                                  # bundled sample models -> reports/demo_report.html
 steelreuse --donor donor.json --demand demand.json --out reports/report.html
+
+# also write a per-element status JSON for the pyRevit "Apply Matches" button:
+steelreuse --donor donor.json --demand demand.json --apply-matches-out status.json
 
 streamlit run app.py                               # interactive dashboard (needs the [ui] extra)
 python -m steelreuse.ml.train                      # regenerate synthetic dataset + train the surrogate
@@ -119,7 +122,7 @@ cd circular-steel-reuse
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[analysis,fea,ml,opt,report,llm,ui,bim,dev]"
-pytest          # 130 tests
+pytest          # 217 tests
 ruff check .
 ```
 

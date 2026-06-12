@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
 from .resources import sample_path
 from .schema import ExtractionError
+from .writeback import build_writeback
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -46,6 +48,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--donor", help="donor (supply) extraction JSON")
     ap.add_argument("--demand", help="new-design (demand) extraction JSON")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
+    ap.add_argument("--apply-matches-out",
+                    help="write a per-element status JSON (donor: reused/available/quarantined/"
+                         "unmapped; demand: filled/partially_filled/unfilled/non_steel) for the "
+                         "pyRevit 'Apply Matches' button to colour the source models")
     ap.add_argument("--knockdown", type=float, default=1.0,
                     help="default reclaimed f_y knockdown (<=1.0) for donor members with no audit data")
     # Pre-demolition audit (PDA): per-member condition / verification provenance.
@@ -158,6 +164,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
 
+    if args.apply_matches_out:
+        wb_path = Path(args.apply_matches_out)
+        wb_path.parent.mkdir(parents=True, exist_ok=True)
+        wb_path.write_text(json.dumps(build_writeback(res), indent=2), encoding="utf-8")
+
     if isinstance(loads, AreaLoadModel):
         trib = "geometry-estimated" if args.trib_from_geometry else f"{args.trib_width:g} m"
         parts = ["gravity"]
@@ -201,6 +212,8 @@ def _execute(args: argparse.Namespace, donor: str, demand: str) -> int:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
     print(f"Narrative source: {source}")
     print(f"Report written -> {out}")
+    if args.apply_matches_out:
+        print(f"Apply-matches data written -> {wb_path}")
     return 0
 
 

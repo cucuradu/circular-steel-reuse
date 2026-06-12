@@ -34,7 +34,7 @@ Program to obtain the carbon‑optimal feasible assignment. An optional global f
 realistic action effects (gravity load path, sway imperfection, wind, seismic, and second‑order effects).
 A language model generates the report prose under a strict constraint that it performs no arithmetic; all
 quantities are computed deterministically and validated. The deterministic core is hand‑verified against
-published section data and protected by 127 automated tests. The tool is scoped as member‑level
+published section data and protected by 217 automated tests. The tool is scoped as member‑level
 pre‑feasibility decision support: it does not design connections, and reclaimed material requires physical
 verification before reliance.
 
@@ -506,11 +506,12 @@ would require a non‑circular validation against real reuse outcomes.
 `V_pl,Rd(S235) = 348 kN`, flexural buckling `χ_z(L = 4 m, S275) = 0.392`, LTB `χ_LT(L = 6 m) ≈ 0.45`
 decreasing with span, and deflection `δ ≈ 9.62 mm` (w = 10 N/mm, L = 6 m).
 
-**Automated suite.** 127 tests (across twelve files) pass under a clean linter, covering the member
+**Automated suite.** 217 tests (across nineteen files) pass under a clean linter, covering the member
 checks, the matcher (known‑answer feasibility, use constraints, the avoided‑new and standard‑restricted
 baselines, degenerate‑geometry safety, the greedy guard, the combination envelope, cutting‑stock), the
 frame analysis (topology, recovery of `wL²/8`, multi‑storey accumulation, sway/wind/seismic forces,
-multi‑span splitting), and catalogue integrity for all 711 rows.
+multi‑span splitting, sway‑stiffness classification), the pre‑demolition audit, the connection screen
+(geometric compatibility and standard fin‑plate capacity), and catalogue integrity for all 711 rows.
 
 **Methodology record.** A methodology document maps each clause to its implementation, assumption and
 validation basis; the limitation register (Chapter 13) states the explicit non‑claims.
@@ -686,8 +687,10 @@ LTB, MILP, P‑Δ, SLS, ULS.
 `steelreuse --donor D.json --demand M.json --out report.html` with options: `--knockdown`; audit
 `--pda audit.csv --include-unverified`; loads
 `--dead --live --gamma-g --gamma-q --trib-width --col-trib-area --col-floors --trib-from-geometry`;
-combination `--col-ecc --phi`; demand filter `--all-demand`; matching `--cut`; analysis
-`--frame-analysis --pdelta --wind --seismic`; legacy `--beam-udl --column-axial`. Additional entry points:
+combination `--col-ecc --phi`; construction stage `--construction --construction-live`; connection
+screen `--connections`; demand filter `--all-demand`; matching `--cut`; analysis
+`--frame-analysis --pdelta --wind --seismic`; legacy `--beam-udl --column-axial`; utility `--demo
+--debug --version`. Additional entry points:
 `streamlit run app.py` (dashboard); `python -m steelreuse.inventory donor.json` (pre‑demolition
 inventory); `python -m steelreuse.ml.train` (regenerate the ML study).
 
