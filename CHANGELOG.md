@@ -16,6 +16,17 @@ All notable changes to this project are documented here. The format is based on
   the demo headline is unchanged. CASE_STUDY/METHODOLOGY/README updated.
 
 ### Added
+- **Moment-shape-aware `C₁` and `C_m`** (`--moment-shape`, `run_pipeline(moment_shape=)`, default off →
+  byte-identical): drops the conservative uniform-moment assumption (`C₁ = C_m = 1.0`) when the real
+  moment diagram is known. `C₁` (LTB moment-gradient) uses the general 4-moment / `C_b` formula — `1.0`
+  for uniform moment, **`1.136`** for a simply-supported beam under UDL — and feeds `M_cr`/`χ_LT` for a
+  less-conservative LTB check; `C_m` (6.3.3) uses Annex B Table B.3 `0.6 + 0.4·ψ` from the end-moment
+  ratio for end-moment-driven members. The analytic path uses the simply-supported-UDL shape, the frame
+  path samples the **solved** PyNite diagram (`x = 0, L/4, L/2, 3L/4, L`), and the unrestrained
+  construction-stage / wind-uplift entries take `C₁ = 1.136`. Hand-verified vs EN 1993-1-1 Annex B / NCCI
+  SN003 / AISC `C_b`; see METHODOLOGY §5.5b. On the real case study the headline is unchanged
+  (slab-restrained, length-limited); under `--construction` the booked CO₂ moves 64404.2 → 63458.2 kg
+  (reuse 71, verified) as the avoided-new baseline also lightens.
 - **Stock stewardship & counterfactual fates** — a family of opt-in knobs (all default off, so existing
   results stay byte-identical) addressing what the single-project matcher cannot see: the donor's
   end-of-life fate, capacity waste, section variety, and future demand. See METHODOLOGY §6.1 + §7.6.
