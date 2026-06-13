@@ -43,7 +43,7 @@ import math
 from dataclasses import dataclass, field
 
 from ..schema import ExtractedMember
-from .ec3_checks import MemberDemand
+from .ec3_checks import MemberDemand, c1_moment_gradient, cm_from_psi, end_moment_ratio
 from .sections import SectionProps
 
 # Steel elastic constants (N/mm^2). G = E / (2(1+nu)) with nu = 0.3.
@@ -69,6 +69,7 @@ class FrameOptions:
     level_tol_mm: float = 500.0    # node elevations within this are one storey level (for wind/seismic)
     seismic_cs: float = 0.0        # EN 1998-1 base-shear coefficient Sd(T1)*lambda/g (0 = off)
     psi2_imposed: float = 0.3      # EN 1990 quasi-permanent factor (seismic mass + seismic combination)
+    moment_shape: bool = False     # derive C1 (LTB) + Cmy/Cmz (6.3.3) from the solved moment diagram
 
 
 @dataclass
@@ -561,6 +562,41 @@ def _envelope_moment(member, axis: str, combo: str) -> float:
     return max(abs(member.max_moment(axis, combo)), abs(member.min_moment(axis, combo)))
 
 
+def _cm_axis(samples: list[float]) -> float:
+    """Annex B ``Cm`` for one axis from five moment samples ``[0, L/4, L/2, 3L/4, L]``.
+
+    The linear end-moment formula ``Cm = 0.6 + 0.4ψ`` only applies when the member is genuinely
+    *end-moment driven* (a frame column under lateral load: the peak sits at an end). When the peak
+    is interior — a transverse-loaded beam whose end moments are near zero — ``ψ`` is meaningless, so
+    the conservative ``Cm = 1.0`` is kept (and such members carry ≈0 axial anyway, so the 6.3.3 term
+    barely engages). Threshold: an end moment ≥ half the peak counts as end-moment driven."""
+    mmax = max(abs(v) for v in samples)
+    if mmax <= 0.0 or max(abs(samples[0]), abs(samples[-1])) < 0.5 * mmax:
+        return 1.0
+    return cm_from_psi(end_moment_ratio(samples[0], samples[-1]))
+
+
+def _moment_shape_factors(member, length: float, combo: str) -> tuple[float, float, float]:
+    """``(C1, Cmy, Cmz)`` for one member/combo from the SOLVED moment diagram.
+
+    Samples the signed local moment at ``x = 0, L/4, L/2, 3L/4, L``: the major-axis (``My``) samples
+    give the LTB moment-gradient ``C1`` via the 4-moment formula, and each axis's diagram gives the
+    Annex B equivalent-uniform-moment ``Cm`` (see :func:`_cm_axis`). Any failure to read a station
+    (PyNite API/edge cases) falls back to the conservative ``1.0`` — the factor is never over-claimed.
+    A pinned beam (≈0 end moments, parabolic span) yields ``C1≈1.136``, ``Cmy=1.0``; a column under
+    linear end moments yields the right ``Cm`` and ``C1``."""
+    if length <= 0:
+        return 1.0, 1.0, 1.0
+    xs = [0.0, 0.25 * length, 0.5 * length, 0.75 * length, length]
+    try:
+        my = [float(member.moment("My", x, combo)) for x in xs]
+        mz = [float(member.moment("Mz", x, combo)) for x in xs]
+    except Exception:  # pragma: no cover - PyNite station/edge cases -> conservative default
+        return 1.0, 1.0, 1.0
+    c1 = c1_moment_gradient(max(abs(v) for v in my), my[1], my[2], my[3])
+    return c1, _cm_axis(my), _cm_axis(mz)
+
+
 def _governing_shear(member, combo: str) -> float:
     """Worst transverse shear magnitude (max of |Fy|, |Fz|) for a combo."""
     return max(abs(member.max_shear("Fy", combo)), abs(member.min_shear("Fy", combo)),
@@ -879,12 +915,14 @@ def analyze_frame(
         kz = getattr(m, "kz", None) or 1.0
         per_combo: list[tuple[str, MemberDemand]] = []
         for name, _ in uls_combos:                 # SLS drives only the deflection check, not slots
+            c1, cmy, cmz = (_moment_shape_factors(mem, length, name)
+                            if options.moment_shape else (1.0, 1.0, 1.0))
             per_combo.append((name, MemberDemand(
                 N_Ed=_governing_axial(mem, name),
                 My_Ed=_envelope_moment(mem, "My", name),
                 Mz_Ed=_envelope_moment(mem, "Mz", name),
                 Vz_Ed=_governing_shear(mem, name),
-                L=length, ky=ky, kz=kz,
+                L=length, ky=ky, kz=kz, C1=c1, Cmy=cmy, Cmz=cmz,
                 compression_flange_restrained=restrained, w_service=w_serv,
             )))
         demands_by_member[mid] = per_combo

@@ -133,6 +133,12 @@ def main(argv: list[str] | None = None) -> int:
                          "donors could also serve — a single-project proxy for option value "
                          "(unseen future demand); the principled tool is portfolio matching "
                          "(--demand with several models). Selection only, booked CO2 unchanged")
+    ap.add_argument("--moment-shape", action="store_true",
+                    help="sharper (less conservative) checks from the real moment diagram: derive the "
+                         "LTB moment-gradient C1 (4-moment / Cb formula) and the 6.3.3 Cm factors "
+                         "(EN Annex B) instead of the conservative uniform-moment 1.0 — a "
+                         "simply-supported beam under UDL gets C1=1.136; frame members use their "
+                         "solved diagram. Default off (results byte-identical without it)")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -222,7 +228,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         disposition=args.disposition or bool(args.disposition_csv),
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
         min_util=args.min_util, max_distinct_sections=args.max_distinct_sections,
-        reserve_w=args.reserve,
+        reserve_w=args.reserve, moment_shape=args.moment_shape,
     )
 
     ctx = build_report_context(res)

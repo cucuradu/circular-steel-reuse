@@ -12,7 +12,7 @@ from pathlib import Path
 from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
 from .core.carbon import Passport, build_passport
 from .core.connections import ConnectionPolicy
-from .core.ec3_checks import MemberDemand
+from .core.ec3_checks import MemberDemand, c1_moment_gradient
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
 from .core.frame import FrameOptions, FrameResult, analyze_frame
 from .core.loads import AreaLoadModel, estimate_column_loads, estimate_tributary_widths
@@ -105,7 +105,13 @@ def build_supply(
     return supply, report, audit
 
 
-def _construction_demand(loads, member_id: str, span_mm: float) -> tuple[str, MemberDemand] | None:
+# Simply-supported span under uniform load -> the 4-moment LTB factor C1 = 1.136 (vs the conservative
+# 1.0). Used for the unrestrained construction-stage / wind-uplift entries when --moment-shape is on.
+_C1_SS_UDL = c1_moment_gradient(1.0, 0.75, 1.0, 0.75)
+
+
+def _construction_demand(loads, member_id: str, span_mm: float,
+                         moment_shape: bool = False) -> tuple[str, MemberDemand] | None:
     """Bare-steel erection-stage envelope entry for a beam span (EN 1991-1-6), or ``None`` if off.
 
     The defining feature of the stage is the **missing slab**: the compression flange is unrestrained,
@@ -119,11 +125,12 @@ def _construction_demand(loads, member_id: str, span_mm: float) -> tuple[str, Me
     w = loads.construction_udl_Npmm(member_id)
     return ("ULS construction stage", MemberDemand(
         My_Ed=w * span_mm**2 / 8.0, Vz_Ed=w * span_mm / 2.0, L=span_mm,
-        compression_flange_restrained=False,
+        compression_flange_restrained=False, C1=_C1_SS_UDL if moment_shape else 1.0,
     ))
 
 
-def _uplift_demand(loads, member_id: str, span_mm: float) -> tuple[str, MemberDemand] | None:
+def _uplift_demand(loads, member_id: str, span_mm: float,
+                   moment_shape: bool = False) -> tuple[str, MemberDemand] | None:
     """Wind-uplift load-reversal envelope entry for a ROOF beam span, or ``None`` if off / no reversal.
 
     Net upward wind (suction) on a light roof reverses the bending: the BOTTOM flange goes into
@@ -139,7 +146,7 @@ def _uplift_demand(loads, member_id: str, span_mm: float) -> tuple[str, MemberDe
         return None
     return ("ULS wind uplift", MemberDemand(
         My_Ed=w * span_mm**2 / 8.0, Vz_Ed=w * span_mm / 2.0, L=span_mm,
-        compression_flange_restrained=False,
+        compression_flange_restrained=False, C1=_C1_SS_UDL if moment_shape else 1.0,
     ))
 
 
@@ -213,6 +220,7 @@ def build_slots(
     backend: ForceBackend | None = None,
     steel_only: bool = False,
     frame_slots: dict[str, list] | None = None,
+    moment_shape: bool = False,
 ) -> list[DemandSlot]:
     """Turn demand members into force-based slots.
 
@@ -244,11 +252,11 @@ def build_slots(
                 for s in member_slots:
                     envelope = list(s.demands)
                     if m.role == "beam":
-                        extra = _construction_demand(loads, m.id, s.required_length_mm)
+                        extra = _construction_demand(loads, m.id, s.required_length_mm, moment_shape)
                         if extra:
                             envelope.append(extra)
                         if m.id in roof_ids:
-                            extra = _uplift_demand(loads, m.id, s.required_length_mm)
+                            extra = _uplift_demand(loads, m.id, s.required_length_mm, moment_shape)
                             if extra:
                                 envelope.append(extra)
                     slots.append(DemandSlot(
@@ -272,7 +280,8 @@ def build_slots(
         per_combo = [
             (name, member_demands(
                 m, load, backend, ky=m.ky or 1.0, kz=m.kz or 1.0,
-                compression_flange_restrained=loads.beam_flange_restrained))
+                compression_flange_restrained=loads.beam_flange_restrained,
+                moment_shape=moment_shape))
             for name, load in loads.combination_loads(m)
         ]
         spans = m.spans_mm or ([m.length_mm] if m.length_mm else [0.0])
@@ -281,11 +290,11 @@ def build_slots(
             span = spans[idx] if idx < len(spans) else spans[-1]
             combo_demands = [(name, dl[idx]) for name, dl in per_combo]
             if m.role == "beam":
-                extra = _construction_demand(loads, m.id, span or 0.0)
+                extra = _construction_demand(loads, m.id, span or 0.0, moment_shape)
                 if extra:
                     combo_demands.append(extra)
                 if m.id in roof_ids:
-                    extra = _uplift_demand(loads, m.id, span or 0.0)
+                    extra = _uplift_demand(loads, m.id, span or 0.0, moment_shape)
                     if extra:
                         combo_demands.append(extra)
             req_len = m.length_mm if m.role == "column" else span
@@ -365,6 +374,7 @@ def run_pipeline(
     min_util: float = 0.0,
     max_distinct_sections: int | None = None,
     reserve_w: float = 0.0,
+    moment_shape: bool = False,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -430,12 +440,12 @@ def run_pipeline(
             # Route the sway imperfection (--phi) to the frame-level EHF treatment (not the
             # member-level notional moment); P-Delta is auto-enabled there whenever phi > 0.
             opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
-                                wind_kpa=wind_kpa, seismic_cs=seismic_cs)
+                                wind_kpa=wind_kpa, seismic_cs=seismic_cs, moment_shape=moment_shape)
             fr = analyze_frame(demand.members, loads, catalog, options=opts)
             frame_slots = fr.slots_by_member if fr.ok else None
 
         model_slots = build_slots(demand, loads, steel_only=steel_only_demand,
-                                  frame_slots=frame_slots)
+                                  frame_slots=frame_slots, moment_shape=moment_shape)
         if tag is not None:
             for s in model_slots:
                 s.id = f"{tag}::{s.id}"

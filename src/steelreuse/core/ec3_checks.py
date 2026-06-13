@@ -173,6 +173,25 @@ def chi_LT(sec: SectionProps, fy: float, L: float, section_class: int, C1: float
     return min(chi, 1.0, 1.0 / lam**2)
 
 
+def c1_moment_gradient(m_max: float, m_quarter: float, m_mid: float, m_three_quarter: float) -> float:
+    """LTB moment-gradient factor ``C1`` (≈ AISC ``C_b``) from four moment samples along the segment.
+
+    General 4-moment formula (NCCI SN003 / AISC F1):
+
+        C1 = 12.5·|M_max| / (2.5·|M_max| + 3·|M_¼| + 4·|M_½| + 3·|M_¾|)
+
+    It is valid for *any* moment diagram and uses magnitudes (sign-safe). It reduces to **1.0** for a
+    uniform moment and **≈1.136** for a simply-supported beam under uniform load. Capped at the
+    EN-conventional **2.70** and floored at **1.0** (uniform moment is the conservative baseline, and
+    C1 > 1 must never be over-claimed from noisy sampling); a zero diagram returns 1.0.
+    """
+    mmax = abs(m_max)
+    denom = 2.5 * mmax + 3 * abs(m_quarter) + 4 * abs(m_mid) + 3 * abs(m_three_quarter)
+    if mmax <= 0.0 or denom <= 0.0:
+        return 1.0
+    return max(1.0, min(12.5 * mmax / denom, 2.70))
+
+
 def _buckling_alpha(sec: SectionProps, axis: str) -> float:
     """Imperfection factor alpha from the buckling curve, EN 1993-1-1 Tables 6.1/6.2 (rolled I/H).
 
@@ -229,6 +248,26 @@ def N_b_Rd(sec: SectionProps, fy: float, L: float, k: float, axis: str) -> tuple
 # ---------------------------------------------------------------------------
 # EN 1993-1-1 6.3.3 beam-column interaction, Annex B (Method 2)
 # ---------------------------------------------------------------------------
+
+def cm_from_psi(psi: float) -> float:
+    """Equivalent-uniform-moment factor ``Cm`` for linear end moments, EN 1993-1-1 Annex B Table B.3:
+    ``Cm = 0.6 + 0.4·ψ ≥ 0.4`` with the end-moment ratio ``ψ`` clamped to ``[-1, 1]``."""
+    psi = max(-1.0, min(psi, 1.0))
+    return max(0.6 + 0.4 * psi, 0.4)
+
+
+def end_moment_ratio(m_i: float, m_j: float) -> float:
+    """Signed end-moment ratio ``ψ ∈ [-1, 1]`` from a member's two end moments.
+
+    ``ψ`` = (smaller-magnitude end moment) / (larger-magnitude end moment), keeping signs — so equal
+    same-sign ends give ``+1`` (single curvature) and equal opposite-sign ends give ``-1`` (double
+    curvature). A zero diagram returns ``+1`` (uniform → ``Cm = 1.0``, the conservative default). The
+    two moments must share a consistent convention (same sign ⇒ single curvature)."""
+    a, b = (m_i, m_j) if abs(m_i) >= abs(m_j) else (m_j, m_i)
+    if a == 0.0:
+        return 1.0
+    return max(-1.0, min(b / a, 1.0))
+
 
 def annex_b_k_factors(
     section_class: int,
@@ -292,6 +331,8 @@ class MemberDemand:
     kz: float = 1.0            # about z
     compression_flange_restrained: bool = False
     C1: float = 1.0            # LTB moment-distribution factor (1.0 = uniform moment, conservative)
+    Cmy: float = 1.0           # 6.3.3 equivalent-uniform-moment factor, major axis (1.0 = conservative)
+    Cmz: float = 1.0           # 6.3.3 equivalent-uniform-moment factor, minor axis (1.0 = conservative)
     w_service: float | None = None   # service UDL (N/mm) for the optional deflection check
     defl_limit_ratio: float = 250.0  # delta <= L / this
 
@@ -446,7 +487,8 @@ def check_member(
         ltb = (chi_LT(sec, fy, demand.L, section_class, demand.C1)
                if susceptible and abs(demand.My_Ed) > 0 and demand.L > 0 else 1.0)
         k = annex_b_k_factors(section_class, lam_y, lam_z, n_y, n_z,
-                              hollow=sec.is_hollow, susceptible=susceptible)
+                              hollow=sec.is_hollow, susceptible=susceptible,
+                              Cmy=demand.Cmy, Cmz=demand.Cmz)
         My_Rk = (sec.Wpl_y if section_class <= 2 else sec.Wel_y) * fy
         Mz_Rk = (sec.Wpl_z if section_class <= 2 else sec.Wel_z) * fy
         my_term = abs(demand.My_Ed) / (ltb * My_Rk / GAMMA_M1)
@@ -455,7 +497,8 @@ def check_member(
         u_662 = n_z + k["kzy"] * my_term + k["kzz"] * mz_term
         checks.append(CheckResult(
             "interaction_NM", max(u_661, u_662),
-            {"method": "EN 1993-1-1 6.3.3, Annex B Method 2 (Cm=1.0)",
+            {"method": "EN 1993-1-1 6.3.3, Annex B Method 2",
+             "Cmy": round(demand.Cmy, 3), "Cmz": round(demand.Cmz, 3), "C1": round(demand.C1, 3),
              "eq_6_61": round(u_661, 4), "eq_6_62": round(u_662, 4),
              "chi_LT": round(ltb, 4), **{f: round(v, 4) for f, v in k.items()}},
         ))

@@ -123,6 +123,24 @@ def test_portal_beam_recovers_simply_supported_closed_form():
     assert dem.compression_flange_restrained is True          # slab restraint (beam role)
 
 
+def test_moment_shape_factors_come_from_the_solved_diagram():
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    loads = AreaLoadModel()
+    members = [_col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000)]
+
+    off = analyze_frame(members, loads, cat)                          # conservative default
+    assert off.demands_by_member["b1"][0][1].C1 == 1.0
+
+    on = analyze_frame(members, loads, cat, options=FrameOptions(moment_shape=True))
+    dem = on.demands_by_member["b1"][0][1]
+    # The pinned beam's parabolic (simply-supported UDL) diagram, sampled from the real PyNite solve,
+    # must give C1 ≈ 1.136 — proving the moment sampling actually ran (not the 1.0 fallback)...
+    assert dem.C1 == pytest.approx(1.136, abs=2e-2)
+    # ...and its ≈0 end moments give the conservative Cm = 1.0 (no end-moment reduction on a pin).
+    assert dem.Cmy == pytest.approx(1.0, abs=1e-6)
+
+
 def test_column_axial_accumulates_through_storeys():
     pytest.importorskip("Pynite")
     cat = load_default_catalog()

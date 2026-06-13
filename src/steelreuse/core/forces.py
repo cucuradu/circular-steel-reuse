@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from .ec3_checks import MemberDemand
+from .ec3_checks import MemberDemand, c1_moment_gradient
 
 
 class ForceBackend(Protocol):
@@ -84,6 +84,7 @@ def member_demands(
     ky: float = 1.0,
     kz: float = 1.0,
     compression_flange_restrained: bool = False,
+    moment_shape: bool = False,
 ) -> list[MemberDemand]:
     """Build a :class:`MemberDemand` per structural span of a member.
 
@@ -104,12 +105,16 @@ def member_demands(
 
     spans = member.spans_mm or ([member.length_mm] if member.length_mm else [])
     w_serv = load.w_service_Npmm if load.w_service_Npmm is not None else load.udl_Npmm
+    # Moment-shape LTB factor: a simply-supported span under uniform load has the parabolic diagram
+    # M(¼)=M(¾)=0.75·M_mid, so the 4-moment formula gives C1≈1.136 — sharper than the conservative
+    # 1.0 (uniform-moment) default. Opt-in; off ⇒ C1 stays 1.0 and results are byte-identical.
+    c1 = c1_moment_gradient(1.0, 0.75, 1.0, 0.75) if moment_shape else 1.0
     for span in spans:
         M, V = backend.beam_span_forces(span, load.udl_Npmm)
         out.append(MemberDemand(
             My_Ed=M, Vz_Ed=V, L=span, ky=ky, kz=kz,
             compression_flange_restrained=compression_flange_restrained,
-            w_service=w_serv or None,
+            C1=c1, w_service=w_serv or None,
         ))
     return out
 
