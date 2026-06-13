@@ -73,6 +73,7 @@ def build_report_context(res: PipelineResult) -> dict:
         "total_new_co2_kg": round(p.total_new_kgco2e, 1),
         "donor_saved_co2_kg": round(p.total_saved_kgco2e, 1),
         "n_reused": m.n_reused,
+        "reuse_rate_pct": round(100.0 * m.n_reused / res.slot_count) if res.slot_count else 0,
         "match_co2_saved_kg": round(m.total_co2_saved_kg, 1),
         "total_offcut_mm": round(m.total_offcut_mm, 1),
         "n_unmatched": len(m.unmatched_slots),
@@ -102,6 +103,9 @@ def build_report_context(res: PipelineResult) -> dict:
         # Section variety of the result (anti-Frankenstein metric, always shown; cap when set).
         "distinct_sections": len({a.section for a in m.assignments}),
         "max_distinct_sections": (m.weights or {}).get("max_distinct_sections"),
+        # WHY the reuse came out this way: the binding constraint among unfilled slots + the lever
+        # (steelreuse.match.optimize.diagnose_match). The narrative explains this; numbers stay here.
+        "diagnosis": res.diagnosis or {},
         "disclaimer": SCOPE_DISCLAIMER,
     }
     # Portfolio (C1): per-project breakdown of the combined allocation across demand models.
@@ -200,21 +204,43 @@ def find_invented_numbers(text: str, allowed: set[float], tol: float = 0.5) -> l
 
 
 def deterministic_narrative(ctx: dict) -> str:
-    """A safe, number-faithful summary written purely from the computed context."""
+    """A safe, number-faithful summary written purely from the computed context.
+
+    Leads with the *diagnosis* (why the result came out this way and the lever to improve it), not a
+    recital of counts — the same conclusion the LLM is asked to render, available with no provider.
+    """
+    rate = ctx.get("reuse_rate_pct")
     parts = [
-        f"Of {ctx['slot_count']} demand slot(s), {ctx['n_reused']} were matched to reclaimed "
-        f"members, avoiding about {ctx['match_co2_saved_kg']} kg CO2e of new-steel production.",
+        f"{ctx['n_reused']} of {ctx['slot_count']} demand slot(s) were matched to reclaimed steel"
+        + (f" ({rate}%)" if rate is not None else "")
+        + f", avoiding about {ctx['match_co2_saved_kg']} kg CO2e of new-steel production."
     ]
-    if ctx["unmatched_slots"]:
-        parts.append(f"{ctx['n_unmatched']} slot(s) found no suitable reclaimed member "
-                     "and would need new steel.")
-    if ctx["unused_supply"]:
-        parts.append(f"{ctx['n_unused']} reclaimed member(s) were left unused and remain "
-                     "available for other projects.")
+    d = ctx.get("diagnosis") or {}
+    binding = d.get("binding_constraint")
+    if ctx["n_unmatched"] and binding and binding != "none":
+        why = {
+            "length": (f"the {d['n_unmatched']} unfilled slot(s) need longer members than the free "
+                       "stock provides — the donors both strong enough and long enough are used up "
+                       "and the remainder is too short for these spans"),
+            "capacity": (f"{d['capacity_limited']} of the {d['n_unmatched']} unfilled slot(s) had no "
+                         "donor section strong or stiff enough"),
+            "contention": (f"the adequate stock ran out — {d['contention']} unfilled slot(s) would "
+                           "have taken a donor had more of the right sections been available"),
+            "economics": (f"{d['uneconomic']} unfilled slot(s) could only be filled by donors so "
+                          "over-spec that reuse would book negative net CO2"),
+        }.get(binding, "")
+        parts.append(f"The binding constraint is {binding}: {why}. In short, {d['lever']}.")
+    if ctx.get("ltb_restraint_reliant"):
+        parts.append(f"{ctx['ltb_restraint_reliant']} reused beam(s) pass bending only because the "
+                     "slab restrains the compression flange — confirm that restraint, especially at "
+                     "the construction stage.")
+    if ctx.get("cut_donors"):
+        parts.append(f"{ctx['cut_donors']} donor(s) were cut to length, leaving "
+                     f"{ctx['reusable_remainder_m']} m of reusable remainder for other work.")
     if ctx["unknown"]:
-        top = "; ".join(f"{b['count']}x {b['name']}" for b in ctx["unknown_breakdown"][:5])
+        top = "; ".join(f"{b['count']}x {b['name']}" for b in ctx["unknown_breakdown"][:3])
         parts.append(f"{ctx['unknown']} donor member(s) across {ctx['unknown_kinds']} type(s) could "
-                     f"not be identified and were excluded from analysis (top: {top}).")
+                     f"not be identified and were excluded (top: {top}).")
     if ctx.get("audit_present"):
         parts.append(f"A pre-demolition audit covered {ctx['audit_audited']} donor member(s) "
                      f"(average f_y knockdown {ctx['audit_avg_knockdown']}); "
@@ -229,12 +255,24 @@ def generate_narrative(ctx: dict, provider: LLMProvider | None = None) -> tuple[
         return deterministic_narrative(ctx), "deterministic"
 
     system = (
-        "You are a structural reuse assistant. Write a concise, plain-language narrative for an "
-        "engineer reviewing a steel-reuse matching report. CRITICAL: do not perform any arithmetic "
-        "and do not introduce any numbers that are not already in the data provided. Only use the "
-        "figures given. Keep it under 150 words."
+        "You are a structural-reuse analyst writing the summary of a steel-reuse matching report for "
+        "an engineer. Be ANALYTICAL, not a list. Lead with the headline outcome, then EXPLAIN WHY the "
+        "result came out this way: the binding constraint and the lever that would improve it are "
+        "given to you in the 'diagnosis' field — build the explanation around them in your own words "
+        "(e.g. 'reuse here is limited by donor length, not capacity, so cutting or splicing is the "
+        "lever'). Then flag the key risks (beams that rely on slab restraint for LTB, quarantined or "
+        "unidentified stock). Do NOT recite the assignment table or list section names. CRITICAL: do "
+        "no arithmetic and introduce no number that is not already in the data. Keep it under 130 words."
     )
-    prompt = f"Matching results (already computed, do not change any number):\n{ctx}"
+    prompt = (
+        "Computed results — explain them in plain language, do not change or invent any number:\n"
+        f"- headline: {ctx['n_reused']} of {ctx['slot_count']} slots reused "
+        f"({ctx.get('reuse_rate_pct')}%), {ctx['match_co2_saved_kg']} kg CO2e avoided\n"
+        f"- diagnosis (why, and the lever): {ctx.get('diagnosis')}\n"
+        f"- risks: beams relying on slab restraint for LTB = {ctx.get('ltb_restraint_reliant')}, "
+        f"unidentified donors = {ctx['unknown']}, donors cut to length = {ctx['cut_donors']}\n"
+        f"- full computed context (numbers you may quote): {ctx}"
+    )
     try:  # pragma: no cover - exercised only with a live provider
         text = provider.complete(system, prompt).strip()
     except Exception:
@@ -265,6 +303,9 @@ _TEMPLATE = """<!doctype html>
  <div class="kpi"><b>{{ ctx.donor_saved_co2_kg }}</b>kg CO2e in full donor stock</div>
  <div class="kpi"><b>{{ ctx.unmatched_slots|length }}</b>slots need new steel</div>
 </div>
+{% if ctx.diagnosis and ctx.diagnosis.binding_constraint and ctx.diagnosis.binding_constraint != 'none' %}
+<p class="note"><b>Why the rest went unfilled:</b> the binding constraint is
+<b>{{ ctx.diagnosis.binding_constraint }}</b> — {{ ctx.diagnosis.lever }}.</p>{% endif %}
 {% if ctx.projects %}<h2>Portfolio — projects sharing one donor stock</h2>
 <p class="note">One optimization allocated the donor stock across all the projects below at once —
 a donor goes wherever it saves the most, so "save the heavy sections for the project that needs

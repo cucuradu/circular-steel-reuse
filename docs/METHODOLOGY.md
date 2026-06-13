@@ -539,6 +539,17 @@ All figures are computed in Python and injected by Jinja2. If an LLM provider is
 not present in the computed context and the report falls back to the deterministic narrative. The LLM is
 never given a calculator (CLAUDE.md rule 1).
 
+**The narrative diagnoses, it does not recite.** `diagnose_match` (`match/optimize.py`, run on every
+report) classifies each *unfilled* slot by the reason it stayed empty — **length** (an adequate donor
+section is in stock but none long enough — or the long-and-strong donors are used and the free
+remainder is too short, so splicing/longer stock is the lever), **capacity** (no section strong/stiff
+enough), **contention** (a usable donor existed but went to a better slot), **economics** (the only
+feasible donors are so over-spec that reuse would book negative net CO₂) — and names the **binding
+constraint** and the **lever** that would improve it. Both the deterministic narrative and the LLM
+prompt lead with that diagnosis (and flag risks such as LTB-restraint-reliant beams) instead of
+listing the assignment table. The conclusion is computed in Python; the LLM only renders it, so the
+anti-hallucination guard still holds.
+
 ## 9. Assumptions register
 
 | Assumption | Default | Override | Conservatism |

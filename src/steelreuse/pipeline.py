@@ -28,6 +28,7 @@ from .match.optimize import (
     DemandSlot,
     MatchResult,
     SupplyItem,
+    diagnose_match,
     match,
     stock_disposition,
 )
@@ -332,6 +333,10 @@ class PipelineResult:
     # ordinary single-demand run (whose behavior is unchanged). Slot ids are then namespaced
     # "tag::slotid"; `demand` holds the FIRST model only (write-back is single-demand only).
     projects: list[dict] | None = None
+    # WHY the reuse came out as it did (always computed): the binding constraint among the unfilled
+    # slots + the lever to improve it — see :func:`steelreuse.match.optimize.diagnose_match`. Drives
+    # the analytical narrative so it diagnoses the result instead of reciting the counts.
+    diagnosis: dict | None = None
 
 
 def _project_tags(paths: list[str]) -> list[str]:
@@ -514,9 +519,13 @@ def run_pipeline(
             fr = row.pop("_frame")
             row["frame_ok"] = fr.ok if fr is not None else None
 
+    # Diagnose WHY the match came out this way (binding constraint + lever) for the narrative — always
+    # computed, cheap, advisory, never changes the result.
+    diagnosis = diagnose_match(supply, slots, catalog, result)
+
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
         donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
-        disposition=disposition_rows, projects=project_rows,
+        disposition=disposition_rows, projects=project_rows, diagnosis=diagnosis,
     )

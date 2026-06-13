@@ -889,3 +889,118 @@ def verify_match(
                               f"{objective} value {_primary(c):.2f} on slot {jid}, above the "
                               f"chosen {_primary(cur):.2f}")
     return issues
+
+
+# Plain-language lever for each binding constraint the diagnosis can name (the narrative renders this;
+# the LLM never derives it — CLAUDE.md rule 1).
+_LEVER = {
+    "length": "the donors that are both strong enough and long enough are used up, and the free "
+              "remainder is too short for these spans — splicing two short members into one full "
+              "length (or sourcing longer stock) is the lever; cutting is already applied",
+    "capacity": "the stock lacks sections strong or stiff enough for these slots, so heavier or "
+                "different donor sections are what would lift reuse",
+    "contention": "the adequate stock is simply outstripped by demand — more reclaimed members of "
+                  "the sections that fit would lift reuse",
+    "economics": "the only donors that fit are so over-spec for these light slots that reusing them "
+                 "would book negative net CO2 — a lighter stock (or a members/mass objective) would "
+                 "put them to work",
+    "none": "every demand slot was filled",
+}
+
+
+def _median(xs: list[float]) -> float:
+    s = sorted(xs)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
+def diagnose_match(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    result: MatchResult,
+    factors: dict[str, CarbonFactor] | None = None,
+) -> dict:
+    """Diagnose **why** the match came out as it did — counts computed in Python for the narrative.
+
+    Every UNFILLED slot is classified by the reason it stayed empty, so the report can state the
+    *binding constraint* and the *lever* that would improve it instead of merely reciting how many
+    slots went unfilled. The LLM only renders this conclusion; it never derives it (CLAUDE.md rule 1).
+
+    Categories (re-deriving the same feasibility cells the solver used, via ``result.weights``):
+
+    * **length** — an adequate donor *section* is in stock but none long enough reaches the slot
+      (cutting/splicing is the lever);
+    * **capacity** — no donor section passes the slot's EN check at any length (need stronger stock);
+    * **contention** — a usable, economic donor existed but went to a better slot (stock exhausted);
+    * **economics** — the only feasible donors are so over-spec that reuse books negative net CO2
+      under the carbon objective (so the slot is left empty).
+
+    The dominant category is the ``binding_constraint``; ``lever`` is its plain-language fix.
+    """
+    factor = (factors or load_factors())["steel"]
+    w = result.weights or {}
+    cells = _cells_from_weights(supply, slots, catalog, factor, w)
+    _apply_reserve(cells, supply, w.get("reserve_w", 0.0), factor)
+    _apply_objective(cells, w.get("objective", "co2"))
+    slots_with_cell = {c.sj for c in cells}              # length + EN feasible (any sign)
+    slots_selectable = {c.sj for c in cells if _coeff(c) > 0}   # also economic under the objective
+    slot_at = {s.id: i for i, s in enumerate(slots)}
+
+    # Distinct donor "kinds" (section, grade, knockdown) -> longest available, for the EN-only re-check
+    # of no-cell slots (splitting "too short" from "too weak" without re-touching every donor).
+    kinds: dict[tuple, float] = {}
+    for s in supply:
+        key = (s.section, s.grade, round(s.knockdown, 4))
+        kinds[key] = max(kinds.get(key, 0.0), s.length_mm)
+
+    length = capacity = contention = economics = 0
+    for sid in result.unmatched_slots:
+        j = slot_at.get(sid)
+        if j is None:
+            continue
+        if j in slots_selectable:
+            contention += 1
+        elif j in slots_with_cell:
+            economics += 1
+        else:
+            slot = slots[j]
+            cap_ok = False
+            for (section, grade, _kd), _maxlen in kinds.items():
+                sec = catalog.get(section)
+                if sec is not None and _passes_all(sec, grade or "S235", slot, _kd):
+                    cap_ok = True
+                    break
+            if cap_ok:
+                length += 1
+            else:
+                capacity += 1
+
+    buckets = {"length": length, "capacity": capacity,
+               "contention": contention, "economics": economics}
+    binding = max(buckets, key=lambda k: buckets[k]) if result.unmatched_slots else "none"
+
+    # "Contention" can really be a SHORT-STOCK (length) story: the few donors long *and* strong
+    # enough are used, and the free remainder is mostly too short for these spans. When that is the
+    # case, report it as length (the actionable lever is splicing / longer stock, not "more stock").
+    used_ids = {a.supply_id for a in result.assignments}
+    free_lens = [s.length_mm for s in supply if s.id not in used_ids]
+    unmatched_lens = [slots[slot_at[sid]].required_length_mm
+                      for sid in result.unmatched_slots if slot_at.get(sid) is not None]
+    if binding == "contention" and free_lens and unmatched_lens:
+        typical_demand = _median(unmatched_lens)
+        too_short = sum(1 for L in free_lens if typical_demand + CUT_TOLERANCE_MM > L)
+        if too_short >= 0.6 * len(free_lens):
+            binding = "length"
+
+    return {
+        "n_unmatched": len(result.unmatched_slots),
+        "length_limited": length,
+        "capacity_limited": capacity,
+        "contention": contention,
+        "uneconomic": economics,
+        "binding_constraint": binding,
+        "lever": _LEVER[binding],
+        "donors_eligible": len({c.si for c in cells}),   # donors with at least one feasible slot
+        "donors_total": len(supply),
+    }

@@ -15,6 +15,18 @@ All notable changes to this project are documented here. The format is based on
   50 reused / 39.3 t to **71 reused / 60.6 t** (54 donors cut, ≈ 160 m reusable remainder);
   the demo headline is unchanged. CASE_STUDY/METHODOLOGY/README updated.
 
+### Changed
+- **The report narrative now diagnoses the result instead of reciting counts.** `diagnose_match`
+  (`match/optimize.py`, computed on every report) classifies each unfilled slot — **length**
+  (adequate sections in stock but too short / long-and-strong donors exhausted → splice or source
+  longer stock), **capacity** (nothing strong enough), **contention** (a usable donor went elsewhere),
+  **economics** (only over-spec donors fit, so reuse would lose carbon) — and names the **binding
+  constraint** and the **lever**. Both the deterministic narrative and the LLM prompt lead with that
+  analysis and flag risks (LTB-restraint-reliant beams), e.g. on the real case study: *"the binding
+  constraint is length … splicing two short members into one full length (or sourcing longer stock) is
+  the lever; cutting is already applied."* Numbers stay Python-computed (`PipelineResult.diagnosis`,
+  `reuse_rate_pct`), so the anti-hallucination guard is unaffected.
+
 ### Added
 - **Moment-shape-aware `C₁` and `C_m`** (`--moment-shape`, `run_pipeline(moment_shape=)`, default off →
   byte-identical): drops the conservative uniform-moment assumption (`C₁ = C_m = 1.0`) when the real
