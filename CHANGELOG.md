@@ -16,6 +16,31 @@ All notable changes to this project are documented here. The format is based on
   the demo headline is unchanged. CASE_STUDY/METHODOLOGY/README updated.
 
 ### Added
+- **Stock stewardship & counterfactual fates** — a family of opt-in knobs (all default off, so existing
+  results stay byte-identical) addressing what the single-project matcher cannot see: the donor's
+  end-of-life fate, capacity waste, section variety, and future demand. See METHODOLOGY §6.1 + §7.6.
+  - **A1 — end-of-life counterfactual** (`--counterfactual none|recycling|rerolling`): books reuse
+    savings *net of* the foregone EAF-recycling (≈0.55 kgCO₂e/kg) or pilot-scale re-rolling
+    (≈1.0 kgCO₂e/kg) credit the consumed steel would otherwise have earned — answering the standard
+    LCA critique of avoided-new accounting. Credits are parameters in `data/carbon/factors.csv`; the
+    mode + credit travel on the result so the verifier and Pareto table share the basis.
+  - **A2 — stock disposition advisory** (`--disposition`, `--disposition-csv`): for every unused donor,
+    compares *store* / *re-roll* / *recycle* with numbers and reports the best fate. Advisory only — the
+    match is unchanged.
+  - **B1 — utilization floor** (`--min-util x`): refuses pairs below a governing-utilization floor so
+    grossly over-spec donors stay in stock (hard gate).
+  - **B2 — over-spec soft penalty** (`--w-overspec w`): the capacity analogue of the off-cut
+    preference; charges the score (not booked CO₂) for a donor's excess mass-per-metre over the slot's
+    avoided-new baseline, flipping the "Frankenstein receiver" toward the lighter section.
+  - **B3 — section-variety cap** (`--max-distinct-sections N`): anti-Frankenstein consolidation onto at
+    most N donor section families (binary `y_f` in the MILP; greedy refuses an (N+1)-th family).
+  - **C1 — portfolio matching** (`--demand a.json b.json …`): one MILP allocates the donor stock across
+    several demand models at once, with per-project and global reporting — the principled "save it for
+    the project that needs it". The single-demand path is unchanged.
+  - **C2 — scarcity / option-value reserve** (`--reserve w`, EXPERIMENTAL, score-only): a single-project
+    proxy for option value that holds scarce, versatile stock back from slots an abundant family could
+    also serve. The principled tool is C1; a non-circular ML calibration of the weight is designed (not
+    built) in `docs/OPTION_VALUE_ML.md` (**C3**).
 - **Selectable matching objectives** (`--objective {co2,members,mass}`, `run_pipeline(objective=)`,
   app selectbox): the matcher can now maximize net CO₂ saved (default, unchanged), the **number of
   members reused**, or the **reclaimed steel mass put back to work** — the latter two break ties

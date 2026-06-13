@@ -324,6 +324,28 @@ inflated carbon, and the recovery-process term (`mass_used·reuse_process`) alre
 preference to the lightest adequate donor. What it cannot see: future demand, alternative
 end-of-life fates, capacity (vs length) waste, and the buildability cost of section variety.
 
+**Implementation status (2026-06-13): A1, A2, B1, B2, B3, C1, C2 are built and tested; C3 is
+designed, not built.** Every knob defaults OFF, so existing results are byte-identical unless asked.
+One-line pointers:
+- **A1 ✅** `--counterfactual none|recycling|rerolling` — EOL recycle/re-roll credits in
+  [carbon.py](src/steelreuse/core/carbon.py) + `data/carbon/factors.csv`; booked net of the foregone
+  fate.
+- **A2 ✅** `--disposition` (+ `--disposition-csv`) — store / re-roll / recycle advisory per unused
+  donor (`match.optimize.stock_disposition`).
+- **B1 ✅** `--min-util x` — utilization floor (hard gate; grossly over-spec donors stay in stock).
+- **B2 ✅** `--w-overspec w` — over-spec soft score penalty (the capacity analogue of the off-cut term).
+- **B3 ✅** `--max-distinct-sections N` — anti-Frankenstein section-variety cap (binary `y_f` in the MILP).
+- **C1 ✅** `--demand a.json b.json …` — portfolio matching across several demand models at once;
+  per-project + global reporting.
+- **C2 ✅** `--reserve w` (EXPERIMENTAL) — scarcity/option-value soft penalty
+  (`match.optimize._apply_reserve`); a single-project proxy for option value, score-only.
+- **C3 ⚙ designed, not built** — [docs/OPTION_VALUE_ML.md](docs/OPTION_VALUE_ML.md): how the dormant
+  `ml/` layer would estimate per-stock-item option value from a demand distribution to *calibrate*
+  C2's weight; decision-support only, never a gate, stays out of the pipeline (CLAUDE.md rule 3).
+
+The write-up (Phase D) lives in [METHODOLOGY](docs/METHODOLOGY.md) ("Stock stewardship &
+counterfactuals"), the CHANGELOG, and the README status row.
+
 ### Phase A — counterfactual fates & honest deltas (accounting first; cheap, thesis-grade)
 - **A1. End-of-life counterfactual option** (`--counterfactual none|recycling|rerolling`): today's
   saving implicitly assumes the unused donor evaporates. The realistic counterfactual for structural

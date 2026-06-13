@@ -436,6 +436,67 @@ rates, transport to the scrap/re-rolling facility, and yield losses are not mode
    donor on its slot) — a necessary condition of optimality that both solve paths must satisfy, so any
    violation exposes input drift or a solver/economics mismatch rather than a judgement call.
 
+### 7.6 Stock stewardship & counterfactual fates  (all opt-in, default off)
+
+The matcher optimises **this** project's reclaimed-steel use. That leaves four things it cannot see:
+the donor's alternative **end-of-life fate**, **capacity** (vs length) waste, the buildability cost of
+**section variety**, and **future demand**. The honest defaults already prevent the worst failure
+modes — the avoided-new baseline (§7 step 2) books a heavy donor in a light slot only at the light
+slot's carbon, and the `used_mass·reuse_process` term gives a mild preference to the lightest adequate
+donor — but the following opt-in knobs make stewardship explicit. **Every one defaults to off / 0 /
+none, so existing results are byte-identical unless a knob is set.** The accounting knobs change booked
+CO₂; the stewardship knobs are **score-only** (they steer selection without altering any booked
+number), exactly like the off-cut preference.
+
+- **A1 — End-of-life counterfactual** (`--counterfactual none|recycling|rerolling`, accounting). Booked
+  CO₂ is reduced by the fate the donor steel forgoes by being reused; see §6.1 for the credits, the
+  ranges, and the recycling-counterfactual debate (avoided-new accounting implicitly assumes the unused
+  donor evaporates — this answers that critique head-on). Changes booked CO₂; the mode and credit
+  travel on the result so the verifier and Pareto table use the same basis.
+- **A2 — Stock disposition advisory** (`--disposition`, `--disposition-csv`, advisory). For every
+  **unused** donor it compares three fates with numbers — *store* (does any unfilled slot here have a
+  feasible cell for it, and what would it have saved?), *re-roll* (straight, prismatic, above a minimum
+  length → `mass·reroll_credit`), *recycle* (`mass·recycle_credit`) — and reports the argmax as advice.
+  It is **purely advisory**: the match is identical with and without it. The feasibility cells already
+  exist at solve time, so it is cheap. (In a proven-optimal unconstrained run no unused donor can show a
+  positive store score — that would be an improving move the MILP would already have taken; store
+  candidates appear once a floor/cap/counterfactual has deliberately left stock behind.)
+- **B1 — Utilization floor** (`--min-util x`, hard gate). Pairs whose **governing** utilization falls
+  below `x` are refused outright, so a grossly over-spec donor stays in stock for a slot that actually
+  needs it ("don't spend the solid column on a 0.1-util slot"). What the floor costs is read off a run
+  with and without it.
+- **B2 — Over-spec soft penalty** (`--w-overspec w`, score-only). The **capacity** analogue of the
+  off-cut preference: the score (never booked CO₂) is charged `w·(donor_kg/m − baseline_kg/m)₊·
+  used_len·saved_per_kg`, strengthening the mild light-donor preference into real stewardship. It
+  flips the classic "Frankenstein receiver" — a short heavy donor whose tiny off-cut otherwise beats a
+  long light one — toward the lighter section.
+- **B3 — Section-variety cap** (`--max-distinct-sections N`, MILP constraint). Section variety has
+  fabrication, QA, connection-detailing and procurement costs no carbon term sees. The cap is a binary
+  `y_f` per usable donor section family with `x_ij ≤ y_f(i)` and `Σ y_f ≤ N`; the greedy fallback
+  refuses to open an (N+1)-th family. The objective can only get worse under the cap — what it costs
+  (extra CO₂ for fewer section types) is exactly the point of comparing runs.
+- **C1 — Portfolio matching** (`--demand a.json b.json …`, the principled multi-project fix). One MILP
+  allocates the donor stock across **several** demand models at once, each loaded, mapped and analysed
+  independently and its slots namespaced `stem::slotid`. "Save the heavy sections for the project that
+  needs them" becomes an optimisation outcome rather than a hunch; reporting is per-project and global.
+  The single-demand path is unchanged.
+- **C2 — Scarcity / option-value reserve** (`--reserve w`, EXPERIMENTAL, score-only). When future
+  demand is *unknown*, this is a deliberately simple single-project proxy for option value: per donor
+  section family, `scarcity_f = (#feasible slots)/(#donors of f)`, normalised by the max across
+  families, charged on the score as `w·scarcity_norm·used_mass·saved_per_kg` — but **only on slots that
+  at least one other family could also serve** (a slot only that family can serve carries no penalty,
+  because spending it there is the point of keeping it). It holds scarce, versatile stock back from
+  shared slots. **Honesty caveat:** within a *fully specified* single project the global MILP already
+  allocates scarce donors correctly (the avoided-new baseline reserves heavy stock), so this proxy only
+  changes outcomes by deliberate conservatism — valuable exactly insofar as demand *not* in the model
+  exists. The principled tool for that is C1; a non-circular ML calibration of `w` is designed (not
+  built) in [OPTION_VALUE_ML.md](OPTION_VALUE_ML.md).
+
+**Storage is not free.** "Store it for a better match" (the premise of C1/C2 and the A2 *store* advice)
+carries transport, yard and double-handling cost, plus the risk the section is never needed; the tool
+quantifies the carbon option value, not the holding cost. Treat the storage advice as one input to a
+decision that must also price the yard — a caveat carried into the option-value design note.
+
 ## 8. Reporting & the LLM guardrail  (`llm/`)
 
 All figures are computed in Python and injected by Jinja2. If an LLM provider is configured
