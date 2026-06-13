@@ -127,6 +127,12 @@ def main(argv: list[str] | None = None) -> int:
                          "(default: no cap). Anti-Frankenstein: section variety has fabrication, "
                          "QA, connection-detailing and procurement costs no carbon term sees; "
                          "the MILP consolidates onto at most N section families")
+    ap.add_argument("--reserve", type=float, default=0.0, metavar="W",
+                    help="EXPERIMENTAL scarcity/reserve weight (default 0 = off): softly penalize "
+                         "consuming donors from scarce capacity classes on slots that abundant "
+                         "donors could also serve — a single-project proxy for option value "
+                         "(unseen future demand); the principled tool is portfolio matching "
+                         "(--demand with several models). Selection only, booked CO2 unchanged")
     ap.add_argument("--verify-match", action="store_true",
                     help="independently audit the matching result after the solve: re-derive every "
                          "feasible (donor, slot) pair, re-check constraints and assignment "
@@ -216,6 +222,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         disposition=args.disposition or bool(args.disposition_csv),
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
         min_util=args.min_util, max_distinct_sections=args.max_distinct_sections,
+        reserve_w=args.reserve,
     )
 
     ctx = build_report_context(res)

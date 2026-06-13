@@ -176,6 +176,48 @@ def _apply_objective(cells: list[_Cell], objective: str) -> None:
         c.objective_coeff = primary + c.score / big
 
 
+def _apply_reserve(cells: list[_Cell], supply: list[SupplyItem], reserve_w: float,
+                   factor: CarbonFactor) -> None:
+    """Scarcity / reserve soft penalty (C2, opt-in, EXPERIMENTAL) — applied to cell scores in place.
+
+    A deliberately simple **single-project proxy for option value**: donors from SCARCE capacity
+    classes should not be spent on slots that more-abundant donors could also serve, because unseen
+    future demand may need exactly them. Per donor section family ``f`` (canonical section name):
+
+        scarcity_f = (# slots for which f is feasible) / (# donors of family f)
+
+    computed once from the feasibility cells, normalized by the maximum across families, and charged
+    as ``reserve_w x scarcity_norm_f x mass_used x saved_per_kg`` — but ONLY on cells whose slot at
+    least one OTHER family could also serve (a slot only f can serve carries no penalty: spending f
+    there is the point of keeping it). Score-only, like the off-cut and over-spec terms: booked CO2
+    is never touched.
+
+    Honesty note: within a fully-specified single project the global MILP already allocates scarce
+    donors correctly — this proxy only changes outcomes by deliberate conservatism (holding scarce
+    stock back from shared slots), which is valuable exactly insofar as demand NOT in the model
+    exists. The principled tool for that is portfolio matching (C1); a calibration path for this
+    weight is designed (not built) in docs/OPTION_VALUE_ML.md.
+    """
+    if reserve_w <= 0 or not cells:
+        return
+    fams = [s.section for s in supply]
+    donors_by_fam: dict[str, set[int]] = {}
+    slots_by_fam: dict[str, set[int]] = {}
+    fams_by_slot: dict[int, set[str]] = {}
+    for c in cells:
+        f = fams[c.si]
+        donors_by_fam.setdefault(f, set()).add(c.si)
+        slots_by_fam.setdefault(f, set()).add(c.sj)
+        fams_by_slot.setdefault(c.sj, set()).add(f)
+    scarcity = {f: len(slots_by_fam[f]) / len(donors_by_fam[f]) for f in donors_by_fam}
+    mx = max(scarcity.values())
+    if mx <= 0:
+        return
+    for c in cells:
+        if len(fams_by_slot[c.sj]) > 1:
+            c.score -= reserve_w * (scarcity[fams[c.si]] / mx) * c.mass_used_kg * factor.saved_per_kg
+
+
 def _passes_all(sec: SectionProps, grade: str, slot: DemandSlot, knockdown: float = 1.0) -> bool:
     """Feasibility bar across the whole load-combination envelope: the section must pass *every*
     combination. Reused by both the supply check and the avoided-new baseline."""
@@ -409,6 +451,7 @@ def match(
     w_overspec: float = 0.0,
     min_util: float = 0.0,
     max_distinct_sections: int | None = None,
+    reserve_w: float = 0.0,
 ) -> MatchResult:
     """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
 
@@ -452,6 +495,11 @@ def match(
     binary ``y_f`` per usable donor section with ``x_ij <= y_f(i)`` and ``sum(y_f) <= N``; the
     greedy fallback refuses to open an (N+1)-th family. The objective can only get worse under
     the cap — what it costs is exactly the point of comparing runs.
+
+    ``reserve_w`` (C2, default 0 = off, EXPERIMENTAL) softly penalizes consuming donors from
+    scarce capacity classes on slots that more-abundant donors could also serve — a single-project
+    proxy for option value (see :func:`_apply_reserve`); the principled tool is portfolio
+    matching (C1). Score-only; booked CO2 unchanged.
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
@@ -469,12 +517,14 @@ def match(
                "new_build_grade": new_build_grade, "objective": objective,
                "counterfactual": counterfactual, "counterfactual_credit": cf_credit,
                "w_overspec": w_overspec, "min_util": min_util,
-               "max_distinct_sections": max_distinct_sections}
+               "max_distinct_sections": max_distinct_sections,
+               "reserve_w": reserve_w}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
                          new_build_grade, allow_cutting, connection_policy,
                          counterfactual_credit=cf_credit, w_overspec=w_overspec,
                          min_util=min_util)
+    _apply_reserve(cells, supply, reserve_w, factor)
     _apply_objective(cells, objective)
 
     if not cells:
@@ -674,7 +724,10 @@ def stock_disposition(
 
     The advice is the argmax: "store" if feasible at positive score, else "re-roll" vs "recycle"
     by credit. Returns one dict per unused donor (id, section, length, mass, the three numbers,
-    flags, and ``advice``); pure function — no behavior change to any solve.
+    flags, and ``advice``); pure function — no behavior change to any solve. The C2 reserve term
+    is deliberately NOT applied here: it shapes competition between live candidates during the
+    solve, while the storage decision for an already-unused donor is judged on base economics
+    (and the restricted sub-matrix would yield different scarcity statistics anyway).
     """
     factor = (factors or load_factors())["steel"]
     unused = set(result.unused_supply)
@@ -746,6 +799,10 @@ def verify_match(
     w = result.weights or {}
     allow_cutting = bool(w.get("allow_cutting"))
     cells = _cells_from_weights(supply, slots, catalog, factor, w)
+    # The reserve term (C2) is computed over the FULL cell matrix, exactly as the solve did, so the
+    # re-derived scores match the stored ones (it is deliberately NOT part of _cells_from_weights:
+    # stock_disposition's restricted sub-matrix would yield different scarcity statistics).
+    _apply_reserve(cells, supply, w.get("reserve_w", 0.0), factor)
     # Judge "improving move" by the PRIMARY value of the objective the result was solved for (it
     # travels on weights): under "members"/"mass" an unfilled slot with any free feasible donor is
     # already a violation, CO2-negative or not. The CO2 tie-break is deliberately ignored here —

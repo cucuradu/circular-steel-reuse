@@ -97,6 +97,12 @@ def main() -> None:
                 help="Anti-Frankenstein cap: the result may use at most N distinct donor "
                      "sections — variety has fabrication, QA, detailing and procurement costs "
                      "no carbon term sees.")
+            reserve_w = st.number_input(
+                "Scarcity reserve weight (0 = off, experimental)", 0.0, 2.0, 0.0, 0.1,
+                help="Softly penalize consuming donors from scarce capacity classes on slots "
+                     "that abundant donors could also serve — a single-project proxy for option "
+                     "value. The principled tool is portfolio matching (CLI --demand with "
+                     "several models). Selection only; booked CO₂ unchanged.")
             counterfactual = st.selectbox(
                 "End-of-life counterfactual", ("none", "recycling", "rerolling"), index=0,
                 format_func=lambda v: {
@@ -146,7 +152,7 @@ def main() -> None:
             wind_kpa=wind, seismic_cs=seismic, objective=objective, pareto=pareto,
             disposition=disposition, counterfactual=counterfactual,
             w_overspec=w_overspec, min_util=min_util,
-            max_distinct_sections=max_distinct or None,
+            max_distinct_sections=max_distinct or None, reserve_w=reserve_w,
         )
     except ExtractionError as e:
         st.error(f"Could not read an input model: {e}")

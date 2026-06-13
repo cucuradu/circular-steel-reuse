@@ -308,6 +308,115 @@ def test_max_distinct_sections_validation_and_verify_flags_violation(cat):
 
 
 # ---------------------------------------------------------------------------
+# C2 — scarcity / option-value reserve weight (opt-in, EXPERIMENTAL)
+# ---------------------------------------------------------------------------
+
+def test_reserve_holds_a_scarce_heavy_donor_back_from_a_shared_slot(cat):
+    # One light 4 m slot that two families can serve. Default (one-piece) economics: the SHORT heavy
+    # IPE500 beats the LONG light IPE240 on score because its off-cut is tiny (same dynamic as
+    # test_w_overspec_flips_a_default_heavy_choice), so at reserve_w = 0 the solver SPENDS the scarce
+    # heavy donor on the shared slot. IPE500 is the scarce family (one donor, the only stock that
+    # could carry a demanding slot a thin section cannot); IPE240 is abundant (two donors). With
+    # reserve_w > 0 the scarce family is penalised on the shared slot — one an abundant donor could
+    # also fill — and held back in stock; the abundant IPE240 takes the slot instead.
+    from steelreuse.match.optimize import verify_match
+
+    slot = _beam_slot(4000, 8.0)
+    supply = [SupplyItem(id="rare", section="IPE500", grade="S355", length_mm=4100),
+              SupplyItem(id="abund1", section="IPE240", grade="S355", length_mm=8000),
+              SupplyItem(id="abund2", section="IPE240", grade="S355", length_mm=8000)]
+
+    spent = match(supply, [slot], cat)                       # reserve off
+    assert spent.n_reused == 1
+    assert spent.assignments[0].supply_id == "rare"          # heavy donor spent on the shared slot
+
+    held = match(supply, [slot], cat, reserve_w=0.2)         # reserve on
+    assert held.n_reused == 1
+    assert held.assignments[0].supply_id in ("abund1", "abund2")  # abundant donor used instead
+    assert "rare" in held.unused_supply                      # scarce donor kept in stock
+    assert held.weights["reserve_w"] == 0.2
+
+    # the knob is selection-only: the booked CO2 of the kept pair is exactly what a plain IPE240
+    # match would book (the reserve penalty lives in the score, never in co2_saved_kg)
+    abund_only = match([supply[1]], [slot], cat)
+    assert held.assignments[0].co2_saved_kg == pytest.approx(
+        abund_only.assignments[0].co2_saved_kg, abs=0.01)
+
+    # ...and the result still verifies: reserve_w travels on weights, and the audit re-applies the
+    # penalty over the FULL cell matrix, so the (now-penalised) scarce donor is not an improving move
+    assert verify_match(supply, [slot], cat, held) == []
+
+
+def test_apply_reserve_exempts_single_family_slots_and_scales_with_scarcity():
+    # Unit test of the mechanism itself, free of MILP economics. A scarce family A (one donor,
+    # feasible for a shared slot AND a slot only it can serve) and an abundant family B (two donors,
+    # the shared slot only). The penalty must: (i) leave the single-family slot untouched — spending
+    # A there is the whole point of keeping it; (ii) fall hardest on the scarce, heavier family.
+    from steelreuse.match.optimize import SupplyItem, _apply_reserve, _Cell
+
+    f = load_factors()["steel"]
+    supply = [SupplyItem(id="a", section="FAM_A", grade="S275", length_mm=5000),
+              SupplyItem(id="b1", section="FAM_B", grade="S275", length_mm=5000),
+              SupplyItem(id="b2", section="FAM_B", grade="S275", length_mm=5000)]
+
+    def build_cells():
+        # slot 0 = shared (A + B feasible); slot 1 = only A feasible
+        return [
+            _Cell(si=0, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=100,
+                  score=100.0, mass_used_kg=300.0),                      # A on shared
+            _Cell(si=1, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=100,
+                  score=100.0, mass_used_kg=100.0),                      # B1 on shared
+            _Cell(si=2, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=100,
+                  score=100.0, mass_used_kg=100.0),                      # B2 on shared
+            _Cell(si=0, sj=1, utilization=.9, status="OK", offcut_mm=0, co2_saved_kg=50,
+                  score=50.0, mass_used_kg=300.0),                       # A on its only slot
+        ]
+
+    # reserve_w = 0 changes nothing
+    off = build_cells()
+    _apply_reserve(off, supply, 0.0, f)
+    assert [c.score for c in off] == [100.0, 100.0, 100.0, 50.0]
+
+    # scarcity_A = |slots A| / |donors A| = 2 / 1 = 2.0 ; scarcity_B = 1 / 2 = 0.5 ; max = 2.0.
+    on = build_cells()
+    _apply_reserve(on, supply, 1.0, f)
+    a_shared, b1_shared, _b2, a_only = on
+    spk = f.saved_per_kg
+    assert a_only.score == 50.0                                   # single-family slot exempt
+    assert a_shared.score == pytest.approx(100.0 - (2.0 / 2.0) * 300.0 * spk)
+    assert b1_shared.score == pytest.approx(100.0 - (0.5 / 2.0) * 100.0 * spk)
+    # the scarce, heavier family is held back far harder than the abundant one
+    assert (100.0 - a_shared.score) > (100.0 - b1_shared.score)
+
+
+def test_reserve_default_keeps_results_identical(cat):
+    # Explicit 0.0 must produce the exact same assignments and scores as not passing it at all.
+    slot = _beam_slot(6000, 20.0)
+    supply = [SupplyItem(id="a", section="IPE400", grade="S275", length_mm=7000),
+              SupplyItem(id="b", section="IPE360", grade="S275", length_mm=6500)]
+    base = match(supply, [slot], cat)
+    explicit = match(supply, [slot], cat, reserve_w=0.0)
+    assert [dataclasses.asdict(x) for x in base.assignments] == \
+        [dataclasses.asdict(x) for x in explicit.assignments]
+    assert explicit.weights["reserve_w"] == 0.0
+
+
+def test_reserve_flows_through_pipeline_and_weights():
+    from steelreuse.core.sections import load_default_catalog
+    from steelreuse.match.optimize import verify_match
+
+    donor = str(DATA / "samples" / "donor.json")
+    demand = str(DATA / "samples" / "demand.json")
+    base = run_pipeline(donor, demand)
+    assert base.match.weights.get("reserve_w", 0.0) == 0.0
+
+    res = run_pipeline(donor, demand, reserve_w=2.0)
+    assert res.match.weights["reserve_w"] == 2.0
+    # whatever the reserve does to selection, the shipped result remains internally consistent
+    assert verify_match(res.supply, res.slots, load_default_catalog(), res.match) == []
+
+
+# ---------------------------------------------------------------------------
 # A2 — stock disposition advisory
 # ---------------------------------------------------------------------------
 
