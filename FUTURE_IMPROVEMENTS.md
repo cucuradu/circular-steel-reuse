@@ -548,8 +548,21 @@ with an owner and a fix sketch.
 ### I-9. Validation & academic credibility
 - ★ **Reproduce an independently published worked example** (SCI P362 / Access Steel beam-column)
   as a test — external authority beyond our own hand algebra (thesis roadmap #12).
-- **Cross-software benchmark**: the validated 2-bay frame solved in SAP2000 via the OAPI scaffold →
-  force comparison table in thesis §11.
+- ✅ **Cross-software benchmark — BUILT (experimental, 2026-06-13).** An optional, OFF-by-default
+  SAP2000 OAPI frame backend ([core/frame_sap2000.py](src/steelreuse/core/frame_sap2000.py)) drops
+  into the PyNite `analyze_frame` seam (reusing the same pure-Python topology + extraction helpers,
+  swapping only the solver) for the **ULS gravity** case on connectable frames; sway/wind/seismic are
+  refused rather than silently ignored, and an unavailable SAP2000 falls back to analytic like a
+  missing PyNite. `--solver sap2000` (default `pynite`, byte-identical) routes the pipeline; the
+  `steelreuse-bench-sap2000` CLI emits `docs/benchmark/forces_compare.{csv,md}` (analytic vs PyNite vs
+  SAP2000 on a validated 2-bay frame, % diff), and `tests/test_sap2000_parity.py` asserts
+  PyNite↔SAP2000 agreement, skipping when SAP2000 is absent (CI green). **Validated 2026-06-14 on
+  real SAP2000 27.1.0:** the parity test PASSES — SAP2000 matches PyNite to ~14 significant figures on
+  the canonical frame (committed `docs/benchmark/forces_compare.{csv,md}`), confirming the OAPI build
+  and the sign/axis mapping. *Residuals:* only the gravity case is modelled; the diff on the full real
+  `demand_test_4` model (492 solved members) hasn't been run yet (`--demand` is wired and ready); the
+  hidden-instance teardown is force-killed via a watchdog (SAP2000's `ApplicationExit` proved
+  unreliable headless).
 - **EU showcase case study** (IPE/HE building) alongside the US one — exercises the EU catalog and
   the EN grades end to end.
 - **Thesis sensitivity study**: CO₂ saved vs knockdown / condition mix / γ-factors (tornado chart) —

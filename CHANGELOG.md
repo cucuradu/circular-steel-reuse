@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Experimental SAP2000 (OAPI) frame backend + cross-software benchmark** (FUTURE_IMPROVEMENTS I-9,
+  thesis §11). An optional, OFF-by-default `analyze_frame_sap2000` ([core/frame_sap2000.py]) drops in
+  for the PyNite `analyze_frame`: it reuses the *same* pure-Python topology and force-extraction
+  helpers, swapping only the solver, so a force difference is solver numerics rather than modelling.
+  Scope is the **ULS gravity** combination on connectable frames; sway/wind/seismic/P-Δ are refused
+  (`ok=False` + warning) and SAP2000 being unavailable falls back to analytic exactly like a missing
+  PyNite. Reachable via `--solver sap2000` (default `pynite`, so certified results are byte-identical)
+  and through the `[sap2000]` extra (comtypes; Windows). The only sign-critical mapping (SAP2000 is
+  tension-positive, EN/PyNite compression-positive) lives in a tested adapter. New
+  `steelreuse-bench-sap2000` writes `docs/benchmark/forces_compare.{csv,md}` comparing analytic vs
+  PyNite vs SAP2000 on a validated 2-bay frame; `tests/test_sap2000_parity.py` asserts PyNite↔SAP2000
+  agreement and **skips** when SAP2000 is absent (CI stays green). On the bundled run, beams match
+  analytic↔PyNite at 0 % (the `wL²/8` anchor) and the interior column carries 2× the load path.
+  **Validated on real SAP2000 27.1.0 (2026-06-14):** the parity test passes — SAP2000 reproduces the
+  PyNite forces to ~14 significant figures. A `--demand <model>.json` option runs the same diff on a
+  real extracted building (PyNite vs SAP2000, with a worst-offenders summary). Instance teardown is
+  hardened with a tracked-PID force-kill + watchdog, since SAP2000's headless `ApplicationExit` and the
+  save-before-analyze step otherwise leaked/hung instances.
+
 ### Changed
 - **Cutting-stock is now the DEFAULT** (CLI, app, `run_pipeline`): reclamation practice cuts
   members to length routinely, and the one-piece rule artificially stranded long donors (an

@@ -23,6 +23,10 @@ models/
 THESIS*.html
 THESIS*.pdf
 
+# SteelReuse Revit add-on: machine-specific interpreter config + per-run match outputs
+steelreuse_runner_config.json
+steelreuse_reports/
+
 # Secrets (LLM API keys etc.)
 .env
 *.key

@@ -159,3 +159,80 @@ def build_writeback(result: PipelineResult) -> dict:
             "co2_saved_kg": result.match.total_co2_saved_kg,
         },
     }
+
+
+def build_results(result: PipelineResult) -> dict:
+    """Return the assignment-keyed ``results.json`` contract the Revit dockable panel consumes.
+
+    A sibling of :func:`build_writeback`: that one is *element*-keyed (drives the Apply-Matches
+    colouring); this one is *assignment*-keyed (drives the filterable results table). Both are pure
+    reshaping of values :func:`steelreuse.pipeline.run_pipeline` already computed (CLAUDE.md hard
+    rule 1 -- no new arithmetic here).
+
+    Shape (``schema_version`` lets the panel and engine evolve independently)::
+
+        {"schema_version": 1,
+         "kpis": {slots, reused, co2_saved_kg, objective, proven_optimal, supply_count},
+         "assignments": [{demand_id, slot_id, demand_section, donor_id, donor_section,
+                          utilization, governing_combo, co2_saved_kg, connection_review}],
+         "unfilled": [{demand_id, slot_id, demand_section}],
+         "quarantined_donors": [{donor_id, donor_section, reason}]}
+    """
+    m = result.match
+    slots_by_id = {s.id: s for s in (result.slots or [])}
+    donor_by_id = {d.id: d for d in result.donor.members} if result.donor else {}
+
+    assignments = []
+    for a in m.assignments:
+        slot = slots_by_id.get(a.slot_id)
+        assignments.append({
+            "demand_id": slot.member_id if slot else "",
+            "slot_id": a.slot_id,
+            "demand_section": (slot.design_section if slot else None) or "",
+            "donor_id": a.supply_id,
+            "donor_section": a.section,
+            "utilization": a.utilization,
+            "governing_combo": a.governing_combination,
+            "check_status": a.status,
+            "chi_lt": a.chi_lt,
+            "chi_lt_if_free": a.chi_lt_if_free,
+            "offcut_mm": a.offcut_mm,
+            "co2_saved_kg": a.co2_saved_kg,
+            "connection_review": a.connection_status == "review",
+        })
+
+    unfilled = []
+    for slot_id in m.unmatched_slots:
+        slot = slots_by_id.get(slot_id)
+        if slot is None:
+            continue
+        unfilled.append({
+            "demand_id": slot.member_id,
+            "slot_id": slot.id,
+            "demand_section": slot.design_section or "",
+        })
+
+    quarantined_donors = []
+    quarantine_reasons = dict(result.audit.quarantined) if result.audit else {}
+    for donor_id, reason in quarantine_reasons.items():
+        member = donor_by_id.get(donor_id)
+        quarantined_donors.append({
+            "donor_id": donor_id,
+            "donor_section": (member.section if member else "") or "",
+            "reason": reason,
+        })
+
+    return {
+        "schema_version": 1,
+        "kpis": {
+            "slots": result.slot_count,
+            "reused": m.n_reused,
+            "co2_saved_kg": round(m.total_co2_saved_kg, 1),
+            "objective": m.objective,
+            "proven_optimal": m.proven_optimal,
+            "supply_count": result.supply_count,
+        },
+        "assignments": assignments,
+        "unfilled": unfilled,
+        "quarantined_donors": quarantined_donors,
+    }

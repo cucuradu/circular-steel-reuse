@@ -380,6 +380,7 @@ def run_pipeline(
     max_distinct_sections: int | None = None,
     reserve_w: float = 0.0,
     moment_shape: bool = False,
+    solver: str = "pynite",
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
@@ -446,7 +447,13 @@ def run_pipeline(
             # member-level notional moment); P-Delta is auto-enabled there whenever phi > 0.
             opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
                                 wind_kpa=wind_kpa, seismic_cs=seismic_cs, moment_shape=moment_shape)
-            fr = analyze_frame(demand.members, loads, catalog, options=opts)
+            if solver == "sap2000":
+                # Experimental OAPI backend (gravity only); falls back to analytic per member when
+                # SAP2000 is unavailable or an out-of-scope case is requested — same FrameResult shape.
+                from .core.frame_sap2000 import analyze_frame_sap2000
+                fr = analyze_frame_sap2000(demand.members, loads, catalog, options=opts)
+            else:
+                fr = analyze_frame(demand.members, loads, catalog, options=opts)
             frame_slots = fr.slots_by_member if fr.ok else None
 
         model_slots = build_slots(demand, loads, steel_only=steel_only_demand,

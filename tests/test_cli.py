@@ -1,5 +1,7 @@
 """CLI smoke tests: --version, the no-input error, bundled samples, and graceful failures."""
 
+import json
+
 import pytest
 
 from steelreuse import __version__
@@ -38,6 +40,21 @@ def test_malformed_json_exits_one_no_traceback(tmp_path, capsys):
     bad.write_text("{ this is not json", encoding="utf-8")
     assert main(["--donor", str(bad), "--demand", str(bad)]) == 1
     assert "error" in capsys.readouterr().err.lower()
+
+
+def test_results_out_writes_versioned_contract(tmp_path):
+    rp = tmp_path / "results.json"
+    rc = main([
+        "--donor", str(sample_path("donor.json")),
+        "--demand", str(sample_path("demand.json")),
+        "--out", str(tmp_path / "report.html"),
+        "--results-out", str(rp),
+    ])
+    assert rc == 0
+    assert rp.exists()
+    data = json.loads(rp.read_text(encoding="utf-8"))
+    assert data["schema_version"] == 1
+    assert "assignments" in data and "kpis" in data
 
 
 def test_load_rejects_non_object_top_level(tmp_path):

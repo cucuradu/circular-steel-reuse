@@ -1,0 +1,6 @@
+title: |-
+  Results
+tooltip: >-
+  Open the filterable results of the last match (or pick a results.json): KPI header, a sortable table
+  of every reuse (demand vs donor section, utilisation, governing case, connection review, CO2e), plus
+  the unfilled demand slots and quarantined donors. Filter by section, status, or minimum utilisation.

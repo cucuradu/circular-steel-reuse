@@ -1,0 +1,7 @@
+title: |-
+  Run
+  Match
+tooltip: >-
+  Run the full steel-reuse match without leaving Revit: pick the donor and new-design JSONs, choose
+  the objective and options, and SteelReuse shells out to the signed Python to produce the match
+  report, the Apply-Matches status file, and the dockable-panel results. No command line needed.

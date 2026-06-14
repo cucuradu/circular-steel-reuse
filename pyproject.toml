@@ -19,6 +19,7 @@ dependencies = []
 [project.scripts]
 steelreuse = "steelreuse.cli:main"
 steelreuse-validate = "steelreuse.validate_extraction:main"
+steelreuse-bench-sap2000 = "steelreuse.benchmark.sap2000_bench:main"
 
 [project.optional-dependencies]
 analysis = ["numpy>=1.26", "pandas>=2.1"]

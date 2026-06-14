@@ -23,7 +23,7 @@ from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
 from .resources import sample_path
 from .schema import ExtractionError
-from .writeback import build_writeback
+from .writeback import build_results, build_writeback
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -56,6 +56,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="write a per-element status JSON (donor: reused/available/quarantined/"
                          "unmapped; demand: filled/partially_filled/unfilled/non_steel) for the "
                          "pyRevit 'Apply Matches' button to colour the source models")
+    ap.add_argument("--results-out",
+                    help="write an assignment-keyed results JSON (the versioned contract the pyRevit "
+                         "dockable results panel consumes: KPIs + per-match demand/donor/utilisation/"
+                         "governing-case + unfilled slots + quarantined donors)")
     ap.add_argument("--knockdown", type=float, default=1.0,
                     help="default reclaimed f_y knockdown (<=1.0) for donor members with no audit data")
     # Pre-demolition audit (PDA): per-member condition / verification provenance.
@@ -160,6 +164,10 @@ def main(argv: list[str] | None = None) -> int:
                          "per-member closed forms; column axials then come from the real load path. "
                          "With --phi, the sway imperfection is applied as frame equivalent horizontal "
                          "forces (EN 5.3.2) + a 2nd-order P-Delta solve")
+    ap.add_argument("--solver", choices=["pynite", "sap2000"], default="pynite",
+                    help="frame solver for --frame-analysis: 'pynite' (default) or the experimental "
+                         "'sap2000' OAPI backend (gravity only; Windows + SAP2000 + the [sap2000] "
+                         "extra; falls back to analytic when unavailable)")
     ap.add_argument("--pdelta", action="store_true",
                     help="force a 2nd-order (P-Delta) frame solve even without --phi "
                          "(only with --frame-analysis)")
@@ -229,6 +237,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
         min_util=args.min_util, max_distinct_sections=args.max_distinct_sections,
         reserve_w=args.reserve, moment_shape=args.moment_shape,
+        solver=args.solver,
     )
 
     ctx = build_report_context(res)
@@ -251,6 +260,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             wb_path.parent.mkdir(parents=True, exist_ok=True)
             wb_path.write_text(json.dumps(build_writeback(res), indent=2), encoding="utf-8")
 
+    if args.results_out:
+        rp = Path(args.results_out)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        rp.write_text(json.dumps(build_results(res), indent=2), encoding="utf-8")
+
     if isinstance(loads, AreaLoadModel):
         trib = "geometry-estimated" if args.trib_from_geometry else f"{args.trib_width:g} m"
         parts = ["gravity"]
@@ -270,7 +284,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             extra = (f", {len(res.frame.skipped_member_ids)} fell back to analytic"
                      if res.frame.skipped_member_ids else "")
             notes = f" [{'; '.join(res.frame.warnings)}]" if res.frame.warnings else ""
-            print(f"Forces: frame analysis (PyNite) — {res.frame.node_count} nodes, "
+            print(f"Forces: frame analysis ({args.solver}) — {res.frame.node_count} nodes, "
                   f"{res.frame.member_count} members{extra}{notes}")
         else:
             why = res.frame.warnings[0] if res.frame.warnings else "unavailable"
