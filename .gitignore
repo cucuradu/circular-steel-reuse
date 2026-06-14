@@ -18,8 +18,7 @@ out/
 /reports/
 data/generated/
 models/
-# Thesis: only the markdown source is tracked; html/pdf are rebuilt by build_thesis_pdf.py
-# (the PDF ships attached to the GitHub release).
+# Thesis: only the markdown source (THESIS_PRO.md) is tracked; any rendered html/pdf is a local artifact.
 THESIS*.html
 THESIS*.pdf
 
@@ -43,13 +42,5 @@ _commitmsg.txt
 .DS_Store
 Thumbs.db
 
-# Maid (local read-only worker): track the harness + routine templates, ignore transient I/O
-maid/queue/*
-maid/reports/*
-maid/done/*
-maid/logs/*
-!maid/queue/.gitkeep
-!maid/reports/.gitkeep
-!maid/done/.gitkeep
-!maid/logs/.gitkeep
-# routine templates are committed (they are the source of truth for recurring tasks)
+# Maid: local-only dev-automation worker; not part of the deliverable
+maid/

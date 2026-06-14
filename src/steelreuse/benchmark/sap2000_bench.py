@@ -383,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="output directory for forces_compare.{csv,md} (default: docs/benchmark)")
     parser.add_argument("--demand", default=None,
                         help="extracted demand model JSON to compare on the REAL building (e.g. "
-                             "pyrevit_extension/demand_test_4.json); default is the 2-bay frame")
+                             "data/case_study/demand.json); default is the 2-bay frame")
     parser.add_argument("--reference", default="pynite", choices=["analytic", "pynite", "sap2000"],
                         help="reference solver for %% difference (default: pynite)")
     args = parser.parse_args(argv)

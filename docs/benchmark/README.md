@@ -61,7 +61,7 @@ The benchmark can run on an actual extracted demand model instead of the toy fra
 sanity-check (and tweak) the PyNite forces against SAP2000 on the building itself:
 ```powershell
 & $py -m steelreuse.benchmark.sap2000_bench `
-    --demand pyrevit_extension/demand_test_4.json `
+    --demand data/case_study/demand.json `
     --out docs/benchmark/test4
 ```
 Both solvers split continuous members **identically**, so the 492 sub-members line up one-to-one. The
@@ -86,8 +86,8 @@ To source the actual matching forces from SAP2000 instead of PyNite, add `--solv
 frame-analysis run:
 ```powershell
 & $py -m steelreuse.cli `
-    --donor  pyrevit_extension/donortest3.json `
-    --demand pyrevit_extension/demandtest3.json `
+    --donor  data/case_study/donor.json `
+    --demand data/case_study/demand.json `
     --frame-analysis --solver sap2000 `
     --out reports/report_sap2000.html
 ```

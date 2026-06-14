@@ -4,22 +4,22 @@ This applies the full pipeline to **real models extracted from Revit** with the 
 not synthetic data. It shows what the tool does on a messy, real-world input and documents the
 limitations it surfaces honestly.
 
-The models (`pyrevit_extension/donor_test2.json`, `demand_test2.json`) are US/AISC steel frames:
+The models (`data/case_study/donor.json`, `data/case_study/demand.json`) are US/AISC steel frames:
 
 | Model | Members | Columns | Beams |
 |-------|---------|---------|-------|
 | Donor (supply, building to deconstruct) | 1016 | 74 | 942 |
 | Demand (new design) | 270 | 54 | 216 |
 
-Reproduce (the `…test_4` models are the current canonical extraction — every member carries
+Reproduce (`data/case_study/` holds the canonical extraction — every member carries
 coordinates, 74/74 + 54/54 columns included, **and the measured section dimensions** `h/b/t_f/t_w`
-captured by the dimension-aware extractor; three independent extractions of the same building —
-test2, test3, test_4 — agree on 1016/270 members with identical role splits. The donor count is
-additionally **verified against Revit schedules**: 942 Structural Framing + 74 Structural Columns
+captured by the dimension-aware extractor; three independent extractions of the same building agreed
+on 1016/270 members with identical role splits before this canonical set was retained. The donor count
+is additionally **verified against Revit schedules**: 942 Structural Framing + 74 Structural Columns
 = 1016, an exact match — the Phase-1 completeness check):
 
 ```powershell
-steelreuse --donor pyrevit_extension/donor_test_4.json --demand pyrevit_extension/demand_test_4.json --frame-analysis --out reports/case_study.html
+steelreuse --donor data/case_study/donor.json --demand data/case_study/demand.json --frame-analysis --out reports/case_study.html
 ```
 
 ## Result (default area-load model, steel-only demand, frame analysis on)

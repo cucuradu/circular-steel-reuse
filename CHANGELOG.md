@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Removed
+- **Repository hygiene for delivery.** Removed the local-only `maid/` dev-automation worker and
+  `build_thesis_pdf.py` (with its release-workflow step and ruff exception) from the tracked tree —
+  neither is part of the shipped tool. Pruned the superseded `*_test2`/`*test3` Revit extraction
+  fixtures (~1.8 MB); the single canonical extraction now lives in `data/case_study/{donor,demand}.json`
+  (renamed from `pyrevit_extension/{donor,demand}_test_4.json`). All runnable references updated.
+
+### Changed
+- README: added CI + license badges and corrected the status table — the SAP2000 backend is now shown
+  as shipped-but-experimental (◑) rather than not-started (⬜).
+
 ### Added
 - **Experimental SAP2000 (OAPI) frame backend + cross-software benchmark** (FUTURE_IMPROVEMENTS I-9,
   thesis §11). An optional, OFF-by-default `analyze_frame_sap2000` ([core/frame_sap2000.py]) drops in

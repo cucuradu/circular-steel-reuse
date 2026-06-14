@@ -26,17 +26,10 @@ jobs:
           python -m pip install --upgrade pip build
           python -m build
 
-      - name: Build thesis PDF
-        continue-on-error: true
-        run: |
-          python -m pip install markdown
-          python build_thesis_pdf.py
-
       - name: Collect release assets
         shell: pwsh
         run: |
           $assets = @(Get-ChildItem dist/*.whl, dist/*.tar.gz -ErrorAction SilentlyContinue)
-          if (Test-Path THESIS_PRO.pdf) { $assets += Get-Item THESIS_PRO.pdf }
           $assets | ForEach-Object { $_.FullName } | Out-File assets.txt -Encoding utf8
           Get-Content assets.txt
 

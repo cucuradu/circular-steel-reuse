@@ -64,7 +64,7 @@ Drawn entirely from data the tool already has on a `SupplyItem` / audited donor:
    size, and how often each demand *section class* appears. The bootstrap source is the existing
    synthetic sweep ([`synthetic.py`](../src/steelreuse/synthetic.py) already enumerates
    section × grade × span × load through the real EN 1993 checks), refined with the case-study demand
-   models (`demand_test_4.json` and the bundled sample) as empirical anchors for what real structures
+   models (`data/case_study/demand.json` and the bundled sample) as empirical anchors for what real structures
    actually ask for.
 2. Monte-Carlo *K* synthetic future projects from that distribution.
 3. For each draw, run the **existing deterministic matcher** (`match.optimize.match`) with *d* present
