@@ -21,7 +21,10 @@ All notable changes to this project are documented here. The format is based on
   (adequate sections in stock but too short / long-and-strong donors exhausted → splice or source
   longer stock), **capacity** (nothing strong enough), **contention** (a usable donor went elsewhere),
   **economics** (only over-spec donors fit, so reuse would lose carbon) — and names the **binding
-  constraint** and the **lever**. Both the deterministic narrative and the LLM prompt lead with that
+  constraint** and the **lever**. It also flags **over-spec ("upgrade") matches** — reused donors
+  ≥ 2× heavier per metre than the lightest section that would have passed (e.g. *a W30×235 where a
+  W27×84 suffices*), honest under avoided-new but a stewardship signal (`--w-overspec`/`--reserve`).
+  Both the deterministic narrative and the LLM prompt lead with that
   analysis and flag risks (LTB-restraint-reliant beams), e.g. on the real case study: *"the binding
   constraint is length … splicing two short members into one full length (or sourcing longer stock) is
   the lever; cutting is already applied."* Numbers stay Python-computed (`PipelineResult.diagnosis`,

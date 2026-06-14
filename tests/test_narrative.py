@@ -86,6 +86,44 @@ def test_diagnose_all_filled_has_no_binding_constraint(cat):
     assert d["binding_constraint"] == "none" and d["n_unmatched"] == 0
 
 
+def test_diagnose_flags_overspec_upgrade_match(cat):
+    # A lightly loaded 4 m slot filled by a far heavier donor than the lightest section that would
+    # pass it -> flagged over-spec, with the donor and a lighter alternative named for the narrative.
+    slot = _beam_slot(4000, 8.0)
+    supply = [SupplyItem(id="heavy", section="IPE500", grade="S355", length_mm=4200)]
+    res = match(supply, [slot], cat)
+    assert res.n_reused == 1 and res.assignments[0].utilization < 0.3   # grossly over-spec
+    d = diagnose_match(supply, [slot], cat, res)
+    assert d["n_overspec"] == 1
+    assert d["overspec_example"]["donor"] == "IPE500"
+    assert d["overspec_example"]["lighter"] != "IPE500"
+
+
+def test_diagnose_right_sized_match_is_not_overspec(cat):
+    # A donor that IS the lightest adequate section for the slot must never be flagged over-spec.
+    from steelreuse.match.optimize import lightest_adequate_section
+    slot = _beam_slot(6000, 20.0)
+    lightest = lightest_adequate_section(slot, cat, "S355")
+    supply = [SupplyItem(id="fit", section=lightest.name, grade="S355", length_mm=7000)]
+    res = match(supply, [slot], cat)
+    assert res.n_reused == 1
+    assert diagnose_match(supply, [slot], cat, res)["n_overspec"] == 0
+
+
+def test_narrative_reports_overspec_when_common():
+    ctx = {
+        "slot_count": 10, "n_reused": 8, "reuse_rate_pct": 80, "match_co2_saved_kg": 100.0,
+        "n_unmatched": 0, "unknown": 0, "unknown_kinds": 0, "unknown_breakdown": [],
+        "diagnosis": {"binding_constraint": "none", "lever": "", "n_unmatched": 0, "n_overspec": 5,
+                      "overspec_example": {"donor": "W18X55", "lighter": "W12X26"}},
+    }
+    text = deterministic_narrative(ctx)
+    assert "over-spec" in text and "W18X55" in text and "W12X26" in text and "--w-overspec" in text
+    # below the reporting floor -> stays quiet (only noticeable upgrades are surfaced)
+    ctx["diagnosis"]["n_overspec"] = 1
+    assert "over-spec" not in deterministic_narrative(ctx)
+
+
 # ---------------------------------------------------------------------------
 # the narrative leads with the diagnosis, and the numbers stay guard-safe
 # ---------------------------------------------------------------------------

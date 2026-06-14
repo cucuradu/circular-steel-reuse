@@ -288,21 +288,29 @@ def baseline_new_mass_kg(
     book its avoided carbon against a coincidentally-lighter tube nobody would have bought.
     Returns ``None`` if nothing passes (then the slot is infeasible for reuse too).
     """
+    sec = lightest_adequate_section(slot, catalog, new_build_grade)
+    return None if sec is None else sec.mass_kgm * slot.required_length_mm / 1000.0
+
+
+def lightest_adequate_section(
+    slot: DemandSlot, catalog: dict[str, SectionProps], new_build_grade: str = "S355"
+) -> SectionProps | None:
+    """The lightest catalog section that passes the slot's exact EN check — the *new member you would
+    otherwise buy* (see :func:`baseline_new_mass_kg`). Same standard/shape-family restrictions; returns
+    the section itself so callers can both weigh it and name it (e.g. flag over-spec donor matches)."""
     if _degenerate(slot):
         return None
     grade = slot.grade or new_build_grade
     target_std = _slot_standard(slot, catalog)
     want_hollow = _slot_wants_hollow(slot, catalog)
-    best: float | None = None
+    best: SectionProps | None = None
     for sec in catalog.values():
         if target_std is not None and sec.standard != target_std:
             continue
         if sec.is_hollow != want_hollow:
             continue
-        if _passes_all(sec, grade, slot):
-            mass = sec.mass_kgm * slot.required_length_mm / 1000.0
-            if best is None or mass < best:
-                best = mass
+        if _passes_all(sec, grade, slot) and (best is None or sec.mass_kgm < best.mass_kgm):
+            best = sec
     return best
 
 
@@ -914,6 +922,12 @@ def _median(xs: list[float]) -> float:
     return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
 
 
+# A donor at least this many times heavier per metre than the lightest section that would have passed
+# the slot is flagged "over-spec" (an upgrade match) — the Frankenstein-receiver signal. Set at 2x so
+# only egregious upgrades (e.g. a ~2x-heavier section) surface, not mild grade-driven margins.
+_OVERSPEC_RATIO = 2.0
+
+
 def diagnose_match(
     supply: list[SupplyItem],
     slots: list[DemandSlot],
@@ -993,6 +1007,27 @@ def diagnose_match(
         if too_short >= 0.6 * len(free_lens):
             binding = "length"
 
+    # Over-spec ("upgrade") matches: a donor markedly heavier per metre than the lightest section that
+    # would have passed the slot. Honest under avoided-new (booked at the lighter section's carbon),
+    # but worth flagging — the "Frankenstein receiver" the --w-overspec / --reserve knobs target.
+    slot_by_id = {s.id: s for s in slots}
+    new_grade = w.get("new_build_grade", "S355")
+    n_overspec = 0
+    worst: tuple[float, str, str] | None = None      # (ratio, donor section, lighter section)
+    for a in result.assignments:
+        slot = slot_by_id.get(a.slot_id)
+        donor = catalog.get(a.section)
+        if slot is None or donor is None:
+            continue
+        lighter = lightest_adequate_section(slot, catalog, new_grade)
+        if lighter is None or lighter.mass_kgm <= 0 or lighter.name == a.section:
+            continue
+        ratio = donor.mass_kgm / lighter.mass_kgm
+        if ratio >= _OVERSPEC_RATIO:
+            n_overspec += 1
+            if worst is None or ratio > worst[0]:
+                worst = (ratio, a.section, lighter.name)
+
     return {
         "n_unmatched": len(result.unmatched_slots),
         "length_limited": length,
@@ -1003,4 +1038,6 @@ def diagnose_match(
         "lever": _LEVER[binding],
         "donors_eligible": len({c.si for c in cells}),   # donors with at least one feasible slot
         "donors_total": len(supply),
+        "n_overspec": n_overspec,
+        "overspec_example": ({"donor": worst[1], "lighter": worst[2]} if worst else None),
     }

@@ -545,8 +545,12 @@ section is in stock but none long enough — or the long-and-strong donors are u
 remainder is too short, so splicing/longer stock is the lever), **capacity** (no section strong/stiff
 enough), **contention** (a usable donor existed but went to a better slot), **economics** (the only
 feasible donors are so over-spec that reuse would book negative net CO₂) — and names the **binding
-constraint** and the **lever** that would improve it. Both the deterministic narrative and the LLM
-prompt lead with that diagnosis (and flag risks such as LTB-restraint-reliant beams) instead of
+constraint** and the **lever** that would improve it. It also flags **over-spec ("upgrade") matches** —
+reused donors at least **2× heavier per metre** than the lightest section that would have passed the
+slot (the "Frankenstein receiver", e.g. *a W30×235 where a W27×84 suffices*): honest under avoided-new
+(booked at the lighter section's carbon) but surfaced, with a named example, when several occur, since
+`--w-overspec`/`--reserve` would steer that heavy stock elsewhere. Both the deterministic narrative and
+the LLM prompt lead with this diagnosis (and flag risks such as LTB-restraint-reliant beams) instead of
 listing the assignment table. The conclusion is computed in Python; the LLM only renders it, so the
 anti-hallucination guard still holds.
 

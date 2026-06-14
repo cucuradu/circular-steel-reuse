@@ -230,6 +230,15 @@ def deterministic_narrative(ctx: dict) -> str:
                           "over-spec that reuse would book negative net CO2"),
         }.get(binding, "")
         parts.append(f"The binding constraint is {binding}: {why}. In short, {d['lever']}.")
+    # Over-spec ("upgrade") matches — flagged only when several reuses are markedly heavier than the
+    # lightest section that would pass (the "Frankenstein receiver"); honest, but a stewardship signal.
+    ex = d.get("overspec_example")
+    if d.get("n_overspec", 0) >= 3 and ex:
+        parts.append(f"{d['n_overspec']} reused member(s) are well over-spec — a much lighter section "
+                     f"would have passed (e.g. {ex['donor']} where {ex['lighter']} suffices). That is "
+                     "honest under avoided-new (booked at the lighter section's carbon), but "
+                     "--w-overspec or --reserve would steer such heavy stock toward the slots that "
+                     "actually need it.")
     if ctx.get("ltb_restraint_reliant"):
         parts.append(f"{ctx['ltb_restraint_reliant']} reused beam(s) pass bending only because the "
                      "slab restrains the compression flange — confirm that restraint, especially at "
@@ -271,6 +280,9 @@ def generate_narrative(ctx: dict, provider: LLMProvider | None = None) -> tuple[
         f"- diagnosis (why, and the lever): {ctx.get('diagnosis')}\n"
         f"- risks: beams relying on slab restraint for LTB = {ctx.get('ltb_restraint_reliant')}, "
         f"unidentified donors = {ctx['unknown']}, donors cut to length = {ctx['cut_donors']}\n"
+        f"- over-spec/upgrade matches (heavy donor where a much lighter section would pass, honest but "
+        f"a stewardship flag): {ctx.get('diagnosis', {}).get('n_overspec')} "
+        f"(example: {ctx.get('diagnosis', {}).get('overspec_example')})\n"
         f"- full computed context (numbers you may quote): {ctx}"
     )
     try:  # pragma: no cover - exercised only with a live provider
