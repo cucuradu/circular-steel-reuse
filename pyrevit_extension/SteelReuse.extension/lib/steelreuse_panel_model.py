@@ -108,3 +108,68 @@ def filter_rows(rows, status="all", section="", min_util=0.0):
             continue
         out.append(r)
     return out
+
+
+# KPI rows compared between two runs: (display label, kpis-block key). The unfilled count is handled
+# separately because it comes from the length of the 'unfilled' list, not the kpis block.
+_DIFF_KPIS = [
+    ("Members reused", "reused"),
+    ("CO2e saved (kg)", "co2_saved_kg"),
+    ("Mass reused (kg)", "mass_reused_kg"),
+    ("Distinct sections", "distinct_sections"),
+]
+
+
+def _slot_donors(data):
+    """Map slot_id -> donor_id for filled slots, slot_id -> None for unfilled slots."""
+    out = {}
+    for a in data.get("assignments", []):
+        out[a.get("slot_id")] = a.get("donor_id")
+    for u in data.get("unfilled", []):
+        out[u.get("slot_id")] = None
+    return out
+
+
+def _delta(baseline, current):
+    """current - baseline, rounded to 1 dp when either side is a float."""
+    if isinstance(baseline, float) or isinstance(current, float):
+        return round(current - baseline, 1)
+    return current - baseline
+
+
+def diff(baseline_data, current_data):
+    """Compare two results.json v2 dicts: KPI deltas + per-slot outcome changes.
+
+    Returns ``{"kpis": [{"label","baseline","current","delta"}, ...],
+    "slots": [{"slot_id","change","detail"}, ...]}`` where ``change`` is 'lost' (was filled, now
+    unfilled), 'gained' (was unfilled, now filled) or 'donor' (filled by a different member).
+    Unchanged slots are omitted. Pure data in/out, so it is unit-tested headless.
+    """
+    bk = baseline_data.get("kpis", {})
+    ck = current_data.get("kpis", {})
+    kpis = []
+    for label, key in _DIFF_KPIS:
+        b = bk.get(key, 0)
+        c = ck.get(key, 0)
+        kpis.append({"label": label, "baseline": b, "current": c, "delta": _delta(b, c)})
+    bu = len(baseline_data.get("unfilled", []))
+    cu = len(current_data.get("unfilled", []))
+    kpis.append({"label": "Unfilled slots", "baseline": bu, "current": cu, "delta": cu - bu})
+
+    base = _slot_donors(baseline_data)
+    cur = _slot_donors(current_data)
+    slots = []
+    for slot_id in sorted(set(base) | set(cur)):
+        b = base.get(slot_id)
+        c = cur.get(slot_id)
+        if b == c:
+            continue
+        if b is not None and c is None:
+            slots.append({"slot_id": slot_id, "change": "lost", "detail": "filled -> unfilled"})
+        elif b is None and c is not None:
+            slots.append({"slot_id": slot_id, "change": "gained",
+                          "detail": "unfilled -> filled (" + str(c) + ")"})
+        else:
+            slots.append({"slot_id": slot_id, "change": "donor",
+                          "detail": "donor " + str(b) + " -> " + str(c)})
+    return {"kpis": kpis, "slots": slots}

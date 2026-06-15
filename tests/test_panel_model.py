@@ -67,3 +67,53 @@ def test_kpis_and_blocks_exposed():
     assert v.kpis["reused"] == 2
     assert v.diagnosis["binding_constraint"] == "length"
     assert v.has_pareto is False and v.has_disposition is False
+
+
+def _data(reused, co2, mass, distinct, assignments, unfilled):
+    return {"schema_version": 2,
+            "kpis": {"reused": reused, "slots": 5, "co2_saved_kg": co2, "mass_reused_kg": mass,
+                     "distinct_sections": distinct, "objective": "co2", "proven_optimal": True,
+                     "supply_count": 9, "reuse_rate_pct": 0, "match_optimality": "x",
+                     "max_distinct_sections": None},
+            "assignments": [{"slot_id": s, "donor_id": d, "demand_id": s.split("#")[0],
+                             "demand_section": "W16X26", "donor_section": "W18X55",
+                             "utilization": 0.5, "governing_combo": "ULS gravity",
+                             "check_status": "OK", "chi_lt": 1.0, "chi_lt_if_free": None,
+                             "offcut_mm": 0.0, "co2_saved_kg": 100.0, "connection": "ok",
+                             "connection_review": False, "verification": "-", "condition": "-",
+                             "knockdown": 1.0} for s, d in assignments],
+            "unfilled": [{"slot_id": s, "demand_id": s.split("#")[0], "demand_section": "W16X26"}
+                         for s in unfilled],
+            "quarantined_donors": [], "diagnosis": {}, "warnings": {}, "paths": {}}
+
+
+def test_diff_kpi_deltas():
+    base = _data(90, 1000.0, 800.0, 8, [("N1#0", "D1")], ["N2#0"])
+    cur = _data(71, 700.0, 600.0, 6, [("N1#0", "D1")], ["N2#0", "N3#0"])
+    out = model.diff(base, cur)
+    by = {r["label"]: r for r in out["kpis"]}
+    assert by["Members reused"]["delta"] == -19
+    assert by["CO2e saved (kg)"]["delta"] == -300.0
+    assert by["Mass reused (kg)"]["delta"] == -200.0
+    assert by["Distinct sections"]["delta"] == -2
+    assert by["Unfilled slots"]["baseline"] == 1 and by["Unfilled slots"]["current"] == 2
+    assert by["Unfilled slots"]["delta"] == 1
+
+
+def test_diff_slot_changes_lost_gained_donor_and_unchanged():
+    base = _data(2, 1.0, 1.0, 1, [("S_same#0", "D1"), ("S_lost#0", "D2"), ("S_donor#0", "D3")],
+                 ["S_gain#0"])
+    cur = _data(2, 1.0, 1.0, 1, [("S_same#0", "D1"), ("S_donor#0", "D9"), ("S_gain#0", "D8")],
+                ["S_lost#0"])
+    changes = {c["slot_id"]: c["change"] for c in model.diff(base, cur)["slots"]}
+    assert changes["S_lost#0"] == "lost"
+    assert changes["S_gain#0"] == "gained"
+    assert changes["S_donor#0"] == "donor"
+    assert "S_same#0" not in changes
+
+
+def test_diff_slot_detail_strings():
+    base = _data(1, 1.0, 1.0, 1, [("S_donor#0", "D3")], [])
+    cur = _data(1, 1.0, 1.0, 1, [("S_donor#0", "D9")], [])
+    detail = model.diff(base, cur)["slots"][0]["detail"]
+    assert "D3" in detail and "D9" in detail
