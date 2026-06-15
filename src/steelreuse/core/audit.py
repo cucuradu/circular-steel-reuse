@@ -18,8 +18,9 @@ understands:
 
 Design rule (keeps existing results byte-identical): a member that carries **no** audit data at all is
 treated as legacy input — admitted to supply at the run's default knockdown. Quarantine and derived
-knockdowns engage **only** when the audit actually recorded something. Honest by default (CLAUDE.md
-Hard Rule #5): the tool never *invents* a condition; absence of data means "not audited", not "fine".
+knockdowns engage **only** when the audit actually recorded something. Honest by default
+(docs/DESIGN_PRINCIPLES.md Hard Rule #5): the tool never *invents* a condition; absence of data means
+"not audited", not "fine".
 
 Standard library only.
 """

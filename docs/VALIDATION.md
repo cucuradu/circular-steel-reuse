@@ -17,7 +17,7 @@ pytest tests/test_validation.py tests/test_ec3.py tests/test_frame.py -q
 The reference section throughout is **IPE 300** (S275 unless noted). Catalog properties used:
 `A = 5380 mm²`, `W_pl,y = 628×10³ mm³`, `I_y = 83.56×10⁶ mm⁴`, `i_z = 33.5 mm`, `A_v ≈ 2567 mm²` —
 these match the ArcelorMittal / eurocodeapplied IPE tables (the catalog rows were cross-checked against
-that source; see [FUTURE_IMPROVEMENTS.md](../FUTURE_IMPROVEMENTS.md) #4).
+that source; see [OVERVIEW.md](OVERVIEW.md) §11).
 
 ---
 

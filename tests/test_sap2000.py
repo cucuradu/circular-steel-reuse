@@ -4,7 +4,7 @@ These exercise the pure-Python parts: the scope guard (refuses non-gravity cases
 connection), the force-extraction adapter (:class:`_SapMemberForces`), and the benchmark
 table/%diff assembly. The OAPI glue itself and PyNite↔SAP2000 parity live in
 ``test_sap2000_parity.py`` (skipped unless SAP2000 is installed) — exactly the project's
-"tests must not require SAP2000" rule (CLAUDE.md).
+"tests must not require SAP2000" rule (docs/DESIGN_PRINCIPLES.md).
 """
 
 import pytest

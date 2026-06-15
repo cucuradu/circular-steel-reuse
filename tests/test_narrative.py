@@ -1,7 +1,7 @@
 """Analytical narrative + the match diagnosis behind it.
 
 The report narrative must DIAGNOSE the result (the binding constraint on reuse and the lever to
-improve it) rather than recite counts — and, per CLAUDE.md rule 1, every number is computed in
+improve it) rather than recite counts — and, per docs/DESIGN_PRINCIPLES.md rule 1, every number is computed in
 Python (`diagnose_match`) and only rendered by the narrative, so the LLM anti-hallucination guard
 still passes when a live provider quotes them.
 """

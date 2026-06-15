@@ -18,8 +18,8 @@ All notable changes to this project are documented here. The format is based on
   as shipped-but-experimental (◑) rather than not-started (⬜).
 
 ### Added
-- **Experimental SAP2000 (OAPI) frame backend + cross-software benchmark** (FUTURE_IMPROVEMENTS I-9,
-  thesis §11). An optional, OFF-by-default `analyze_frame_sap2000` ([core/frame_sap2000.py]) drops in
+- **Experimental SAP2000 (OAPI) frame backend + cross-software benchmark** (see OVERVIEW.md §11).
+  An optional, OFF-by-default `analyze_frame_sap2000` ([core/frame_sap2000.py]) drops in
   for the PyNite `analyze_frame`: it reuses the *same* pure-Python topology and force-extraction
   helpers, swapping only the solver, so a force difference is solver numerics rather than modelling.
   Scope is the **ULS gravity** combination on connectable frames; sway/wind/seismic/P-Δ are refused
@@ -234,7 +234,7 @@ All notable changes to this project are documented here. The format is based on
   audit data is unchanged (admitted at the run default). Provenance surfaces in the material passport,
   the HTML report (audit section + per-assignment Provenance column), and the console. New flags
   `--pda <csv>` and `--include-unverified`; new schema fields on `ExtractedMember`. See
-  `docs/PRE_DEMOLITION_AUDIT.md`. Closes FUTURE_IMPROVEMENTS #11.
+  `docs/PRE_DEMOLITION_AUDIT.md`.
 
 ## [0.2.0] - 2026-06-09
 
@@ -254,9 +254,8 @@ tool (CI, license, releases).
 - **Optional cutting-stock** mode (`--cut`): one donor cut into several pieces for several slots.
 - **MIT `LICENSE`** file (the project already declared MIT in metadata).
 - **CI** (GitHub Actions, Windows runner, Python 3.11 + 3.12: ruff + pytest) and a tag-driven
-  **release** workflow that builds the wheel/sdist and the thesis PDF.
-- `THESIS_PRO.md` (canonical thesis) and `build_thesis_pdf.py` (Markdown → HTML → PDF with inline SVG
-  figures).
+  **release** workflow that builds the wheel/sdist.
+- Comprehensive technical documentation (`docs/OVERVIEW.md`).
 - `steelreuse --demo` / `--version`; graceful CLI error handling (`--debug` for tracebacks) and
   input validation at the boundary (`ExtractionError`).
 - `steelreuse-validate` (a.k.a. `python -m steelreuse.validate_extraction`): sanity-check an

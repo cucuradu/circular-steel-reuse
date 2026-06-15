@@ -1,4 +1,4 @@
-"""Stock stewardship & counterfactual fates (FUTURE_IMPROVEMENTS plan, 2026-06-12).
+"""Stock stewardship & counterfactual fates (stock stewardship & counterfactual fates).
 
 Phase A2: the stock disposition advisory (store / re-roll / recycle per unused donor).
 Later phases (A1ii counterfactual booking, B* stewardship knobs, C* portfolio/scarcity) add their

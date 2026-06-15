@@ -1,6 +1,6 @@
 # SAP2000 cross-software benchmark — how to run
 
-This folder holds the **cross-software force benchmark** (FUTURE_IMPROVEMENTS I-9, thesis §11): the
+This folder holds the **cross-software force benchmark** (see [../OVERVIEW.md](../OVERVIEW.md) §11): the
 same frame solved with three force methods — **analytic** (`wL²/8`), **PyNite** (the free default
 solver), and **SAP2000** (the professional solver, via its OAPI) — with a per-member comparison table.
 Its job is *external validation*: if PyNite and SAP2000 agree, the project's force numbers are trusted
@@ -10,7 +10,7 @@ There are **two different things** you can do with the SAP2000 backend. Don't co
 
 | | What frame it solves | Purpose |
 |---|---|---|
-| **The benchmark** (`steelreuse-bench-sap2000`) | a tiny, hand-checkable **2-bay toy frame** (5 members) | prove PyNite ≈ SAP2000 on something you can verify by hand → the thesis table |
+| **The benchmark** (`steelreuse-bench-sap2000`) | a tiny, hand-checkable **2-bay toy frame** (5 members) | prove PyNite ≈ SAP2000 on something you can verify by hand → the reference comparison table |
 | **The pipeline backend** (`--solver sap2000`) | your **real receiver (demand) model** — every extracted member | actually source member forces for the matching from SAP2000 instead of PyNite |
 
 ---
@@ -37,7 +37,7 @@ $py = "C:\Users\Radu\Projects\Python\.venv-signed\Scripts\python.exe"
 
 ---
 
-## A. Run the benchmark (the thesis table)
+## A. Run the benchmark
 
 With SAP2000 **closed** (the backend starts its own instance):
 ```powershell
@@ -45,7 +45,7 @@ With SAP2000 **closed** (the backend starts its own instance):
 ```
 This writes / overwrites:
 - `docs/benchmark/forces_compare.csv` — machine-readable (SI units: N, N·mm).
-- `docs/benchmark/forces_compare.md` — the thesis-ready table (kN, kNm) with `%Δ` vs PyNite.
+- `docs/benchmark/forces_compare.md` — the reference table (kN, kNm) with `%Δ` vs PyNite.
 
 Options: `--reference pynite|analytic|sap2000` (which solver the `%Δ` is measured against).
 

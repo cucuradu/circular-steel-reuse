@@ -1,1 +1,4 @@
-"""LLM layer — narrative report only. The model never computes numbers (see CLAUDE.md, hard rule)."""
+"""LLM layer — narrative report only.
+
+The model never computes numbers (see docs/DESIGN_PRINCIPLES.md, hard rule).
+"""

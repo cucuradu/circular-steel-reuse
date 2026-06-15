@@ -1,6 +1,6 @@
 """Report builder: deterministic numbers + (optional) LLM narrative.
 
-Hard rule (CLAUDE.md): numbers are computed in Python and injected by Jinja2. The LLM only writes
+Hard rule (docs/DESIGN_PRINCIPLES.md): numbers are computed in Python and injected by Jinja2. The LLM only writes
 prose; its output is screened by :func:`find_invented_numbers` and discarded (deterministic fallback)
 if it introduces any figure not present in the computed results.
 """

@@ -6,7 +6,7 @@ Lives in the extension ``lib/`` (pyRevit adds it to the engine path) so any push
 rules as the extractor/Apply-Matches buttons (the default IronPython 3 engine; pyRevit 6.x CPython
 3.12 errors under Revit 2026).
 
-The heavy matching engine never runs in Revit (CLAUDE.md hard rule 2). Instead this module shells out
+The heavy matching engine never runs in Revit (docs/DESIGN_PRINCIPLES.md hard rule 2). Instead this module shells out
 to the **signed CPython venv** via ``python -m steelreuse.cli`` -- never the pip ``steelreuse.exe``
 launcher, which Windows Application Control (WDAC) blocks as an unsigned binary.
 

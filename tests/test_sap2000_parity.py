@@ -2,7 +2,8 @@
 
 This is the on-machine validation gate for the experimental SAP2000 backend (and the sign/axis
 mapping in particular). In CI — and on any box without SAP2000 + the ``[sap2000]`` extra — every test
-here skips, honouring the project rule that tests must never *require* SAP2000 (CLAUDE.md). Run it on
+here skips, honouring the project rule that tests must never *require* SAP2000
+(docs/DESIGN_PRINCIPLES.md). Run it on
 the trial machine to confirm the two solvers agree on the validated canonical frame.
 """
 

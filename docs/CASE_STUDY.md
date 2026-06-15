@@ -46,7 +46,7 @@ slots fill and ≈ 39.3 t CO₂e books, the difference being long donors strande
   model's one **HSS**, now checked with hollow-section rules); **581 are "unknown"** and are *reported,
   never guessed* — overwhelmingly **open-web bar joists** (482), plus concrete members, channels (C/MC)
   and sizeless L-angles, all intentionally out of scope (joists aren't rolled members; mono-symmetric
-  shapes need their own checks; see [FUTURE_IMPROVEMENTS.md](../FUTURE_IMPROVEMENTS.md)). 0 fuzzy
+  shapes need their own checks; see [OVERVIEW.md](OVERVIEW.md) §13). 0 fuzzy
   matches — nothing entered the analysis on a guessed identity.
 - **Geometry confirmation behaves honestly on real data:** 465 donor members carry all four measured
   dimensions. Every W-shape among them already maps by name; the 31 dimension-carrying members that

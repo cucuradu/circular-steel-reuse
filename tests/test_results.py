@@ -1,7 +1,8 @@
 """Tests for steelreuse.writeback.build_results: the assignment-keyed results.json contract that the
 Revit dockable results panel consumes (distinct from build_writeback's element-keyed status.json).
 
-Pure reshaping of values run_pipeline already computed -- no new arithmetic (CLAUDE.md hard rule 1).
+Pure reshaping of values run_pipeline already computed -- no new arithmetic
+(docs/DESIGN_PRINCIPLES.md hard rule 1).
 """
 
 import json

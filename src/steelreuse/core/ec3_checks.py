@@ -3,7 +3,7 @@
 Everything is in internal units: forces in N, moments in N*mm, lengths in mm, stresses in N/mm^2.
 Sign convention: ``N_Ed`` is **compression-positive**; a negative value is treated as tension.
 
-Scope & honesty (see CLAUDE.md):
+Scope & honesty (see docs/DESIGN_PRINCIPLES.md):
   * Implemented: classification, tension, compression+flexural buckling, biaxial bending (major axis
     with chi_LT, minor axis plain), shear, the full EN 1993-1-1 **6.3.3 beam-column interaction**
     (eq. 6.61/6.62 with Annex B Method 2 factors, C_m = 1.0 -> conservative for any moment shape),

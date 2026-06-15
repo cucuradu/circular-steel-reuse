@@ -12,8 +12,9 @@ single magic number, and the characteristic (unfactored) pressure is kept for th
 
 Tributary widths can either be a single configured default or **estimated per beam from the model
 geometry** (:func:`estimate_tributary_widths`) using the spacing to parallel neighbouring beams.
-Conservative by default (CLAUDE.md rule 4): an edge beam with a neighbour on one side only is given the
-full bay width, and anything the estimator is unsure about falls back to the configured default.
+Conservative by default (docs/DESIGN_PRINCIPLES.md rule 4): an edge beam with a neighbour on one side
+only is given the full bay width, and anything the estimator is unsure about falls back to the
+configured default.
 
 Units: pressures in kN/m^2 (== kPa); lengths/areas in m at this boundary; the resulting
 :class:`~steelreuse.core.forces.Load` is in internal N, mm (1 kN/m == 1 N/mm).

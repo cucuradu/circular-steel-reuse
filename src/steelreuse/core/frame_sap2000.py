@@ -5,7 +5,7 @@ This is a drop-in for :func:`steelreuse.core.frame.analyze_frame`: same signatur
 topology** (node snapping, column/span splitting, free-end pruning) and its **force-extraction
 helpers** (``_governing_axial`` etc.) verbatim, swapping only the solver — so a force difference
 between this and the PyNite path is solver numerics, not modelling choices. That equivalence is the
-point of the cross-software benchmark (FUTURE_IMPROVEMENTS I-9, thesis §11).
+point of the cross-software benchmark (cross-software validation, see docs/OVERVIEW.md §11).
 
 Scope (deliberately small, see the 2026-06-13 design spec): the **default ULS gravity combination**
 on *connectable* frames only. Lateral / 2nd-order cases (sway EHF, wind, seismic, P-Δ, α_cr) are out

@@ -166,8 +166,8 @@ def build_results(result: PipelineResult) -> dict:
 
     A sibling of :func:`build_writeback`: that one is *element*-keyed (drives the Apply-Matches
     colouring); this one is *assignment*-keyed (drives the filterable results table). Both are pure
-    reshaping of values :func:`steelreuse.pipeline.run_pipeline` already computed (CLAUDE.md hard
-    rule 1 -- no new arithmetic here).
+    reshaping of values :func:`steelreuse.pipeline.run_pipeline` already computed
+    (docs/DESIGN_PRINCIPLES.md hard rule 1 -- no new arithmetic here).
 
     Shape (``schema_version`` lets the panel and engine evolve independently)::
 

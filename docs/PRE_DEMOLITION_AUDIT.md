@@ -30,7 +30,7 @@ pre-demolition audit upstream of any reuse claim.
 The tool never *invents* a condition. A donor member that carries **no audit data at all** is treated
 as legacy input — admitted to supply at the run's default knockdown (`--knockdown`, default `1.0`), so
 existing results are unchanged. Quarantine and derived knockdowns engage **only** when the audit
-actually recorded something. Absence of data means "not audited", not "fine" (CLAUDE.md rule 5).
+actually recorded something. Absence of data means "not audited", not "fine" (DESIGN_PRINCIPLES.md rule 5).
 
 ## The two audit facts → numbers
 

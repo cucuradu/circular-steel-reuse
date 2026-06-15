@@ -26,7 +26,7 @@ donor.json / demand.json            (pyRevit or IFC extractor; lengths in mm)
         ▼  llm/report.py         deterministic numbers + (optional) LLM prose → HTML
 ```
 
-The deterministic checks are the **single source of truth** (CLAUDE.md rule 3). The ML modules
+The deterministic checks are the **single source of truth** (DESIGN_PRINCIPLES.md rule 3). The ML modules
 (`ml/`) and the LLM narrative never alter a number; the LLM only writes prose around fixed numeric
 tokens and is screened for invented figures.
 
@@ -46,7 +46,7 @@ stress is N/mm² = MPa throughout. Loads enter in kN/m² and m and are converted
   AISC tabulated tube properties). `SectionProps.standard` ∈ {`EU`,`US`}; `SectionProps.is_hollow`
   marks tubes for the shape-aware checks. Round HSS and pipe are excluded (CHS needs a `D/t`
   classification rule).
-- **Mapping** (never silently guesses, CLAUDE.md rule 5): `exact → user-override → normalized → fuzzy
+- **Mapping** (never silently guesses, DESIGN_PRINCIPLES.md rule 5): `exact → user-override → normalized → fuzzy
   (quarantined) → unknown`. Fuzzy matches (e.g. `IPE300` vs `IPE330`, ratio ≈ 0.83) are **quarantined
   by default** — reported but excluded from analysis until confirmed via an override CSV — because a
   near-miss would otherwise enter the checks with the wrong section properties.
@@ -94,7 +94,7 @@ pre-sizing, with explicit EN 1990 partial factors rather than a single magic num
   to a typical office floor (EN 1991-1-1 cat. B). All overridable on the CLI.
 - **Beam tributary widths** can be estimated per-beam from the model geometry
   (`estimate_tributary_widths`): half the gap to the nearest parallel framing neighbour each side, with
-  an **edge beam taking the whole bay** (conservative, CLAUDE.md rule 4).
+  an **edge beam taking the whole bay** (conservative, DESIGN_PRINCIPLES.md rule 4).
 - **Column tributary area + floor count** (`estimate_column_loads`): columns are collapsed to plan grid
   points; tributary area = half-bay each side in x and y (edge = half the present bay, i.e. slab edge at
   the column, no overhang); **floor count = the number of columns in the vertical stack at or above the
@@ -173,7 +173,7 @@ default and fallback.
   to the analytic path; and if an irregular model still solves but yields **non-physical forces**
   (an ill-conditioned near-mechanism), a magnitude guard rejects the result and falls back to the
   per-member analytic loads. The frame solve therefore either produces sane forces or falls back — it
-  never feeds garbage to the checker (CLAUDE.md rule 4).
+  never feeds garbage to the checker (DESIGN_PRINCIPLES.md rule 4).
 - **Loads & load path**: the floor pressure (§4) is applied as a UDL on the **beams only**, split into
   permanent (`DL`) and imposed (`LL`) load *cases*; the ULS/SLS *combinations* apply the EN 1990 factors
   (`γ_G·DL + γ_Q·LL`). **Columns carry no applied load** — each column's axial comes from the solved load
@@ -215,7 +215,7 @@ default and fallback.
   `J ≈ ⅓·Σ b_i t_i³`; unmapped members use a generic stiff section (forces in the determinate parts of a
   simple braced frame don't depend on stiffness).
 - **Robustness**: any solver failure (residual instability, missing extra) is caught and the run falls
-  back to the analytic loads with a warning, never a crash (CLAUDE.md rule 4).
+  back to the analytic loads with a warning, never a crash (DESIGN_PRINCIPLES.md rule 4).
 
 **Residuals (still open):** lateral cases (sway / wind / seismic) are applied in `+X`/`+Y` (worst-magnitude
 for a regular doubly-symmetric frame); the seismic action is the simplified **lateral force method** with a
@@ -224,7 +224,7 @@ effective lengths remain `k = 1.0` (the solve gives forces, not buckling lengths
 bending is now carried through: the per-combo envelope keeps `M_y` and `M_z` separately and the checker
 runs the biaxial 6.3.3 interaction (§5.5); the residual is that member *rotation* about its own axis is
 not captured from the BIM, so the local→section axis mapping assumes the default orientation. See
-`FUTURE_IMPROVEMENTS.md`.
+the design overview ([OVERVIEW.md](OVERVIEW.md) §13).
 
 **Continuous multi-span members** are handled: `expand_spans` splits a beam carrying `spans_mm = [s₁, s₂,…]`
 into one sub-element per span at its interior supports (interpolated along the member axis so the interior
@@ -537,7 +537,7 @@ decision that must also price the yard — a caveat carried into the option-valu
 All figures are computed in Python and injected by Jinja2. If an LLM provider is configured
 (Gemini/Ollama), it writes prose only; `find_invented_numbers` rejects any output containing a figure
 not present in the computed context and the report falls back to the deterministic narrative. The LLM is
-never given a calculator (CLAUDE.md rule 1).
+never given a calculator (DESIGN_PRINCIPLES.md rule 1).
 
 **The narrative diagnoses, it does not recite.** `diagnose_match` (`match/optimize.py`, run on every
 report) classifies each *unfilled* slot by the reason it stayed empty — **length** (an adequate donor
@@ -631,7 +631,28 @@ its own `wL²/8`; `run_pipeline` then yields one slot per span. **Seismic:** `se
 2-storey box gives a base shear `Cs·ΣW` distributed inverted-triangular (roof force = 2× the floor force),
 and `seismic_cs > 0` adds the `seismic X/Y` design situations.
 
-**Whole suite:** 217 tests, ruff clean.
+**Whole suite:** 328 tests, ruff clean.
+
+### 10.1 Sensitivity & uncertainty of the CO₂ figure  (`sensitivity.py`, `--demo` via `steelreuse-sensitivity`)
+
+The report books a single headline "CO₂ saved" under a fixed set of assumptions; this layer answers the
+examiner's standard question — *how much does it move when those assumptions move?* — without recomputing
+any number itself (it **re-runs the pipeline** and reads `match.total_co2_saved_kg`, so the no-arithmetic
+rule still holds). Two views:
+
+- **Tornado (one-at-a-time).** Each driver is varied across a documented range with everything else at
+  baseline, and drivers are ranked by the swing they cause: reclaimed knockdown `0.70–1.00`; permanent /
+  imposed load `±20 %`; `γ_G` `1.20–1.50`; `γ_Q` `1.35–1.50`; and the end-of-life **counterfactual**
+  (`none` / `recycling` / `rerolling`). On the bundled demo the counterfactual basis dominates by an order
+  of magnitude (the re-rolling credit is the single most consequential LCA assumption), with the load and
+  partial-factor assumptions a distant second — exactly the honest framing the avoided-new critique demands.
+- **Monte Carlo (optional, `--monte-carlo N`).** The numeric drivers are sampled together from their ranges
+  for a CO₂-saved confidence band (P5–P50–P95) around the point estimate; reproducible for a fixed `--seed`.
+
+Direction is guarded by property-style tests (`tests/test_sensitivity.py`): a lower knockdown never
+*increases* the saving, booking net of a counterfactual never increases it (and re-rolling ≤ recycling ≤
+none), the tornado is sorted with non-negative swings, and the band is ordered. Outputs are a `tornado.csv`
+and a `tornado.png` (the chart needs the `[analysis]` extra; the sweep + CSV are standard-library only).
 
 ## 11. ML modules (exploratory, not in the certified path)
 
@@ -641,14 +662,14 @@ entirely deterministic (sections → loads → EN 1993 → carbon → MILP). Thr
 - **Capacity surrogate** (`ml/surrogate.py`, XGBoost) imitates the deterministic utilization for a fast
   pre-screen. Its reported test R² (~1.0) is **circular**: the labels are produced by the EN 1993
   checker itself over a synthetic sweep, so a high score only shows the model can reproduce the checker,
-  not real-world predictive power. It is never authoritative (CLAUDE.md rule 3).
+  not real-world predictive power. It is never authoritative (DESIGN_PRINCIPLES.md rule 3).
 - **Reuse score** (`ml/reuse_score.py`) is a transparent weighted heuristic (section standardization ×
   length usability) — the honest, non-formula judgement, replaceable by a trained model when real reuse
   outcomes are available.
 - **Clustering** (`ml/clustering.py`) groups similar sections (KMeans) for exploration.
 
 Wiring any of these into the pipeline (surrogate as a pre-filter, reuse-score as an objective term) is a
-deliberate future decision, logged in `FUTURE_IMPROVEMENTS.md` #7 — not a default.
+deliberate future decision ([OVERVIEW.md](OVERVIEW.md) §13) — not a default.
 
 ## 12. Out of scope (explicit non-claims)
 
@@ -660,4 +681,4 @@ axis (the biaxial check of §5.5 assumes the default local→section axis orient
 fatigue, corrosion and weldability of aged steel;
 effective-section (class 4) design. (Cutting one donor into several slots is available as the optional
 cutting-stock mode, §7 point 5; per-member forces from a global solve — with sway, wind, seismic and P-Δ —
-via `--frame-analysis` `--phi` `--wind` `--seismic`, §4.1.) See `FUTURE_IMPROVEMENTS.md` for the backlog.
+via `--frame-analysis` `--phi` `--wind` `--seismic`, §4.1.) See [OVERVIEW.md](OVERVIEW.md) §13 for limitations and future work.

@@ -1,6 +1,6 @@
 """Cross-software force benchmark — analytic vs PyNite vs SAP2000 on one validated frame.
 
-The headline thesis-validation artifact (FUTURE_IMPROVEMENTS I-9, §11): solve the *same* small,
+The headline cross-software validation artifact (see docs/OVERVIEW.md §11): solve the *same* small,
 hand-validated frame three ways and tabulate the agreement, so the project's own hand-calcs gain an
 independent commercial-solver cross-check. The force-comparison assembly here is pure Python (unit
 tested in CI); only the SAP2000 column needs the OAPI, so a run without SAP2000 reports that solver
@@ -98,7 +98,7 @@ def _solver_order(rows: list[ComparisonRow]) -> list[str]:
 def comparison_to_markdown(
     rows: list[ComparisonRow], reference: str = "pynite", solvers: list[str] | None = None
 ) -> str:
-    """Render the comparison as a thesis-ready markdown table (N in kN, M in kNm, V in kN)."""
+    """Render the comparison as a reference markdown table (N in kN, M in kNm, V in kN)."""
     solvers = solvers if solvers is not None else _solver_order(rows)
     head = ["Member"]
     for s in solvers:

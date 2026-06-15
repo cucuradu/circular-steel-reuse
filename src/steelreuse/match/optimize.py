@@ -386,7 +386,7 @@ def _feasible_cell(
     if allow_cutting:
         # Cutting-stock: one donor can serve several slots, so the remainder is genuinely reusable
         # (tracked per donor after the solve, not per piece). Don't penalise off-cut here — that bias
-        # against long stock is exactly what cutting-stock removes (FUTURE_IMPROVEMENTS #9).
+        # against long stock is exactly what cutting-stock removes9)#9).
         cell_offcut, score = 0.0, co2_saved
     else:
         # One-piece-per-donor: the remainder is cut off and returns to stock (not emitted), so the
@@ -900,7 +900,7 @@ def verify_match(
 
 
 # Plain-language lever for each binding constraint the diagnosis can name (the narrative renders this;
-# the LLM never derives it — CLAUDE.md rule 1).
+# the LLM never derives it — docs/DESIGN_PRINCIPLES.md rule 1).
 _LEVER = {
     "length": "the donors that are both strong enough and long enough are used up, and the free "
               "remainder is too short for these spans — splicing two short members into one full "
@@ -939,7 +939,8 @@ def diagnose_match(
 
     Every UNFILLED slot is classified by the reason it stayed empty, so the report can state the
     *binding constraint* and the *lever* that would improve it instead of merely reciting how many
-    slots went unfilled. The LLM only renders this conclusion; it never derives it (CLAUDE.md rule 1).
+    slots went unfilled. The LLM only renders this conclusion; it never derives it
+    (docs/DESIGN_PRINCIPLES.md rule 1).
 
     Categories (re-deriving the same feasibility cells the solver used, via ``result.weights``):
 

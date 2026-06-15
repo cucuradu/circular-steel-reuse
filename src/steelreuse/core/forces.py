@@ -96,7 +96,7 @@ def member_demands(
 
     if member.role == "column":
         # A nonzero moment (from a notional eccentricity) engages the N+M interaction check; left
-        # unrestrained so LTB is considered conservatively when it does (CLAUDE.md rule 4).
+        # unrestrained so LTB is considered conservatively when it does (docs/DESIGN_PRINCIPLES.md rule 4).
         out.append(MemberDemand(
             N_Ed=load.axial_N, My_Ed=load.axial_moment_Nmm,
             L=member.length_mm or 0.0, ky=ky, kz=kz,

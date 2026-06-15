@@ -1,22 +1,19 @@
-# Circular Structural Reuse Matcher
+# Circular Structural Reuse Matcher — Technical Overview
 
-### A Decision‑Support Workflow for Eurocode‑Compliant Steel Reuse and Embodied‑Carbon Quantification
-
----
-
-**Master's Thesis**
-
-**Author:** [Your Full Name]  ·  **Student ID:** [ID]<br>
-**Degree programme:** [M.Sc. in Civil Engineering — Structural Engineering]<br>
-**Institution:** Politecnico di Milano<br>
-**Supervisor:** [Supervisor]  ·  **Co‑supervisor:** [Co‑supervisor]<br>
-**Academic year:** [20XX–20XX]
-
-> Bracketed fields are placeholders to be completed before submission.
+*A decision‑support workflow for Eurocode‑compliant steel reuse and embodied‑carbon quantification.*
 
 ---
 
-## Abstract
+This is the comprehensive technical reference for the tool: its motivation, system architecture, the
+engineering methods it implements, how it is verified, and what it does and does not claim. It is
+written to be read end to end, but each section is self‑contained. For installation and the command
+reference see the [README](../README.md); for the clause‑by‑clause Eurocode mapping see
+[METHODOLOGY.md](METHODOLOGY.md); for the five governing engineering rules see
+[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md).
+
+---
+
+## Summary
 
 Embodied carbon — the greenhouse‑gas emissions of producing and constructing a building's materials —
 is now a decisive share of a structure's lifetime impact, and structural steel is a principal
@@ -26,7 +23,7 @@ certification. Direct reuse of reclaimed members avoids almost all of that burde
 reclaimed members can safely occupy which positions in a new design — across thousands of candidate
 pairings, each subject to the full set of code checks — is intractable by hand.
 
-This thesis presents a software workflow that automates the assessment. Given a digital model of a
+The tool is a software workflow that automates the assessment. Given a digital model of a
 building to be deconstructed (the *donor*) and of a new design (the *demand*), it identifies the steel
 sections, derives the design actions, verifies every candidate member against Eurocode EN 1993‑1‑1,
 quantifies the embodied carbon avoided against a defensible baseline, and solves a Mixed‑Integer Linear
@@ -34,11 +31,11 @@ Program to obtain the carbon‑optimal feasible assignment. An optional global f
 realistic action effects (gravity load path, sway imperfection, wind, seismic, and second‑order effects).
 A language model generates the report prose under a strict constraint that it performs no arithmetic; all
 quantities are computed deterministically and validated. The deterministic core is hand‑verified against
-published section data and protected by 217 automated tests. The tool is scoped as member‑level
+published section data and protected by 324 automated tests. The tool is scoped as member‑level
 pre‑feasibility decision support: it does not design connections, and reclaimed material requires physical
 verification before reliance.
 
-**Keywords:** circular economy; steel reuse; embodied carbon; Eurocode EN 1993‑1‑1; BIM; Mixed‑Integer
+**Topics:** circular economy; steel reuse; embodied carbon; Eurocode EN 1993‑1‑1; BIM; Mixed‑Integer
 Linear Programming; design for deconstruction.
 
 ---
@@ -506,7 +503,7 @@ would require a non‑circular validation against real reuse outcomes.
 `V_pl,Rd(S235) = 348 kN`, flexural buckling `χ_z(L = 4 m, S275) = 0.392`, LTB `χ_LT(L = 6 m) ≈ 0.45`
 decreasing with span, and deflection `δ ≈ 9.62 mm` (w = 10 N/mm, L = 6 m).
 
-**Automated suite.** 217 tests (across nineteen files) pass under a clean linter, covering the member
+**Automated suite.** 324 tests (across 28 files) pass under a clean linter, covering the member
 checks, the matcher (known‑answer feasibility, use constraints, the avoided‑new and standard‑restricted
 baselines, degenerate‑geometry safety, the greedy guard, the combination envelope, cutting‑stock), the
 frame analysis (topology, recovery of `wL²/8`, multi‑storey accumulation, sway/wind/seismic forces,
@@ -625,15 +622,15 @@ schedule cross‑check in Revit (the donor side is verified: 942 + 74 match exac
 (5) effective‑length inference from buckling modes (the `α_cr` classification + per‑member override
 are done, §7.3); (6) shape‑aware checks for channels/angles/round tube and the small
 European sizes; (7) multi‑objective optimisation; (8) an independently published validation benchmark.
-The full all‑fronts idea register (BIM round‑trip, review‑queue UX, property‑based testing, transport
-emissions, statistical f_y from coupon results per EN 1990 Annex D, …) lives in the repository's
-`FUTURE_IMPROVEMENTS.md`.
+Further candidate directions (BIM round‑trip, review‑queue UX, property‑based testing, transport
+emissions, statistical f_y from coupon results per EN 1990 Annex D, …) are noted alongside the items
+above.
 
 ---
 
 # 14. Conclusion
 
-This thesis demonstrates that the assessment of direct structural‑steel reuse can be automated as a
+This work demonstrates that the assessment of direct structural‑steel reuse can be automated as a
 transparent, Eurocode‑aware workflow that also quantifies the embodied carbon saved. From a donor and a
 demand model, the tool identifies sections without unsupported guessing, derives design actions (optionally
 from a global frame solve with sway, wind, seismic and second‑order effects), verifies every candidate

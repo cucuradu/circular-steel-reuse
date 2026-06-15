@@ -5,14 +5,14 @@ none is proposed to be. It sets out how the dormant `ml/` layer could earn a *no
 estimating each stock item's **option value** (its probability of a better future match) — and how
 that estimate would *calibrate*, never *replace*, the experimental scarcity weight from phase C2
 (`--reserve`, `match.optimize._apply_reserve`). It is the third leg of the stock-stewardship plan in
-[FUTURE_IMPROVEMENTS.md](../FUTURE_IMPROVEMENTS.md): **A/B** are accounting and single-project knobs,
+[OVERVIEW.md §13](OVERVIEW.md): **A/B** are accounting and single-project knobs,
 **C1** (portfolio matching) is the principled multi-project optimiser, **C2** is a cheap
 single-project proxy for the option value of holding stock back, and **C3** — here — is how you would
 put a defensible *number* on that option value instead of a hand-tuned weight.
 
 ## Why this is the honest ML job (and the surrogate was not)
 
-The repo is deliberate about where machine learning may and may not sit (CLAUDE.md rule 3): the
+The repo is deliberate about where machine learning may and may not sit (DESIGN_PRINCIPLES.md rule 3): the
 certified result path is entirely deterministic — EN 1993-1-1 checks → carbon accounting → MILP — and
 nothing learned is ever allowed to *gate* a structural decision. The existing capacity surrogate
 ([`ml/surrogate.py`](../src/steelreuse/ml/surrogate.py)) makes that point by counter-example: its
@@ -126,7 +126,7 @@ needs data the project does not yet have:
 
 - **Out of the pipeline.** No model output gates, filters, or ranks a *certified* match. The
   deterministic EN 1993 check and the booked-carbon MILP objective stay the sole authorities
-  (CLAUDE.md rule 3).
+  (DESIGN_PRINCIPLES.md rule 3).
 - **Decision support only.** Permitted touch-points are: tuning the opt-in C2 `reserve_w`/scarcity
   term (which is itself score-only and default off), and enriching the A2 stock-disposition advisory
   (store / re-roll / recycle) with an estimated option value column. Both are advisory.

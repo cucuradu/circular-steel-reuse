@@ -18,9 +18,9 @@ out/
 /reports/
 data/generated/
 models/
-# Thesis: only the markdown source (THESIS_PRO.md) is tracked; any rendered html/pdf is a local artifact.
-THESIS*.html
-THESIS*.pdf
+# Rendered documentation artifacts (the Markdown sources under docs/ are the tracked originals)
+*.docs.html
+*.docs.pdf
 
 # SteelReuse Revit add-on: machine-specific interpreter config + per-run match outputs
 steelreuse_runner_config.json
@@ -33,7 +33,7 @@ steelreuse_reports/
 # Scratch
 _commitmsg.txt
 
-# Claude Code harness state (agent worktrees, local settings)
+# Local tooling state (editor/agent worktrees, local settings)
 .claude/
 
 # Editor / OS

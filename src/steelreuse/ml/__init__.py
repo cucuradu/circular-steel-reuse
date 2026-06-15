@@ -11,6 +11,6 @@ kept for exploration and a possible future role, not as authority:
   today and replaceable by a trained model once real reuse outcomes exist.
 * ``clustering`` — KMeans grouping of similar sections, for exploration.
 
-To actually use any of these in the pipeline, see FUTURE_IMPROVEMENTS.md #7 (a deliberate decision, not
+To actually use any of these in the pipeline, see docs/OVERVIEW.md §10 (a deliberate decision, not
 a default).
 """

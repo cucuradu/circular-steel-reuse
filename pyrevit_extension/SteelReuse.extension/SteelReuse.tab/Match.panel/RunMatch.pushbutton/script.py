@@ -4,7 +4,7 @@
 Runs on the default IronPython 3 engine (no ``#! python3`` -- see Extract.pushbutton for why).
 Stdlib only, no f-strings, %-formatting.
 
-The heavy matching engine never runs in Revit (CLAUDE.md hard rule 2). This button collects the run
+The heavy matching engine never runs in Revit (docs/DESIGN_PRINCIPLES.md hard rule 2). This button collects the run
 options, then hands them to :mod:`steelreuse_runner` (in the extension ``lib/``), which shells out to
 the signed CPython venv via ``python -m steelreuse.cli``. The three artifacts land in a
 ``steelreuse_reports`` folder beside the new-design model:
