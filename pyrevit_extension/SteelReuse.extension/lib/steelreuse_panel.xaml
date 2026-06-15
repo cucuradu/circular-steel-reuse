@@ -179,21 +179,59 @@
       <TextBox x:Name="minutil_filter" Width="60" VerticalAlignment="Center" Padding="3"/>
     </StackPanel>
 
-    <!-- Assignments grid -->
-    <DataGrid Grid.Row="3" x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True"
-              HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserAddRows="False"
-              SelectionMode="Single">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Slot" Binding="{Binding slot_id}" Width="95"/>
-        <DataGridTextColumn Header="Demand sec." Binding="{Binding demand_section}" Width="95"/>
-        <DataGridTextColumn Header="Donor" Binding="{Binding donor_id}" Width="80"/>
-        <DataGridTextColumn Header="Donor sec." Binding="{Binding donor_section}" Width="95"/>
-        <DataGridTextColumn Header="Util" Binding="{Binding utilization, StringFormat=N2}" Width="60"/>
-        <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="70"/>
-        <DataGridTextColumn Header="Gov. case" Binding="{Binding governing}" Width="130"/>
-        <DataGridTextColumn Header="CO2 (kg)" Binding="{Binding co2_saved_kg, StringFormat=N0}" Width="80"/>
-      </DataGrid.Columns>
-    </DataGrid>
+    <!-- Results: assignments grid + the rich output tabs (shown only when that block ran) -->
+    <TabControl Grid.Row="3" x:Name="results_tabs">
+      <TabItem Header="Assignments">
+        <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserAddRows="False"
+                  SelectionMode="Single">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Slot" Binding="{Binding slot_id}" Width="95"/>
+            <DataGridTextColumn Header="Demand sec." Binding="{Binding demand_section}" Width="95"/>
+            <DataGridTextColumn Header="Donor" Binding="{Binding donor_id}" Width="80"/>
+            <DataGridTextColumn Header="Donor sec." Binding="{Binding donor_section}" Width="95"/>
+            <DataGridTextColumn Header="Util" Binding="{Binding utilization, StringFormat=N2}" Width="60"/>
+            <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="70"/>
+            <DataGridTextColumn Header="Gov. case" Binding="{Binding governing}" Width="130"/>
+            <DataGridTextColumn Header="CO2 (kg)" Binding="{Binding co2_saved_kg, StringFormat=N0}" Width="80"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+      <TabItem Header="Unfilled + diagnosis" x:Name="tab_unfilled">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#FFF7E6" Padding="10" Margin="0,0,0,6">
+            <TextBlock x:Name="diagnosis_text" TextWrapping="Wrap" FontSize="13"/>
+          </Border>
+          <TextBox Grid.Row="1" x:Name="unfilled_text" IsReadOnly="True" FontFamily="Consolas"
+                   TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
+                   HorizontalScrollBarVisibility="Auto"/>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Portfolio" x:Name="tab_portfolio">
+        <TextBox x:Name="portfolio_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Pareto" x:Name="tab_pareto">
+        <TextBox x:Name="pareto_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Disposition" x:Name="tab_disposition">
+        <TextBox x:Name="disposition_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Audit" x:Name="tab_audit">
+        <TextBox x:Name="audit_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Warnings" x:Name="tab_warnings">
+        <TextBox x:Name="warnings_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+    </TabControl>
 
     <!-- Progress / log -->
     <TextBox Grid.Row="4" x:Name="progress_box" Height="104" Margin="0,10,0,0" IsReadOnly="True"

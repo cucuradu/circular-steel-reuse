@@ -21,6 +21,7 @@ import steelreuse_panel_model as panelmodel  # extension lib/ is on the engine p
 import steelreuse_runner as runner
 from pyrevit import forms
 from System import Action  # marshal worker-thread results back to the WPF UI thread
+from System.Windows import Visibility  # show/hide the optional result tabs
 
 _DIR = os.path.dirname(__file__)
 
@@ -45,6 +46,10 @@ class SteelReusePanel(forms.WPFWindow):
         self.open_report_button.Click += self._open_report
         self.open_folder_button.Click += self._open_folder
         self.export_button.Click += self._export_csv
+        # Optional result tabs start hidden; a run reveals the ones whose data is present.
+        for tab in (self.tab_unfilled, self.tab_portfolio, self.tab_pareto,
+                    self.tab_disposition, self.tab_audit, self.tab_warnings):
+            tab.Visibility = Visibility.Collapsed
         self._restore()
 
     # -- setup ------------------------------------------------------------------------------------
@@ -218,7 +223,113 @@ class SteelReusePanel(forms.WPFWindow):
         warn = "" if self._view.schema_ok else "WARNING: unexpected results schema version.\n"
         self.progress_box.Text = warn + "Done.\n\n" + (stdout or "").strip()
         self.progress_box.ScrollToHome()
+        self._render_tabs()
         self._apply_filters(None, None)
+
+    # -- result tabs (rendered as monospace tables; hidden when their block is absent) -------------
+    def _render_tabs(self):
+        v = self._view
+        diag = v.diagnosis or {}
+        binding = diag.get("binding_constraint")
+        if binding and binding != "none":
+            self.diagnosis_text.Text = ("Binding constraint: %s.  %s"
+                                        % (binding, diag.get("lever", "")))
+        else:
+            self.diagnosis_text.Text = "Every demand slot that could be filled was filled."
+        unfilled = v.unfilled
+        lines = ["%s unfilled slot(s) need new steel:" % len(unfilled), ""]
+        for r in unfilled:
+            lines.append("  %-16s %s" % (r.get("slot_id", ""), r.get("demand_section", "")))
+        self.unfilled_text.Text = "\n".join(lines)
+        self.tab_unfilled.Visibility = Visibility.Visible
+
+        self.warnings_text.Text = self._fmt_warnings()
+        self.tab_warnings.Visibility = Visibility.Visible
+
+        self._opt_tab(self.tab_portfolio, v.has_portfolio, self.portfolio_text, self._fmt_portfolio)
+        self._opt_tab(self.tab_pareto, v.has_pareto, self.pareto_text, self._fmt_pareto)
+        self._opt_tab(self.tab_disposition, v.has_disposition,
+                      self.disposition_text, self._fmt_disposition)
+        self._opt_tab(self.tab_audit, v.has_audit, self.audit_text, self._fmt_audit)
+
+    def _opt_tab(self, tab, present, box, fmt):
+        if present:
+            box.Text = fmt()
+            tab.Visibility = Visibility.Visible
+        else:
+            tab.Visibility = Visibility.Collapsed
+
+    def _fmt_warnings(self):
+        w = self._view.warnings
+        out = [
+            "LTB restraint-reliant beams : %s" % w.get("ltb_restraint_reliant", 0),
+            "Imperfection-governed       : %s" % w.get("imperfection_governed", 0),
+            "Donors cut to length        : %s   (remainder %s m)"
+            % (w.get("cut_donors", 0), w.get("reusable_remainder_m", 0)),
+            "Connection-review flags     : %s" % w.get("connection_review", 0),
+            "Unidentified donor members  : %s" % w.get("unknown", 0),
+        ]
+        breakdown = w.get("unknown_breakdown", [])
+        if breakdown:
+            out += ["", "Unidentified breakdown (top 20):"]
+            for b in breakdown[:20]:
+                out.append("  %6s x %s" % (b.get("count", ""), b.get("name", "")))
+        return "\n".join(out)
+
+    def _fmt_pareto(self):
+        out = ["%-10s %8s %14s %14s  %s"
+               % ("objective", "reused", "CO2e (kg)", "mass (kg)", "optimal"), ""]
+        for p in self._view.pareto:
+            mark = "*" if p.get("selected") else " "
+            out.append("%s%-9s %8s %14.1f %14.1f  %s"
+                       % (mark, p.get("label") or p.get("objective", ""), p.get("n_reused", ""),
+                          float(p.get("co2_saved_kg") or 0), float(p.get("mass_reused_kg") or 0),
+                          "yes" if p.get("proven_optimal") else "no"))
+        out += ["", "* = the objective this run's assignments follow."]
+        return "\n".join(out)
+
+    def _fmt_disposition(self):
+        d = self._view.disposition
+        t = d.get("totals", {})
+        out = [
+            "Unused donors: %s    store %s | re-roll %s | recycle %s"
+            % (t.get("n", ""), t.get("store", ""), t.get("reroll", ""), t.get("recycle", "")),
+            "Potential credits: %.1f kg CO2e re-roll, %.1f kg CO2e recycle"
+            % (float(t.get("reroll_credit_kg") or 0), float(t.get("recycle_credit_kg") or 0)),
+            "",
+            "%-12s %7s %6s %8s %8s" % ("section", "donors", "store", "re-roll", "recycle"), "",
+        ]
+        for r in d.get("by_section", []):
+            out.append("%-12s %7s %6s %8s %8s"
+                       % (r.get("section", ""), r.get("n", ""), r.get("store", ""),
+                          r.get("reroll", ""), r.get("recycle", "")))
+        return "\n".join(out)
+
+    def _fmt_portfolio(self):
+        out = ["%-18s %6s %7s %14s %9s"
+               % ("project", "slots", "reused", "CO2e (kg)", "unfilled"), ""]
+        for p in self._view.portfolio:
+            out.append("%-18s %6s %7s %14.1f %9s"
+                       % (p.get("tag", ""), p.get("slot_count", ""), p.get("n_reused", ""),
+                          float(p.get("co2_saved_kg") or 0), p.get("n_unmatched", "")))
+        return "\n".join(out)
+
+    def _fmt_audit(self):
+        a = self._view.audit
+        out = ["Audited %s | admitted %s | quarantined %s | avg knockdown %s"
+               % (a.get("audited", ""), a.get("admitted", ""), a.get("quarantined", ""),
+                  a.get("avg_knockdown", "")), "", "Verification basis:"]
+        for v in a.get("verification", []):
+            out.append("  %-14s %s" % (v.get("basis", ""), v.get("count", "")))
+        out += ["", "Condition grade:"]
+        for c in a.get("condition", []):
+            out.append("  %-14s %s" % (c.get("grade", ""), c.get("count", "")))
+        quarantined = a.get("quarantined_list", [])
+        if quarantined:
+            out += ["", "Quarantined (%s):" % len(quarantined)]
+            for q in quarantined:
+                out.append("  %-14s %s" % (q.get("id", ""), q.get("reason", "")))
+        return "\n".join(out)
 
     # -- display filters (never re-run the match) -------------------------------------------------
     def _apply_filters(self, sender, args):
