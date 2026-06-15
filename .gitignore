@@ -44,3 +44,9 @@ Thumbs.db
 
 # Maid: local-only dev-automation worker; not part of the deliverable
 maid/
+
+# Local academic working copy (the public, de-academic version is docs/OVERVIEW.md)
+THESIS_PRO.*
+
+# Per-run benchmark output dirs (the tracked sample lives directly in docs/benchmark/)
+docs/benchmark/*/
