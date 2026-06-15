@@ -1,10 +1,19 @@
-# pyRevit extension — Steel Reuse extractor
+# pyRevit extension — Steel Reuse
 
-Adds a **SteelReuse** ribbon tab in Revit with an **Extract Steel** button that exports the active
-model's structural steel (framing + columns) to JSON for the matcher, plus a **Match** panel that
-writes the results back: **Apply Matches** (colours + schedulable reuse parameters),
-**Reuse Schedule** (native Revit passport schedule), **Trace Match** (jump from a matched element
-to its partner in the other model) and **Clear Matches** (undo).
+Adds a **SteelReuse** ribbon tab in Revit. **Extract Steel** exports the active model's structural
+steel (framing + columns) to JSON; the **Run Match** window then runs the whole pipeline and shows
+the results **without ever touching a command line**. The rest of the **Match** panel writes results
+back to the model: **Apply Matches** (colours + schedulable reuse parameters), **Reuse Schedule**
+(native Revit passport schedule), **Trace Match** (jump from a matched element to its partner in the
+other model) and **Clear Matches** (undo).
+
+## The no-terminal workflow (at a glance)
+
+1. **Extract Steel** on the donor model → `donor.json`; again on the new-design model → `demand.json`.
+2. **Run Match** → pick the two JSONs, choose options, **Run** → review KPIs, the assignments grid
+   and the result tabs; **Zoom** to any element; **Apply Matches** to colour the model — all in one
+   window.
+3. **Reuse Schedule** for the native passport schedule; **Trace Match** / **Clear Matches** as needed.
 
 ## Install (one time)
 
@@ -30,10 +39,40 @@ IronPython 3 engine**. We deliberately do *not* request the CPython engine: pyRe
 CPython 3.12 has a version-parsing bug under Revit 2026 ("input string '3.12.3' was not in a correct
 format"). The extractor is stdlib-only and IronPython-safe, so it runs fine on the default engine.
 
+## Use: Run Match (the SteelReuse window)
+
+**SteelReuse tab → Run Match** opens a window that runs the whole matcher and shows the results — no
+terminal:
+
+1. Pick the **Donor** and **Demand** JSON (one or several demand models → portfolio matching); the
+   last pair is remembered. Choose the **Objective** and cutting mode; open **Advanced options** for
+   the full engine surface (Policy / Carbon / Loads / Load cases / Frame / Audit & checks). Untouched,
+   the defaults reproduce the canonical run.
+2. **Run Match.** The heavy engine never runs inside Revit (it shells out to the signed CPython venv
+   on a **background thread**, so Revit stays responsive); the full run log streams into the progress
+   pane. First run asks once for the venv `python.exe` and remembers it.
+3. Review: a **KPI header**, a filterable **Assignments** grid (status / section / min-util), and
+   result tabs that appear when their data is present — **Unfilled + diagnosis**, **Pareto**,
+   **Disposition**, **Portfolio**, **Audit**, **Warnings**.
+4. **Zoom to selected element** (or double-click a row) selects + frames that beam in the open model.
+   **Apply Matches to model** colours the open model (pick donor/demand side) — the same as the ribbon
+   button below. **Open report / Open folder / Export CSV** are in the footer.
+
+Artifacts land in a `steelreuse_reports/` folder beside the demand model: `status.json`
+(Apply Matches), `report.html`, `results.json`.
+
+> The window runs on the default **IronPython 3** engine; the matching engine needs the signed CPython
+> venv and is invoked as `python -m steelreuse.cli` (Windows Application Control blocks the
+> `steelreuse.exe` launcher). The EN 1993 checks and the matcher are unchanged — the window is a UX
+> layer over the same `results.json` contract.
+
 ## Use: Apply Matches
 
-1. Run the matcher with `--apply-matches-out status.json`, e.g.:
-   `steelreuse --donor donor.json --demand demand.json --apply-matches-out status.json`
+You can apply from the **Run Match window** (step 4 above) or from the ribbon button — both run the
+same code. From the ribbon:
+
+1. Run a match producing `status.json` (the Run Match window writes it automatically; from a terminal,
+   `steelreuse --donor donor.json --demand demand.json --apply-matches-out status.json`).
 2. Open the **same** donor model (or the same demand model) the JSON was extracted from — element
    ids must match the open document.
 3. **SteelReuse tab → Apply Matches**, pick `status.json`, and choose whether this open model is
@@ -92,22 +131,22 @@ view you applied them in.
 pyrevit_extension/                         <- register THIS as a custom extension directory
 ├─ steelreuse_shared_params.txt            <- shared-parameter definitions (created on first apply)
 └─ SteelReuse.extension/
+   ├─ steelreuse_runner_config.json        <- remembered interpreter + last donor/demand (per machine)
+   ├─ lib/                                  <- shared modules on the engine path
+   │  ├─ steelreuse_runner.py              # options -> CLI args -> background subprocess
+   │  ├─ steelreuse_panel.py               # the Run Match WPFWindow (+ ExternalEvent zoom/apply)
+   │  ├─ steelreuse_panel.xaml             # the window layout
+   │  ├─ steelreuse_panel_model.py         # parse results.json v2 into grid rows + filters
+   │  ├─ steelreuse_apply.py               # shared Apply-Matches (overrides + reuse params)
+   │  └─ steelreuse_results_view.py        # HTML results view (fallback / Results button)
    └─ SteelReuse.tab/
       ├─ Extract.panel/
-      │  └─ Extract.pushbutton/
-      │     ├─ script.py      # runs extractor/pyrevit_extract.py:main()
-      │     └─ bundle.yaml    # button title/tooltip
+      │  └─ Extract.pushbutton/            # runs extractor/pyrevit_extract.py:main()
       └─ Match.panel/
-         ├─ ApplyMatches.pushbutton/
-         │  ├─ script.py      # reads --apply-matches-out JSON: overrides + reuse parameters
-         │  └─ bundle.yaml
-         ├─ ReuseSchedule.pushbutton/
-         │  ├─ script.py      # creates/opens the "SteelReuse Passport" schedule
-         │  └─ bundle.yaml
-         ├─ TraceMatch.pushbutton/
-         │  ├─ script.py      # jump from a matched element to its partner(s) in the other model
-         │  └─ bundle.yaml
-         └─ ClearMatches.pushbutton/
-            ├─ script.py      # undoes Apply Matches (reset overrides, empty reuse parameters)
-            └─ bundle.yaml
+         ├─ RunMatch.pushbutton/           # opens the SteelReuse window (run + review, no terminal)
+         ├─ Results.pushbutton/            # re-open the last results.json in an HTML view
+         ├─ ApplyMatches.pushbutton/       # reads status.json: overrides + reuse parameters
+         ├─ ReuseSchedule.pushbutton/      # creates/opens the "SteelReuse Passport" schedule
+         ├─ TraceMatch.pushbutton/         # jump from a matched element to its partner(s)
+         └─ ClearMatches.pushbutton/       # undoes Apply Matches (reset overrides, empty params)
 ```
