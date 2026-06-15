@@ -263,7 +263,14 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
     if args.results_out:
         rp = Path(args.results_out)
         rp.parent.mkdir(parents=True, exist_ok=True)
-        rp.write_text(json.dumps(build_results(res), indent=2), encoding="utf-8")
+        results_payload = build_results(res)
+        # Stamp the sibling artifact paths so the Revit panel can open the report / folder directly.
+        results_payload["paths"] = {
+            "report": str(out),
+            "status": str(wb_path) if wb_path is not None else "",
+            "results": str(rp),
+        }
+        rp.write_text(json.dumps(results_payload, indent=2), encoding="utf-8")
 
     if isinstance(loads, AreaLoadModel):
         trib = "geometry-estimated" if args.trib_from_geometry else f"{args.trib_width:g} m"

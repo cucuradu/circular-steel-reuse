@@ -57,6 +57,17 @@ def test_results_out_writes_versioned_contract(tmp_path):
     assert "assignments" in data and "kpis" in data
 
 
+def test_results_out_records_sibling_artifact_paths(tmp_path):
+    rep, status, results = (tmp_path / "r.html", tmp_path / "s.json", tmp_path / "res.json")
+    rc = main(["--demo", "--out", str(rep), "--apply-matches-out", str(status),
+               "--results-out", str(results)])
+    assert rc == 0
+    data = json.loads(results.read_text(encoding="utf-8"))
+    assert data["paths"]["report"].endswith("r.html")
+    assert data["paths"]["status"].endswith("s.json")
+    assert data["paths"]["results"].endswith("res.json")
+
+
 def test_load_rejects_non_object_top_level(tmp_path):
     f = tmp_path / "x.json"
     f.write_text("[]", encoding="utf-8")  # valid JSON, but not an object
