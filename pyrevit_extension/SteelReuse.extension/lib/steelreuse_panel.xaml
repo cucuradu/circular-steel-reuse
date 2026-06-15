@@ -10,6 +10,29 @@
     <Style TargetType="Label">
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
+    <!-- Wrap long tooltips so the professional explanations stay readable. -->
+    <Style TargetType="ToolTip">
+      <Setter Property="MaxWidth" Value="360"/>
+      <Setter Property="ContentTemplate">
+        <Setter.Value>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+          </DataTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <!-- A hover "i" icon: set its ToolTip to the explanation for that field. -->
+    <Style x:Key="InfoIcon" TargetType="TextBlock">
+      <Setter Property="Text" Value="&#9432;"/>
+      <Setter Property="Foreground" Value="#0A6EBD"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Margin" Value="6,0,0,0"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Help"/>
+      <Setter Property="ToolTipService.InitialShowDelay" Value="150"/>
+      <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
+    </Style>
   </Window.Resources>
 
   <Grid Margin="14">
@@ -48,8 +71,12 @@
           <ComboBoxItem Content="members"/>
           <ComboBoxItem Content="mass"/>
         </ComboBox>
+        <TextBlock Style="{StaticResource InfoIcon}"
+                   ToolTip="What the matcher maximises: net CO2 saved (default), the number of members reused, or the reclaimed steel mass put back to work. 'members' and 'mass' break ties toward CO2. Feasibility is identical across objectives; only which feasible pairings win changes."/>
         <CheckBox x:Name="no_cut_check" Content="Whole-member only (no cutting)"
                   VerticalAlignment="Center" Margin="16,0,0,0"/>
+        <TextBlock Style="{StaticResource InfoIcon}"
+                   ToolTip="By default cutting-stock is ON: one long donor can be cut into several pieces to fill several slots, matching reclamation practice. Tick this to forbid cutting, so each donor fills at most one slot whole. Off-cuts are reported as reusable remainder."/>
         <Button x:Name="run_button" Content="Run Match" Background="#00A651" Foreground="White"
                 FontWeight="Bold" Margin="22,0,0,0" Padding="18,5"/>
       </StackPanel>
@@ -60,20 +87,30 @@
             <StackPanel Margin="10">
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Min utilisation" Width="170"/>
-                <TextBox x:Name="min_util_box" Width="70"/></StackPanel>
+                <TextBox x:Name="min_util_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Hard gate on the MATCH (0-1): refuses any donor-slot pairing whose governing EN 1993 utilisation is below this, so grossly over-spec donors stay in stock for slots that truly need them. May deliberately leave slots unfilled. (Different from the display Min-util filter, which only hides rows.)"/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Max distinct sections" Width="170"/>
-                <TextBox x:Name="max_sections_box" Width="70"/></StackPanel>
+                <TextBox x:Name="max_sections_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Caps how many distinct donor section families the result may use. Fewer sections means simpler fabrication, procurement and connection detailing (anti-'Frankenstein' consolidation), traded against a little carbon. Blank = no cap."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Over-spec penalty" Width="170"/>
-                <TextBox x:Name="w_overspec_box" Width="70"/></StackPanel>
+                <TextBox x:Name="w_overspec_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Soft weight steering ties toward the lightest adequate donor: charges the optimiser for a donor's excess mass-per-metre over the slot's lightest passing section. Affects selection only, never the booked CO2. Blank/0 = off."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Scarcity reserve (exp.)" Width="170"/>
-                <TextBox x:Name="reserve_box" Width="70"/></StackPanel>
+                <TextBox x:Name="reserve_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="EXPERIMENTAL: gently holds back versatile, scarce stock from slots that abundant donors could also fill - a single-project proxy for option value (unseen future demand). The principled tool is portfolio matching (several demand models). Selection only; booked CO2 unchanged."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                 <CheckBox x:Name="connections_check" Content="Connection screen" Margin="0,0,14,0"/>
                 <CheckBox x:Name="verify_check" Content="Verify optimal" Margin="0,0,14,0"/>
-                <CheckBox x:Name="pareto_check" Content="Pareto trade-off"/></StackPanel>
+                <CheckBox x:Name="pareto_check" Content="Pareto trade-off"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Connection screen: excludes donors geometrically incompatible with the slot's design section (wrong shape family, too deep) before matching; milder mismatches are flagged 'review'.   Verify optimal: independently re-derives every feasible pairing and confirms no better single move exists.   Pareto trade-off: also solves under each objective (CO2/members/mass) and reports the trade-off table; the shipped assignments still follow the selected objective."/></StackPanel>
             </StackPanel>
           </TabItem>
           <TabItem Header="Carbon">
@@ -83,45 +120,68 @@
                 <ComboBox x:Name="counterfactual_combo" Width="120">
                   <ComboBoxItem Content="none"/>
                   <ComboBoxItem Content="recycling"/>
-                  <ComboBoxItem Content="rerolling"/></ComboBox></StackPanel>
-              <CheckBox x:Name="disposition_check" Content="Stock disposition advisory" Margin="0,8,0,0"/>
+                  <ComboBoxItem Content="rerolling"/></ComboBox>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Books reuse savings NET of the credit the donor steel would have earned at end of life: 'recycling' subtracts the EAF scrap credit, 'rerolling' the (research-grade) direct re-rolling credit, per kg consumed. 'none' = plain avoided-new. Answers the standard LCA critique that avoided-new over-credits reuse."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="disposition_check" Content="Stock disposition advisory"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="For every UNUSED donor, advises its best fate - store (still useful for an unfilled slot here), re-roll, or recycle - with the associated CO2 credits, shown on the Disposition tab. Advisory only: it never changes the match."/></StackPanel>
             </StackPanel>
           </TabItem>
           <TabItem Header="Loads">
             <WrapPanel Margin="10">
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Dead g_k (kN/m2)" Width="150"/><TextBox x:Name="dead_box" Width="70" Text="3.5"/></StackPanel>
+                <Label Content="Dead g_k (kN/m2)" Width="150"/><TextBox x:Name="dead_box" Width="55" Text="3.5"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Permanent (dead) area load g_k in kN/m2 - self-weight, finishes, services. Distributed to beams via the tributary width and to columns via tributary area."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Live q_k (kN/m2)" Width="150"/><TextBox x:Name="live_box" Width="70" Text="3.0"/></StackPanel>
+                <Label Content="Live q_k (kN/m2)" Width="150"/><TextBox x:Name="live_box" Width="55" Text="3.0"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Imposed (live) area load q_k in kN/m2 - occupancy / use. Combined with the dead load at the EN 1990 ULS factors below."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="gamma_G" Width="150"/><TextBox x:Name="gamma_g_box" Width="70" Text="1.35"/></StackPanel>
+                <Label Content="gamma_G" Width="150"/><TextBox x:Name="gamma_g_box" Width="55" Text="1.35"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Partial safety factor on the permanent action at ULS (EN 1990, typically 1.35)."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="gamma_Q" Width="150"/><TextBox x:Name="gamma_q_box" Width="70" Text="1.5"/></StackPanel>
+                <Label Content="gamma_Q" Width="150"/><TextBox x:Name="gamma_q_box" Width="55" Text="1.5"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Partial safety factor on the variable (imposed) action at ULS (EN 1990, typically 1.5)."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Beam trib width (m)" Width="150"/><TextBox x:Name="trib_width_box" Width="70" Text="3.0"/></StackPanel>
+                <Label Content="Beam trib width (m)" Width="150"/><TextBox x:Name="trib_width_box" Width="55" Text="3.0"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Default beam tributary width (m): turns the area load into a line load on each beam when widths are not estimated from geometry."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Col trib area (m2)" Width="150"/><TextBox x:Name="col_trib_box" Width="70" Text="9.0"/></StackPanel>
+                <Label Content="Col trib area (m2)" Width="150"/><TextBox x:Name="col_trib_box" Width="55" Text="9.0"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Tributary floor area (m2) each column collects, used to build its axial load (multiplied by the number of floors)."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Col floors" Width="150"/><TextBox x:Name="col_floors_box" Width="70" Text="1"/></StackPanel>
+                <Label Content="Col floors" Width="150"/><TextBox x:Name="col_floors_box" Width="55" Text="1"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Number of floors a column accumulates load from (multiplies the per-floor tributary area)."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Col eccentricity (mm)" Width="150"/><TextBox x:Name="col_ecc_box" Width="70" Text="0"/></StackPanel>
+                <Label Content="Col eccentricity (mm)" Width="150"/><TextBox x:Name="col_ecc_box" Width="55" Text="0"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Notional eccentricity (mm) of the column axial load, producing a small moment; 0 = pure axial."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="510" Margin="0,8,0,0">
                 <CheckBox x:Name="trib_geom_check" Content="Tributary from geometry" Margin="0,0,16,0"/>
-                <CheckBox x:Name="all_demand_check" Content="Include non-steel demand"/></StackPanel>
+                <CheckBox x:Name="all_demand_check" Content="Include non-steel demand"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Tributary from geometry: estimate each beam's width AND each column's tributary area/floors from the model geometry instead of the fixed defaults.   Include non-steel demand: also create slots for concrete/joist members (off by default - only steel is in EN 1993 scope)."/></StackPanel>
             </WrapPanel>
           </TabItem>
           <TabItem Header="Load cases">
             <StackPanel Margin="10">
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Sway imperfection phi" Width="190"/>
-                <TextBox x:Name="phi_box" Width="70"/></StackPanel>
+                <TextBox x:Name="phi_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="EN 1993-1-1 5.3.2 global sway imperfection (e.g. 0.005 = 1/200), added to the combination envelope as equivalent horizontal forces. Blank/0 = gravity only. With Global frame analysis it also triggers a 2nd-order solve."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Construction live (kN/m2)" Width="190"/>
-                <TextBox x:Name="construction_live_box" Width="70" Text="0.75"/></StackPanel>
+                <TextBox x:Name="construction_live_box" Width="70" Text="0.75"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Construction-stage live load q_ca (kN/m2, EN 1991-1-6), used only when 'Construction (bare-steel) stage' is ticked below."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Wind uplift (kN/m2)" Width="190"/>
-                <TextBox x:Name="wind_uplift_box" Width="70"/></StackPanel>
-              <CheckBox x:Name="construction_check" Content="Construction (bare-steel) stage" Margin="0,8,0,0"/>
+                <TextBox x:Name="wind_uplift_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Net upward roof wind pressure (kN/m2): adds a load-reversal case for roof beams with the BOTTOM flange in compression and unrestrained - the lateral-torsional-buckling blind spot of the restrained-flange default. Needs beam coordinates. Blank/0 = off."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="construction_check" Content="Construction (bare-steel) stage"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Adds the bare-steel erection-stage case: full dead + construction live with the compression flange UNRESTRAINED (no slab yet), so a beam that passes only because the slab restrains it is correctly rejected."/></StackPanel>
             </StackPanel>
           </TabItem>
           <TabItem Header="Frame">
@@ -130,16 +190,24 @@
                 <Label Content="Solver" Width="190"/>
                 <ComboBox x:Name="solver_combo" Width="120">
                   <ComboBoxItem Content="pynite"/>
-                  <ComboBoxItem Content="sap2000"/></ComboBox></StackPanel>
+                  <ComboBoxItem Content="sap2000"/></ComboBox>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Force backend for the frame solve: 'pynite' (free, built-in, supports all cases) or 'sap2000' - an experimental cross-check via the SAP2000 OAPI that is GRAVITY ONLY (it refuses P-Delta / wind / seismic) and needs SAP2000 installed + licensed and the [sap2000] extra. If SAP2000 is unavailable it falls back to analytic automatically."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Wind (kN/m2)" Width="190"/>
-                <TextBox x:Name="wind_box" Width="70"/></StackPanel>
+                <TextBox x:Name="wind_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Net horizontal wind pressure (kN/m2, EN 1991-1-4 input) applied as frame storey forces. Requires Global frame analysis, a 3-D model and the PyNite solver. Blank/0 = off."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Seismic Cs" Width="190"/>
-                <TextBox x:Name="seismic_box" Width="70"/></StackPanel>
+                <TextBox x:Name="seismic_box" Width="70"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="EN 1998-1 base-shear coefficient Cs for the lateral-force method, applied as frame storey forces. Requires Global frame analysis and the PyNite solver. Blank/0 = off."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                 <CheckBox x:Name="frame_check" Content="Global frame analysis" Margin="0,0,16,0"/>
-                <CheckBox x:Name="pdelta_check" Content="P-Delta"/></StackPanel>
+                <CheckBox x:Name="pdelta_check" Content="P-Delta"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Global frame analysis: derive member forces from a whole-frame solve, so column axials come from the real load path instead of per-member estimates. Needed for sway / wind / seismic / P-Delta and for the SAP2000 cross-check.   P-Delta: force a 2nd-order solve (PyNite only - the SAP2000 backend is gravity-only)."/></StackPanel>
             </StackPanel>
           </TabItem>
           <TabItem Header="Audit &amp; checks">
@@ -147,13 +215,19 @@
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Pre-demolition audit CSV" Width="170"/>
                 <TextBox x:Name="pda_box" Width="220"/>
-                <Button x:Name="pda_browse" Content="Browse..."/></StackPanel>
+                <Button x:Name="pda_browse" Content="Browse..."/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="A pre-demolition-audit CSV (per donor: condition grade, verification basis, optional yield knockdown, recoverable length). It derives a per-member strength knockdown and quarantines unverified or unsuitable stock from the certified supply - the honest provenance layer for reclaimed steel."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="Default knockdown" Width="170"/>
-                <TextBox x:Name="knockdown_box" Width="70" Text="1.0"/></StackPanel>
+                <TextBox x:Name="knockdown_box" Width="70" Text="1.0"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Default reclaimed yield-strength knockdown (&lt;= 1.0) applied to donor members that carry no audit data. 1.0 = no reduction (use full nominal f_y)."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                 <CheckBox x:Name="include_unverified_check" Content="Admit unverified" Margin="0,0,16,0"/>
-                <CheckBox x:Name="moment_shape_check" Content="Moment-shape C1/Cm"/></StackPanel>
+                <CheckBox x:Name="moment_shape_check" Content="Moment-shape C1/Cm"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Admit unverified: admit donor members the audit could not verify (at a conservative knockdown) instead of quarantining them. Off by default.   Moment-shape C1/Cm: use the real moment diagram for sharper, less-conservative lateral-torsional-buckling (C1) and 6.3.3 (Cm) factors instead of the conservative uniform-moment assumption."/></StackPanel>
             </StackPanel>
           </TabItem>
         </TabControl>
@@ -168,6 +242,8 @@
     <!-- Display filters -->
     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,6">
       <Label Content="Filter:"/>
+      <TextBlock Style="{StaticResource InfoIcon}" Margin="0,0,2,0"
+                 ToolTip="These filter the VISIBLE rows only - they never re-run the match.   Status: 'filled' (a donor satisfies the slot) or 'review' (passes, but a check/connection needs an engineer's look).   Section: show rows whose donor or demand section name contains the text (e.g. 'W18', case-insensitive).   Min util: show only assignments at or above this governing EN 1993 utilisation (0-1). To exclude low-utilisation pairs from the match itself, use the Policy tab's Min-utilisation gate instead."/>
       <ComboBox x:Name="status_filter" Width="90" VerticalAlignment="Center">
         <ComboBoxItem Content="all"/>
         <ComboBoxItem Content="filled"/>
