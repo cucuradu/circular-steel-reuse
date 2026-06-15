@@ -307,6 +307,19 @@
         <TextBox x:Name="warnings_text" IsReadOnly="True" FontFamily="Consolas"
                  TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
       </TabItem>
+      <TabItem Header="Compare" x:Name="tab_compare">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" x:Name="compare_header" Margin="0,0,0,6" FontWeight="Bold"
+                     TextWrapping="Wrap"/>
+          <TextBox Grid.Row="1" x:Name="compare_text" IsReadOnly="True" FontFamily="Consolas"
+                   TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
+                   HorizontalScrollBarVisibility="Auto"/>
+        </Grid>
+      </TabItem>
     </TabControl>
 
     <!-- Progress / log -->
@@ -320,6 +333,10 @@
               Background="#0A6EBD" Foreground="White" FontWeight="Bold" Padding="14,5"/>
       <Button x:Name="apply_button" Content="Apply Matches to model" DockPanel.Dock="Left"
               Background="#00A651" Foreground="White" FontWeight="Bold" Padding="14,5" Margin="8,0,0,0"/>
+      <Button x:Name="pin_button" Content="Pin as baseline" DockPanel.Dock="Left"
+              Padding="14,5" Margin="8,0,0,0"/>
+      <Button x:Name="clear_baseline_button" Content="Clear baseline" DockPanel.Dock="Left"
+              Padding="14,5" Margin="8,0,0,0"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button x:Name="open_report_button" Content="Open report"/>
         <Button x:Name="open_folder_button" Content="Open folder"/>

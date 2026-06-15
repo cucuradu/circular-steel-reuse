@@ -15,7 +15,9 @@ option tabs and the extra result tabs (portfolio/pareto/disposition/audit/warnin
 import csv
 import json
 import os
+import shutil
 import threading
+import time
 
 import steelreuse_apply as apply_mod  # shared Apply-Matches logic (also used by the ribbon button)
 import steelreuse_panel_model as panelmodel  # extension lib/ is on the engine path
@@ -109,6 +111,7 @@ class SteelReusePanel(forms.WPFWindow):
         self._ext_root = ext_root
         self._settings = runner.load_settings(ext_root)
         self._view = None        # parsed ResultsView of the last run
+        self._last_data = None    # raw current results.json dict (for the Compare diff)
         self._rows = []          # currently-displayed (filtered) rows, for CSV export
 
         self.donor_browse.Click += self._pick_donor
@@ -129,9 +132,11 @@ class SteelReusePanel(forms.WPFWindow):
         self._apply_handler = _ApplyHandler()
         self._apply_event = ExternalEvent.Create(self._apply_handler)
         self.apply_button.Click += self._on_apply
+        self.pin_button.Click += self._on_pin
+        self.clear_baseline_button.Click += self._on_clear_baseline
         # Optional result tabs start hidden; a run reveals the ones whose data is present.
         for tab in (self.tab_unfilled, self.tab_portfolio, self.tab_pareto,
-                    self.tab_disposition, self.tab_audit, self.tab_warnings):
+                    self.tab_disposition, self.tab_audit, self.tab_warnings, self.tab_compare):
             tab.Visibility = Visibility.Collapsed
         self._restore()
 
@@ -295,6 +300,7 @@ class SteelReusePanel(forms.WPFWindow):
             self._failed("Could not read results:\n" + str(ex))
             return
         self._view = panelmodel.parse(data)
+        self._last_data = data    # keep the raw dict for the Compare diff
         k = self._view.kpis
         self.kpi_text.Text = (
             "%s / %s slots reused    |    %s kg CO2e saved    |    %s kg reused    |    %s"
@@ -307,6 +313,7 @@ class SteelReusePanel(forms.WPFWindow):
         self.progress_box.Text = warn + "Done.\n\n" + (stdout or "").strip()
         self.progress_box.ScrollToHome()
         self._render_tabs()
+        self._render_compare()
         self._apply_filters(None, None)
 
     # -- result tabs (rendered as monospace tables; hidden when their block is absent) -------------
@@ -498,3 +505,60 @@ class SteelReusePanel(forms.WPFWindow):
                                  "%.3f" % r.utilization, r.status, r.governing,
                                  "%.1f" % r.co2_saved_kg])
         forms.alert("Exported %s rows to:\n%s" % (len(self._rows), target), title="SteelReuse")
+
+    # -- run comparison (pin a baseline, compare live) --------------------------------------------
+    def _baseline_file(self):
+        """Where the pinned baseline results.json is copied to (beside the live results.json)."""
+        results = self._view.paths.get("results") if self._view else None
+        base_dir = os.path.dirname(results) if results else self._ext_root
+        return os.path.join(base_dir, "baseline_results.json")
+
+    def _on_pin(self, sender, args):
+        results = self._view.paths.get("results") if self._view else None
+        if not results or not os.path.isfile(results):
+            forms.alert("Run a match first, then pin it as the baseline.", title="SteelReuse")
+            return
+        target = self._baseline_file()
+        shutil.copyfile(results, target)
+        k = self._view.kpis
+        label = "%s, %s reused, %s kg  |  pinned %s" % (
+            k.get("objective", "?"), k.get("reused", "?"), k.get("co2_saved_kg", "?"),
+            time.strftime("%H:%M"))
+        self._settings["baseline_path"] = target
+        self._settings["baseline_label"] = label
+        runner.save_settings(self._ext_root, self._settings)
+        self._render_compare()
+        self.tab_compare.IsSelected = True
+
+    def _on_clear_baseline(self, sender, args):
+        self._settings.pop("baseline_path", None)
+        self._settings.pop("baseline_label", None)
+        runner.save_settings(self._ext_root, self._settings)
+        self.tab_compare.Visibility = Visibility.Collapsed
+
+    def _render_compare(self):
+        """If a baseline is pinned and the current run is loaded, populate + show the Compare tab."""
+        path = self._settings.get("baseline_path")
+        if not self._last_data or not path or not os.path.isfile(path):
+            self.tab_compare.Visibility = Visibility.Collapsed
+            return
+        try:
+            with open(path) as handle:
+                baseline = json.load(handle)
+        except Exception:  # noqa: BLE001 -- a bad baseline file just hides the tab
+            self.tab_compare.Visibility = Visibility.Collapsed
+            return
+        d = panelmodel.diff(baseline, self._last_data)
+        self.compare_header.Text = ("Current run vs baseline:  "
+                                    + self._settings.get("baseline_label", "(baseline)"))
+        lines = ["%-20s %12s %12s %10s" % ("KPI", "baseline", "current", "delta"), ""]
+        for r in d["kpis"]:
+            lines.append("%-20s %12s %12s %+10s"
+                         % (r["label"], r["baseline"], r["current"], r["delta"]))
+        lines += ["", "Slot changes (%s):" % len(d["slots"]), ""]
+        for c in d["slots"][:200]:
+            lines.append("  %-16s %-7s %s" % (c["slot_id"], c["change"].upper(), c["detail"]))
+        if len(d["slots"]) > 200:
+            lines.append("  ... +%s more" % (len(d["slots"]) - 200))
+        self.compare_text.Text = "\n".join(lines)
+        self.tab_compare.Visibility = Visibility.Visible
