@@ -151,5 +151,5 @@ def test_run_match_end_to_end_is_terminal_free(tmp_path):
     assert os.path.exists(res["paths"]["report"])
     with open(res["paths"]["results"], encoding="utf-8") as fh:
         data = json.load(fh)
-    assert data["schema_version"] == 1
+    assert data["schema_version"] == 2
     assert "assignments" in data

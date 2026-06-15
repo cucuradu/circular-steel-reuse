@@ -53,7 +53,7 @@ def test_results_out_writes_versioned_contract(tmp_path):
     assert rc == 0
     assert rp.exists()
     data = json.loads(rp.read_text(encoding="utf-8"))
-    assert data["schema_version"] == 1
+    assert data["schema_version"] == 2
     assert "assignments" in data and "kpis" in data
 
 

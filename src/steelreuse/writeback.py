@@ -161,44 +161,63 @@ def build_writeback(result: PipelineResult) -> dict:
     }
 
 
+def _mass_reused_kg(result: PipelineResult) -> float:
+    """Reclaimed steel mass put back to work = each reused donor's catalog mass over its used length.
+
+    Mirrors the canonical formula in :func:`steelreuse.pipeline` (``catalog[section].mass_kgm *
+    slot.required_length_mm``) -- the same number the Pareto/CLI report, just summed here. No new
+    structural arithmetic (docs/DESIGN_PRINCIPLES.md hard rule 1).
+    """
+    from .core.sections import load_default_catalog
+    catalog = load_default_catalog()
+    slot_by_id = {s.id: s for s in (result.slots or [])}
+    total = 0.0
+    for a in result.match.assignments:
+        sec = catalog.get(a.section)
+        slot = slot_by_id.get(a.slot_id)
+        if sec is not None and slot is not None:
+            total += sec.mass_kgm * slot.required_length_mm / 1000.0
+    return total
+
+
 def build_results(result: PipelineResult) -> dict:
-    """Return the assignment-keyed ``results.json`` contract the Revit dockable panel consumes.
+    """Return the assignment-keyed ``results.json`` contract (schema v2) the Revit panel consumes.
 
     A sibling of :func:`build_writeback`: that one is *element*-keyed (drives the Apply-Matches
-    colouring); this one is *assignment*-keyed (drives the filterable results table). Both are pure
-    reshaping of values :func:`steelreuse.pipeline.run_pipeline` already computed
-    (docs/DESIGN_PRINCIPLES.md hard rule 1 -- no new arithmetic here).
-
-    Shape (``schema_version`` lets the panel and engine evolve independently)::
-
-        {"schema_version": 1,
-         "kpis": {slots, reused, co2_saved_kg, objective, proven_optimal, supply_count},
-         "assignments": [{demand_id, slot_id, demand_section, donor_id, donor_section,
-                          utilization, governing_combo, co2_saved_kg, connection_review}],
-         "unfilled": [{demand_id, slot_id, demand_section}],
-         "quarantined_donors": [{donor_id, donor_section, reason}]}
+    colouring); this one is *assignment*-keyed (drives the filterable results panel). Schema v2
+    serialises the full report context -- KPIs, diagnosis, warnings, and the optional portfolio /
+    pareto / disposition / audit blocks -- so the panel can render every result view. Pure reshaping
+    of values :func:`steelreuse.pipeline.run_pipeline` + :func:`build_report_context` already
+    computed (docs/DESIGN_PRINCIPLES.md hard rule 1 -- no new arithmetic). Readers branch on
+    ``schema_version``.
     """
+    from .llm.report import build_report_context  # lazy: keeps writeback import-light, no cycle
+    ctx = build_report_context(result)
     m = result.match
     slots_by_id = {s.id: s for s in (result.slots or [])}
     donor_by_id = {d.id: d for d in result.donor.members} if result.donor else {}
 
     assignments = []
-    for a in m.assignments:
-        slot = slots_by_id.get(a.slot_id)
+    for a in ctx["assignments"]:
+        slot = slots_by_id.get(a["slot"])
         assignments.append({
             "demand_id": slot.member_id if slot else "",
-            "slot_id": a.slot_id,
+            "slot_id": a["slot"],
             "demand_section": (slot.design_section if slot else None) or "",
-            "donor_id": a.supply_id,
-            "donor_section": a.section,
-            "utilization": a.utilization,
-            "governing_combo": a.governing_combination,
-            "check_status": a.status,
-            "chi_lt": a.chi_lt,
-            "chi_lt_if_free": a.chi_lt_if_free,
-            "offcut_mm": a.offcut_mm,
-            "co2_saved_kg": a.co2_saved_kg,
-            "connection_review": a.connection_status == "review",
+            "donor_id": a["supply"],
+            "donor_section": a["section"],
+            "utilization": a["utilization"],
+            "governing_combo": a["governing"],
+            "check_status": a["status"],
+            "chi_lt": a["chi_lt"],
+            "chi_lt_if_free": a["chi_lt_if_free"],
+            "offcut_mm": a["offcut_mm"],
+            "co2_saved_kg": a["co2_saved_kg"],
+            "connection": a["connection"],
+            "connection_review": a["connection"] == "review",
+            "verification": a["verification"],
+            "condition": a["condition"],
+            "knockdown": a["knockdown"],
         })
 
     unfilled = []
@@ -222,17 +241,50 @@ def build_results(result: PipelineResult) -> dict:
             "reason": reason,
         })
 
-    return {
-        "schema_version": 1,
+    out = {
+        "schema_version": 2,
         "kpis": {
-            "slots": result.slot_count,
-            "reused": m.n_reused,
-            "co2_saved_kg": round(m.total_co2_saved_kg, 1),
+            "slots": ctx["slot_count"],
+            "reused": ctx["n_reused"],
+            "co2_saved_kg": ctx["match_co2_saved_kg"],
             "objective": m.objective,
             "proven_optimal": m.proven_optimal,
-            "supply_count": result.supply_count,
+            "supply_count": ctx["supply_count"],
+            "mass_reused_kg": round(_mass_reused_kg(result), 1),
+            "distinct_sections": ctx["distinct_sections"],
+            "max_distinct_sections": ctx["max_distinct_sections"],
+            "reuse_rate_pct": ctx["reuse_rate_pct"],
+            "match_optimality": ctx["match_optimality"],
+            "solver_status": ctx["solver_status"],
+            "donor_saved_co2_kg": ctx["donor_saved_co2_kg"],
         },
+        "diagnosis": ctx.get("diagnosis") or {},
         "assignments": assignments,
         "unfilled": unfilled,
         "quarantined_donors": quarantined_donors,
+        "warnings": {
+            "ltb_restraint_reliant": ctx["ltb_restraint_reliant"],
+            "imperfection_governed": ctx["n_imperfection_governed"],
+            "cut_donors": ctx["cut_donors"],
+            "reusable_remainder_m": ctx["reusable_remainder_m"],
+            "unknown": ctx["unknown"],
+            "unknown_breakdown": ctx["unknown_breakdown"],
+            "connection_review": ctx["connection_review"],
+        },
+        "paths": {},  # stamped by the CLI/runner that knows the output folder; panel tolerates absence
     }
+    if "projects" in ctx:
+        out["portfolio"] = ctx["projects"]
+    if "pareto" in ctx:
+        out["pareto"] = ctx["pareto"]
+    if ctx.get("disposition_present"):
+        out["disposition"] = {"totals": ctx["disposition_totals"],
+                              "by_section": ctx["disposition_by_section"]}
+    if ctx.get("audit_present"):
+        out["audit"] = {
+            "audited": ctx["audit_audited"], "admitted": ctx["audit_admitted"],
+            "quarantined": ctx["audit_quarantined"], "avg_knockdown": ctx["audit_avg_knockdown"],
+            "verification": ctx["audit_verification"], "condition": ctx["audit_condition"],
+            "quarantined_list": ctx["audit_quarantined_list"],
+        }
+    return out

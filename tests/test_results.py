@@ -42,8 +42,38 @@ def test_results_contract_is_json_safe_and_versioned(tmp_path):
 
     # Must round-trip through JSON unchanged (no dataclasses/tuples leak into the contract).
     assert json.loads(json.dumps(out)) == out
-    assert out["schema_version"] == 1
+    assert out["schema_version"] == 2
     assert set(out) >= {"schema_version", "kpis", "assignments", "unfilled", "quarantined_donors"}
+
+
+def test_results_kpis_carry_the_full_header_set(tmp_path):
+    kpis = build_results(_run(tmp_path))["kpis"]
+    for key in ("slots", "reused", "co2_saved_kg", "objective", "proven_optimal",
+                "supply_count", "mass_reused_kg", "distinct_sections",
+                "reuse_rate_pct", "match_optimality"):
+        assert key in kpis
+    assert kpis["reused"] == 1
+    assert kpis["mass_reused_kg"] > 0   # one W18X55 donor put back to work
+
+
+def test_results_warnings_block_counts_are_present(tmp_path):
+    warn = build_results(_run(tmp_path))["warnings"]
+    for key in ("ltb_restraint_reliant", "imperfection_governed", "cut_donors",
+                "reusable_remainder_m", "unknown", "unknown_breakdown", "connection_review"):
+        assert key in warn
+    assert isinstance(warn["unknown_breakdown"], list)
+
+
+def test_results_diagnosis_is_present_dict(tmp_path):
+    diag = build_results(_run(tmp_path))["diagnosis"]
+    assert isinstance(diag, dict)   # may be {} when nothing is unfilled, but always a dict
+
+
+def test_results_optional_blocks_absent_when_not_run(tmp_path):
+    out = build_results(_run(tmp_path))   # no pareto / disposition / portfolio / audit-summary run
+    assert "pareto" not in out
+    assert "disposition" not in out
+    assert "portfolio" not in out
 
 
 def test_results_kpis_mirror_the_pipeline(tmp_path):
