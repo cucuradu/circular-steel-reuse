@@ -35,8 +35,11 @@ class GeminiProvider:
 
     name = "gemini"
 
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: str | None = None):
-        self.model = model
+    def __init__(self, model: str | None = None, api_key: str | None = None):
+        # Model is overridable via GEMINI_MODEL so a quota-throttled model (free-tier 429s on
+        # gemini-2.5-flash) can be swapped for a sibling with headroom (e.g. gemini-2.5-flash-lite)
+        # without a code change. Falls back to the flash default when unset.
+        self.model = model or os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
 
     def complete(self, system: str, prompt: str) -> str:  # pragma: no cover - needs network/key
