@@ -27,15 +27,17 @@ The tool is a software workflow that automates the assessment. Given a digital m
 building to be deconstructed (the *donor*) and of a new design (the *demand*), it identifies the steel
 sections, derives the design actions, verifies every candidate member against Eurocode EN 1993‑1‑1,
 quantifies the embodied carbon avoided against a defensible baseline, and solves a Mixed‑Integer Linear
-Program to obtain the carbon‑optimal feasible assignment. An optional global frame analysis supplies
-realistic action effects (gravity load path, sway imperfection, wind, seismic, and second‑order effects).
+Program to obtain the carbon‑optimal feasible assignment — with selectable objectives and a family of
+opt‑in stewardship terms that look beyond the single project. An optional global frame analysis supplies
+realistic action effects (gravity load path, sway imperfection, wind, seismic, and second‑order effects);
+the solver is interchangeable, an experimental SAP2000 backend cross‑validating the open‑source one.
 A language model generates the report prose under a strict constraint that it performs no arithmetic; all
 quantities are computed deterministically and validated. The deterministic core is hand‑verified against
-published section data and protected by 324 automated tests. The tool is scoped as member‑level
+published section data and protected by 312 automated tests. The tool is scoped as member‑level
 pre‑feasibility decision support: it does not design connections, and reclaimed material requires physical
 verification before reliance.
 
-**Topics:** circular economy; steel reuse; embodied carbon; Eurocode EN 1993‑1‑1; BIM; Mixed‑Integer
+**Keywords:** circular economy; steel reuse; embodied carbon; Eurocode EN 1993‑1‑1; BIM; Mixed‑Integer
 Linear Programming; design for deconstruction.
 
 ---
@@ -50,8 +52,8 @@ Linear Programming; design for deconstruction.
 6. Member verification (EN 1993‑1‑1)
 7. Global frame analysis
 8. Embodied‑carbon accounting
-9. Optimal matching
-10. Reporting, narrative generation, and the machine‑learning study
+9. Optimal matching, objectives, and stock stewardship
+10. Reporting, model write‑back, narrative generation, and the machine‑learning study
 11. Verification and validation
 12. Results
 13. Limitations and future work
@@ -285,9 +287,14 @@ case** (`--construction`) adds, for every beam, the bare‑steel erection situat
 (the wet slab is on the beam) plus the EN 1991‑1‑6 construction live load (default 0.75 kN/m²), with the
 compression flange **unrestrained** — the slab that justifies `χ_LT = 1` in the persistent case does not
 yet exist, so the lateral‑torsional reduction applies in earnest. A beam that passes only by virtue of
-slab restraint is thereby caught as a hard check, not merely flagged. Reuse feasibility and the
-avoided‑new baseline (§8.2) both require passing the entire envelope. Additional situations append to this
-list, which is the mechanism by which the frame analysis introduces wind and seismic.
+slab restraint is thereby caught as a hard check, not merely flagged. A second opt‑in case
+(`--wind-uplift q`) adds, for roof beams (the top framing level, located from coordinates), the
+**load‑reversal** situation: a net upward line load `γ_Q·W_up − 1.0·g_k` (EN 1990 6.10, permanent
+favourable, imposed absent) under EN 1991‑1‑4 suction, checked with the **bottom flange in compression
+and unrestrained** — the blind spot of the restrained‑flange default. A net‑downward result (suction
+too small to reverse) changes nothing. Reuse feasibility and the avoided‑new baseline (§8.2) both
+require passing the entire envelope. Additional situations append to this list, which is the mechanism
+by which the frame analysis introduces wind and seismic.
 
 ---
 
@@ -329,7 +336,13 @@ The torsion and warping constants are derived from geometry, `I_t = (2 b t_f³ +
 `I_w = I_z (h − t_f)²/4`; both under‑predict the critical moment, so the result is conservative. The
 elastic critical moment is `M_cr = C₁ (π²E I_z/L²)·√(I_w/I_z + L²G I_t/(π²E I_z))`, giving
 `λ̄_LT = √(W_y f_y/M_cr)` and the rolled‑section reduction `χ_LT` (with `λ̄_LT,0 = 0.4`, `β = 0.75`,
-`α_LT = 0.34` or `0.49`; `C₁ = 1.0`, uniform moment). A compression flange restrained by a slab sets
+`α_LT = 0.34` or `0.49`). The moment‑gradient factor `C₁` defaults to the conservative uniform‑moment
+value `1.0`; with `--moment-shape` it follows the real diagram via the general four‑moment / `C_b`
+formula — `1.0` for uniform moment, **`1.136`** for a simply‑supported span under uniform load — the
+analytic path using the simply‑supported‑UDL shape and the frame path sampling the *solved* moment
+diagram (`x = 0, L/4, L/2, 3L/4, L`); the unrestrained construction‑stage and wind‑uplift entries take
+`C₁ = 1.136`. The feature is off by default (results byte‑identical) and was hand‑verified against
+EN 1993‑1‑1 Annex B / NCCI SN003 / AISC `C_b`. A compression flange restrained by a slab sets
 `χ_LT = 1`; the unrestrained value is nonetheless computed and a warning is raised when it is low, exposing
 reliance on the slab (notably at the construction stage).
 
@@ -339,8 +352,10 @@ Combined axial force and bending are verified with the **full clause 6.3.3 beam�
 equations (6.61) and (6.62), with the Annex B (Method 2) interaction factors: Table B.1 for class 1–2
 (including the RHS variant of `k_zz`), Table B.2 for class 3, and the susceptible/not‑susceptible
 `k_zy` split — a slab‑restrained flange or a hollow section is treated as not susceptible to torsional
-deformation. All equivalent‑moment factors are held at `C_m = 1.0`, the Table B.3 upper bound, so the
-factors remain conservative for any real moment shape; `χ_LT` multiplies `M_y,Rk` exactly as the code
+deformation. The equivalent‑moment factors `C_m` default to `1.0`, the Table B.3 upper bound, so the
+factors remain conservative for any real moment shape; with `--moment-shape` an end‑moment‑driven member
+instead takes `C_m = 0.6 + 0.4·ψ` from its end‑moment ratio `ψ` (Table B.3), tightening the check where
+the diagram is known. `χ_LT` multiplies `M_y,Rk` exactly as the code
 equations prescribe, so lateral‑torsional buckling can never be bypassed in a beam‑column. The check is
 **biaxial**: minor‑axis moments from lateral or sway frame cases enter through `k_yz`/`k_zz`, a
 minor‑axis‑only moment is checked against `M_z,Rd` (no LTB about z), and biaxial bending without axial
@@ -355,9 +370,10 @@ the grade is confirmed by testing. The member status is FAIL (utilisation > 1), 
 # 7. Global frame analysis
 
 By default each member is verified in isolation, with column axials taken from the tributary estimate. The
-optional analysis (`--frame-analysis`, PyNiteFEA) instead assembles and solves the demand structure,
-producing the same per‑member action‑effect envelope from a connected model; the isolated path remains the
-default and the fallback.
+optional analysis (`--frame-analysis`) instead assembles and solves the demand structure, producing the
+same per‑member action‑effect envelope from a connected model; the isolated path remains the default and
+the fallback. The frame solver itself is **interchangeable** (`--solver`): the open‑source PyNiteFEA is
+the default, and an experimental SAP2000 backend (§7.5) provides an independent cross‑check.
 
 ## 7.1 Topology and idealisation
 
@@ -404,6 +420,22 @@ Continuous beams are split at interior supports so each span is checked over its
 reaction is routed to the correct column. Any solver failure is caught and the run reverts to the isolated
 analytic loads with a warning, never aborting.
 
+## 7.5 Solver independence and cross‑software validation
+
+That the action effects are not an artefact of one solver is demonstrated by an **interchangeable
+backend**. An experimental SAP2000 path (`--solver sap2000`, the commercial OAPI via `comtypes` on
+Windows, opt‑in through the `[sap2000]` extra) reuses the *same* pure‑Python topology and
+force‑extraction helpers, swapping only the linear solve, so any force difference is solver numerics
+rather than modelling. Its scope is the ULS gravity combination on connectable frames; the lateral and
+second‑order cases are refused rather than approximated, and SAP2000 being absent falls back to the
+analytic path exactly as a missing PyNite does. The one sign‑critical mapping — SAP2000 is
+tension‑positive, EN/PyNite compression‑positive — lives in a tested adapter. A benchmark utility
+(`steelreuse-bench-sap2000`) writes a side‑by‑side comparison of analytic, PyNite and SAP2000 forces
+on a validated two‑bay frame and, optionally, on a real extracted building. On a live SAP2000 27.1.0
+the two solvers **agree to about fourteen significant figures**, so PyNite results may be relied upon
+as the certified path while SAP2000 stands as an independent witness. The default remains `pynite`, so
+certified results are byte‑identical whether or not SAP2000 is installed.
+
 ---
 
 # 8. Embodied‑carbon accounting
@@ -424,12 +456,23 @@ standard (a US position is benchmarked against a W‑shape), while reclaimed sup
 cross‑standard reuse is legitimate. The net booked saving is
 `baseline_mass·1.55 − reused_mass·0.10 − connection_refabrication`.
 
+## 8.3 End‑of‑life counterfactual
+
+Avoided‑new accounting credits a reuse with the production carbon of the section it displaces, but the
+consumed donor would, absent reuse, not have vanished — it would most likely have been recycled, earning
+its own avoided‑burden credit. The standard LCA critique is that ignoring that foregone credit
+over‑states the benefit. The tool answers it as an opt‑in (`--counterfactual recycling|rerolling`,
+default `none` so results are unchanged): the saving is then booked *net of* the credit the steel would
+otherwise have earned — EAF recycling (≈ 0.55 kgCO₂e/kg) or pilot‑scale re‑rolling (≈ 1.0 kgCO₂e/kg).
+The credits are parameters in the carbon dataset, and the chosen mode travels on the result so the
+verifier (§9.2) and the trade‑off table (§10.1) share the same basis.
+
 ---
 
-# 9. Optimal matching
+# 9. Optimal matching, objectives, and stock stewardship
 
-The matcher assigns reclaimed members (supply) to design positions (slots) to maximise net carbon saving
-subject to feasibility and use constraints.
+The matcher assigns reclaimed members (supply) to design positions (slots) to maximise a selectable
+objective — by default net carbon saving — subject to feasibility and use constraints.
 
 [[FIG-MATCH]]
 
@@ -466,27 +509,95 @@ bespoke design needed" — never excluded, because a bespoke connection may well
 screen yields a 3‑row plate at ≈ 183 kN, hand‑verified in the tests. Designing the connections
 themselves — bolts, welds, plates, block tearing, the bespoke cases — remains out of scope.
 
-## 9.2 Optimisation and fallback
+## 9.1.2 Selectable objectives
+
+Net carbon saving is the default objective, but it is not the only sensible one, and the matcher exposes
+the choice (`--objective {co2,members,mass}`). It can instead maximise the **number of members reused**
+or the **reclaimed steel mass put back to work**; both break ties toward CO₂ and may select a
+carbon‑negative reuse where that serves the stated goal, the booked CO₂ remaining honest regardless.
+Feasibility is identical across objectives — only the cell weights change — so the MILP optimality proof,
+the greedy fallback and the independent verifier (§9.2) all follow the chosen goal.
+
+## 9.2 Optimisation, fallback, and verification
 
 The selection is a Mixed‑Integer Linear Program (binary assignment variables, at most one supply per slot
 and one slot per supply, maximising total score), solved to proven optimality by CBC via PuLP. If the
 solver is unavailable or does not converge, a greedy heuristic selects highest‑scoring admissible pairs
-first and, like the program, never books a carbon‑negative match.
+first and, like the program, never books a carbon‑negative match. A proven‑`Optimal` solve is reported as
+exactly that — the best possible assignment under the use constraints — while a greedy fallback is plainly
+labelled "not proven optimal". An independent audit (`--verify-match`) re‑derives every feasible
+(donor, slot) cell from scratch, re‑validates each assignment's feasibility and score, and confirms that
+no single improving move exists (a free donor into an unfilled slot, or one beating a chosen donor on its
+slot), so the optimality claim does not rest on the optimiser that produced it.
 
 ## 9.3 Cutting‑stock
 
-Optionally (`--cut`), one donor may be cut into several pieces bounded by its length
-(`Σ(required + 50 mm) ≤ length`); the off‑cut penalty is then dropped because the remainder is genuinely
-reusable, and each donor's leftover is reported. The default remains one piece per donor.
+By default a donor may be cut into several pieces bounded by its length (`Σ(required + 50 mm) ≤ length`),
+because reclamation stockists cut members to length routinely and a one‑piece rule strands long stock —
+an 18.8 m donor that fills a single 7.6 m slot wastes 11 m. With cutting on, the off‑cut penalty is
+dropped (the remainder is genuinely reusable) and each donor's leftover is reported. `--no-cut` restores
+whole‑member‑only reuse for cases where field cutting is undesirable; on the case study that one switch
+is the difference between 71 reused / 60.6 t and 50 reused / 39.3 t (§12).
+
+## 9.4 Stock stewardship and the wider problem
+
+A single‑project, carbon‑only optimiser cannot see what a steward of a stockyard sees: the donor's
+end‑of‑life fate, capacity squandered by over‑specifying, the cost of a Frankenstein variety of sections,
+or a future project that will need the scarce stock more. A family of opt‑in terms addresses these, all
+default‑off so existing results stay byte‑identical. The **stock‑disposition advisory** (`--disposition`)
+compares store / re‑roll / recycle for every *unused* donor and names the best fate (advisory only — the
+match is untouched). A **utilization floor** (`--min-util`) hard‑gates grossly over‑spec pairs out of the
+solution; an **over‑spec soft penalty** (`--w-overspec`) is its gentler analogue, charging the *score*
+(not the booked CO₂) for a donor's excess mass per metre over the slot's avoided‑new baseline, steering
+away from a heavy donor in a light slot. A **section‑variety cap** (`--max-distinct-sections N`)
+consolidates onto at most N donor families through a binary family variable in the MILP. **Portfolio
+matching** (`--demand a.json b.json …`) lets one MILP allocate the donor stock across several demand
+models at once — the principled way to "save it for the project that needs it" — with per‑project and
+global reporting; the single‑demand path is unchanged. A single‑project **scarcity / option‑value
+reserve** (`--reserve`, experimental, score‑only) approximates that same instinct when only one project
+is in view, holding scarce versatile stock back from slots an abundant family could also serve. A
+non‑circular ML calibration of that weight is designed but deliberately not built (a side‑study, not a
+result‑path component — Principle 3).
 
 ---
 
-# 10. Reporting, narrative generation, and the machine‑learning study
+# 10. Reporting, model write‑back, narrative generation, and the machine‑learning study
 
 All figures are computed deterministically and rendered to an HTML report (and an interactive dashboard).
-A configured language model (Google Gemini, with a local Ollama fallback) writes only the explanatory
-prose; a post‑generation check rejects any text containing a figure absent from the computed results,
-enforcing Principle 1. The provider is interchangeable and does not affect any result.
+A configured language model (Google Gemini, the model overridable, with a local Ollama fallback) writes
+only the explanatory prose; a post‑generation check rejects any text containing a figure absent from the
+computed results, enforcing Principle 1. The provider is interchangeable and does not affect any result.
+
+## 10.1 A narrative that diagnoses, not recites
+
+The report does not merely restate the counts. A deterministic diagnosis (`diagnose_match`, computed on
+every run) classifies each *unfilled* slot by why it went unfilled — **length** (adequate sections exist
+in stock but are too short, or the long‑and‑strong donors are exhausted → splice or source longer stock),
+**capacity** (nothing strong enough), **contention** (a usable donor was taken elsewhere), or
+**economics** (only over‑spec donors fit, so reuse would lose carbon) — and names the single **binding
+constraint** and the **lever** that would relax it. It also flags **over‑spec ("upgrade") matches** —
+a reused donor two or more times heavier per metre than the lightest section that would have passed
+(*a W30×235 where a W27×84 suffices*): honest under avoided‑new accounting, but a stewardship signal the
+`--w-overspec`/`--reserve` terms can act on. Both the deterministic prose and the language‑model prompt
+lead with this analysis rather than with the tables, and every number in it is Python‑computed, so the
+anti‑hallucination guard is untouched. When `--pareto` is set, an **objective trade‑off table** re‑solves
+the same feasible pairs under each objective (§9.1.2) and shows members reused / CO₂ booked / mass reused
+per goal, making the cost of each choice visible while the shipped assignments still follow `--objective`.
+
+## 10.2 Model write‑back
+
+The workflow closes the loop back into Revit. `build_writeback` reshapes a result into a per‑element
+status map (donor: reused / available / quarantined / unmapped; demand: filled / partially filled /
+unfilled / non‑steel), each with a colour and a one‑line note, exported as JSON (`--apply-matches-out`).
+A pyRevit **Apply Matches** button reads it and applies a solid‑colour graphic override and a summary to
+the matching elements, and writes a **reuse passport** into schedulable shared parameters (Reuse Status,
+Reuse Paired With, Reuse CO₂ Saved, Reuse Note) on the framing and columns — a **Reuse Schedule** button
+then builds a multi‑category passport schedule with a CO₂ grand total. A **Clear Matches** button undoes
+a run, removing only the SteelReuse data, and a **Trace Match** button jumps from a matched element to its
+partner(s) across the two open models. Write‑back is presentational and reversible: it annotates the model
+but never alters the structural design.
+
+## 10.3 The machine‑learning study
 
 A machine‑learning study accompanies the project but is deliberately excluded from the result path
 (Principle 3). It comprises a capacity surrogate (an XGBoost model imitating the checker, whose high
@@ -501,14 +612,21 @@ would require a non‑circular validation against real reuse outcomes.
 **Hand verification.** The deterministic core is checked against published IPE300 section data, including
 `ε(355) = 0.814`, `N_t,Rd(S275) = 1479.5 kN`, `M_pl,Rd = 147.6/172.7 kNm` (S235/S275),
 `V_pl,Rd(S235) = 348 kN`, flexural buckling `χ_z(L = 4 m, S275) = 0.392`, LTB `χ_LT(L = 6 m) ≈ 0.45`
-decreasing with span, and deflection `δ ≈ 9.62 mm` (w = 10 N/mm, L = 6 m).
+decreasing with span, and deflection `δ ≈ 9.62 mm` (w = 10 N/mm, L = 6 m). The moment‑shape factors are
+hand‑verified against EN 1993‑1‑1 Annex B / NCCI SN003 / AISC `C_b` (`C₁ = 1.136` for a simply‑supported
+UDL span; `C_m = 0.6 + 0.4ψ` for end‑moment members), and the shear–moment interaction against an IPE300
+(`V_Ed = 300 kN → ρ = 0.223`, `M_y,V,Rd = 164.2 kNm`).
 
-**Automated suite.** 324 tests (across 28 files) pass under a clean linter, covering the member
+**Automated suite.** 312 tests (across twenty‑nine files) pass under a clean linter, covering the member
 checks, the matcher (known‑answer feasibility, use constraints, the avoided‑new and standard‑restricted
-baselines, degenerate‑geometry safety, the greedy guard, the combination envelope, cutting‑stock), the
-frame analysis (topology, recovery of `wL²/8`, multi‑storey accumulation, sway/wind/seismic forces,
-multi‑span splitting, sway‑stiffness classification), the pre‑demolition audit, the connection screen
-(geometric compatibility and standard fin‑plate capacity), and catalogue integrity for all 711 rows.
+baselines, the selectable objectives and stewardship terms, degenerate‑geometry safety, the greedy guard,
+the independent match verifier, the combination envelope, cutting‑stock), the frame analysis (topology,
+recovery of `wL²/8`, multi‑storey accumulation, sway/wind/seismic forces, multi‑span splitting), the
+audit, connection and write‑back layers, and catalogue integrity for all 711 rows.
+
+**Cross‑software parity.** A dedicated parity test asserts that the SAP2000 backend reproduces the PyNite
+forces and **skips** cleanly when SAP2000 is absent, so CI stays green; on a live SAP2000 27.1.0 the two
+solvers agreed to about fourteen significant figures (§7.5).
 
 **Methodology record.** A methodology document maps each clause to its implementation, assumption and
 validation basis; the limitation register (Chapter 13) states the explicit non‑claims.
@@ -521,19 +639,23 @@ On a representative US donor of 1016 members, 435 map to catalogue sections (the
 the remainder (overwhelmingly open‑web bar joists, plus concrete, channels and angles) being correctly
 reported as unknown; missing grades are assigned flagged defaults. The demand model is assembled into a
 **global frame of 274 nodes and 492 elements** and solved, so the design forces come from the real load
-path; the new design resolves to 181 steel positions, of which the optimiser fills 50 with reclaimed
-members that pass every EN 1993‑1‑1 combination, saving ≈ 39.3 t CO₂e on the avoided‑new basis — reported
-separately from the donor stock's ≈ 315 t total embodied carbon so the design's absorptive capacity is
-visible. On a hand‑checkable two‑bay two‑storey demand, frame analysis yields an interior column of
+path; the new design resolves to 181 steel positions, of which the optimiser fills **71** with reclaimed
+members that pass every EN 1993‑1‑1 combination (54 donors cut to length, ≈ 160 m of reusable remainder),
+saving **≈ 60.6 t CO₂e** on the avoided‑new basis — reported separately from the donor stock's ≈ 315 t
+total embodied carbon so the design's absorptive capacity is visible. Restricting to whole‑member reuse
+(`--no-cut`) fills 50 slots for ≈ 39.3 t, the difference being long donors stranded by the one‑piece rule;
+the bare steel skeleton's α_cr ≈ 0.2 correctly exposes that it carries no lateral system of its own (§7.3).
+On a hand‑checkable two‑bay two‑storey demand, frame analysis yields an interior column of
 332 kN against a corner column of 166 kN — the 2:1 ratio confirmed by hand statics — demonstrating the
-load‑path effect. The case‑study run summary is:
+load‑path effect, and the SAP2000 backend reproduces the same forces to ~14 significant figures (§7.5).
+The case‑study run summary is:
 
 ```
 Loads: area-based, 3.5+3 kN/m^2 (G+Q), ULS 1.35G+1.5Q, tributary 3 m; demand = steel only
 Forces: frame analysis (PyNite) — 274 nodes, 492 members
 Mapping: 435 mapped, 0 fuzzy, 581 unknown of 1016 members
-Supply 435 | demand slots 181 | reused 50
-CO2e saved by matches: 39264.5 kg (full donor stock potential: 315486.4 kg)
+Supply 435 | demand slots 181 | reused 71 (cutting-stock)
+CO2e saved by matches: 60610 kg (full donor stock potential: 315486.4 kg)
 Narrative source: deterministic
 ```
 
@@ -558,23 +680,25 @@ weldability of old steel) remains the engineer's responsibility and out of scope
 results are decision support, to be confirmed by a qualified engineer.
 
 **Member verification.**
-🟡 Combined N+M is the full 6.3.3 (Annex B Method 2) biaxial interaction, but with `C_m = 1.0` (the
-conservative upper bound — no moment‑shape refinement) and member rotation about its own axis assumed
-at the default orientation. 🟡 Shear–moment interaction (6.2.8) treats peak `M` and `V` as coincident
-(conservative for distributed loading).
+🟡 Combined N+M is the full 6.3.3 (Annex B Method 2) biaxial interaction; `C_m` defaults to the
+conservative `1.0` upper bound and refines to `0.6 + 0.4ψ` under `--moment-shape` (§6.5), with member
+rotation about its own axis assumed at the default orientation. 🟡 Shear–moment interaction (6.2.8) treats
+peak `M` and `V` as coincident (conservative for distributed loading).
 🟡 Effective lengths default to `k = 1.0` system lengths — the §5.2.2 second‑order‑plus‑imperfections
 route, whose validity the frame solve now verifies via `α_cr` (§7.3) and which the engineer can
 override per member (`ky`/`kz`); inferring `k` from buckling modes remains future work.
 🟠 Class 4 sections are flagged, not designed.
-🟡 LTB uses `C₁ = 1.0` and geometry‑approximated `I_t`/`I_w` (conservative); the slab‑restraint assumption
-is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning
-and the opt‑in construction‑stage case. 🟡 The construction‑stage (bare‑steel) case is opt‑in
+🟡 LTB uses geometry‑approximated `I_t`/`I_w` (conservative) and `C₁ = 1.0` by default, refined to the
+moment‑gradient value (`1.136` for SS‑UDL) under `--moment-shape` (§6.4); the slab‑restraint assumption
+is the one non‑conservative default, mitigated by the always‑computed unrestrained `χ_LT` warning, the
+opt‑in construction‑stage case, and the wind‑uplift load‑reversal case. 🟡 The construction‑stage (bare‑steel) case is opt‑in
 (`--construction`) rather than always on, and uses the full permanent load with isolated‑span statics
 (conservative for the casting situation, but no staged erection sequence).
 
 **Actions.**
-🟠 The member‑level envelope ships only gravity and the optional sway case; wind, seismic, pattern and
-uplift combinations populate as additional entries (the frame path already provides wind and seismic).
+🟠 The member‑level envelope ships gravity plus the optional sway, construction‑stage and wind‑uplift
+load‑reversal cases (§5.3); wind, seismic and pattern combinations populate as further entries (the frame
+path already provides wind and seismic).
 🟠 Column moments at member level are notional only (no real moment transfer). 🟡 The tributary edge rule
 assumes no overhang. 🟡 Geometry‑based load estimation is opt‑in.
 
@@ -583,7 +707,8 @@ assumes no overhang. 🟡 Geometry‑based load estimation is opt‑in.
 response‑spectrum, accidental torsion or behaviour‑factor spectrum. 🟡 `k = 1.0` system lengths as
 above, now `α_cr`‑verified (§7.3) and overridable per member; biaxial column moments are carried per
 axis into the 6.3.3 check. 🟡 Lateral actions are applied along the X and Y axes only. 🟠 Frame analysis
-requires coordinates, which the IFC path does not yet export.
+requires coordinates, which the IFC path does not yet export. 🟡 The experimental SAP2000 solver (§7.5)
+covers only the ULS gravity combination — the lateral and second‑order cases stay on PyNite.
 
 **Data and catalogue.**
 🟡 The pyRevit extractor has been run on the live building three times; the latest extraction carries
@@ -602,9 +727,12 @@ dimensions, a fuzzy or unknown name is auto‑confirmed by a unique physical‑d
 (method `geometry`).
 
 **Carbon and optimisation.**
-🟠 Single‑objective (carbon only); cost, transport and programme are not yet traded off. 🟡 Cradle‑to‑gate
-scope with one dataset (no A4/A5 or end‑of‑life). 🟡 Cutting‑stock and the cross‑standard restriction lack
-opt‑in toggles for alternative behaviour.
+🟡 The optimiser now offers selectable objectives (CO₂ / members / mass, §9.1.2) and a Pareto trade‑off
+view, but a true *multi‑objective* solve trading cost, transport and programme against carbon is still
+future work. 🟡 Cradle‑to‑gate scope with one dataset (no A4/A5); the end‑of‑life avoided‑burden critique
+is addressed by the opt‑in counterfactual credit (§8.3), but transport (A4) and site (A5) remain out.
+🟡 The cross‑standard restriction lacks an opt‑in toggle for alternative behaviour (cutting‑stock is now
+the default with a `--no-cut` toggle).
 
 **Machine learning and validation.**
 🟡 The ML study is exploratory and unintegrated; integration needs non‑circular validation. 🟡 Validation
@@ -613,15 +741,18 @@ the whole pipeline with every stage asserted against the hand chain); the worked
 self‑derived, so a cross‑check against an independently *published* design example remains a
 worthwhile addition.
 
-**Priority roadmap.** Four items of the original register are now implemented and described in the
+**Priority roadmap.** Several items of the original register are now implemented and described in the
 body: connection‑screen shear capacity (§9.1.1), the full 6.3.3 biaxial interaction (§6.5), the
-construction‑stage case (§5.3) and the shear–moment interaction (§6.2). What remains, in priority
-order: (1) calibrate the audit condition→knockdown factors against test data; (2) the demand‑side
-schedule cross‑check in Revit (the donor side is verified: 942 + 74 match exactly); (3) a complete combination set
-(pattern loading, uplift/load reversal) and modal seismic; (4) IFC coordinate export;
-(5) effective‑length inference from buckling modes (the `α_cr` classification + per‑member override
-are done, §7.3); (6) shape‑aware checks for channels/angles/round tube and the small
-European sizes; (7) multi‑objective optimisation; (8) an independently published validation benchmark.
+construction‑stage case (§5.3), the shear–moment interaction (§6.2), moment‑shape‑aware `C₁`/`C_m`
+(§6.4–6.5), the wind‑uplift load‑reversal case (§5.3), selectable objectives plus the stewardship and
+counterfactual terms (§8.3, §9), the independent match verifier (§9.2), the SAP2000 cross‑software
+backend (§7.5), and the Revit write‑back round‑trip (§10.2). What remains, in priority order:
+(1) calibrate the audit condition→knockdown factors against test data; (2) the demand‑side schedule
+cross‑check in Revit (the donor side is verified: 942 + 74 match exactly); (3) a complete combination set
+(pattern loading) and modal seismic; (4) IFC coordinate export; (5) effective‑length inference from
+buckling modes (the `α_cr` classification + per‑member override are done, §7.3); (6) shape‑aware checks
+for channels/angles/round tube and the small European sizes; (7) true multi‑objective optimisation
+(cost/transport/programme alongside carbon); (8) an independently published validation benchmark.
 Further candidate directions (BIM round‑trip, review‑queue UX, property‑based testing, transport
 emissions, statistical f_y from coupon results per EN 1990 Annex D, …) are noted alongside the items
 above.
@@ -633,10 +764,12 @@ above.
 This work demonstrates that the assessment of direct structural‑steel reuse can be automated as a
 transparent, Eurocode‑aware workflow that also quantifies the embodied carbon saved. From a donor and a
 demand model, the tool identifies sections without unsupported guessing, derives design actions (optionally
-from a global frame solve with sway, wind, seismic and second‑order effects), verifies every candidate
-against the full EN 1993‑1‑1 member checks, accounts for carbon against a defensible avoided‑new baseline,
-and obtains the carbon‑optimal feasible assignment by Mixed‑Integer Linear Programming. Language‑model
-assistance is confined to prose, with arithmetic reserved to validated deterministic code.
+from a global frame solve with sway, wind, seismic and second‑order effects, optionally cross‑validated
+by an independent solver), verifies every candidate against the full EN 1993‑1‑1 member checks, accounts
+for carbon against a defensible avoided‑new baseline, and obtains the optimal feasible assignment by
+Mixed‑Integer Linear Programming — under a selectable objective and, where the steward's wider view
+matters, an opt‑in set of stewardship and end‑of‑life terms. Language‑model assistance is confined to
+prose, with arithmetic reserved to validated deterministic code.
 
 The contribution is as much methodological as computational: by fixing a clear scope — member‑level
 pre‑feasibility, excluding connection design and material certification — encoding conservative defaults,
@@ -681,13 +814,27 @@ LTB, MILP, P‑Δ, SLS, ULS.
 
 # Appendix B — Command‑line interface
 
-`steelreuse --donor D.json --demand M.json --out report.html` with options: `--knockdown`; audit
-`--pda audit.csv --include-unverified`; loads
-`--dead --live --gamma-g --gamma-q --trib-width --col-trib-area --col-floors --trib-from-geometry`;
-combination `--col-ecc --phi`; construction stage `--construction --construction-live`; connection
-screen `--connections`; demand filter `--all-demand`; matching `--cut`; analysis
-`--frame-analysis --pdelta --wind --seismic`; legacy `--beam-udl --column-axial`; utility `--demo
---debug --version`. Additional entry points:
+`steelreuse --donor D.json --demand M.json --out report.html` with options grouped by stage:
+
+- **Material / audit:** `--knockdown`; `--pda audit.csv` `--include-unverified`.
+- **Loads:** `--dead --live --gamma-g --gamma-q --trib-width --col-trib-area --col-floors
+  --trib-from-geometry`.
+- **Combinations:** `--col-ecc --phi`; construction stage `--construction --construction-live`;
+  load reversal `--wind-uplift q`.
+- **Verification refinement:** `--moment-shape` (moment‑aware `C₁`/`C_m`); `--connections`
+  (connection compatibility gate).
+- **Analysis:** `--frame-analysis --pdelta --wind --seismic`; solver `--solver {pynite,sap2000}`.
+- **Matching:** demand filter `--all-demand`; cutting `--no-cut` (default on; `--cut` is a no‑op);
+  objective `--objective {co2,members,mass}`; trade‑off `--pareto`; verification `--verify-match`.
+- **Stewardship / counterfactual:** `--counterfactual {none,recycling,rerolling}`;
+  `--disposition --disposition-csv`; `--min-util --w-overspec --max-distinct-sections --reserve`;
+  portfolio `--demand a.json b.json …`.
+- **Output:** `--out report.html --results-out results.json --apply-matches-out status.json`;
+  `--demo --version --debug`; legacy `--beam-udl --column-axial`.
+
+Additional entry points: `steelreuse-validate` (extraction sanity check);
+`steelreuse-bench-sap2000` (cross‑software force benchmark, §7.5);
+`steelreuse-sensitivity` (tornado / Monte‑Carlo uncertainty study of the headline CO₂ figure);
 `streamlit run app.py` (dashboard); `python -m steelreuse.inventory donor.json` (pre‑demolition
 inventory); `python -m steelreuse.ml.train` (regenerate the ML study).
 
@@ -701,12 +848,15 @@ inventory); `python -m steelreuse.ml.train` (regenerate the ML study).
 | Column area / floors | 9 m² / 1, or geometry / load path | use frame solve for realistic axials |
 | Frame idealisation | simple braced; fixed bases | + optional sway/wind/seismic/P‑Δ |
 | Column moment | 0 unless `--phi`/`--col-ecc` | member‑level notional only |
-| Effective length `k` | 1.0 | conservative |
+| Effective length `k` | 1.0 | conservative; `α_cr`‑verified, per‑member overridable |
 | Reclaimed knockdown | 1.0, or audit‑derived | condition × verification factor (§4.4) |
 | Unverified / condition‑D donor | quarantined | `--include-unverified` to admit |
-| LTB `C₁` | 1.0 | conservative |
+| LTB `C₁` / interaction `C_m` | 1.0 | `1.136` / `0.6+0.4ψ` under `--moment-shape` |
 | Compression‑flange restraint | restrained | non‑conservative if absent — warned |
-| Reclaimed knockdown | 1.0 | assumes grade confirmed |
+| Cutting‑stock | on | `--no-cut` for whole‑member‑only reuse |
+| Matching objective | net CO₂ | or members / mass (`--objective`) |
+| End‑of‑life counterfactual | none | recycling / re‑rolling credit (`--counterfactual`, §8.3) |
+| Frame solver | PyNite | experimental SAP2000 (`--solver`, §7.5) |
 | Carbon factors | ICE v3 (1.55 / 0.10) | swappable |
 
 *Convert this Markdown to PDF with the bundled build script; complete the title‑page placeholders before
