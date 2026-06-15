@@ -37,6 +37,7 @@ class SteelReusePanel(forms.WPFWindow):
 
         self.donor_browse.Click += self._pick_donor
         self.demand_browse.Click += self._pick_demand
+        self.pda_browse.Click += self._pick_pda
         self.run_button.Click += self._on_run
         self.status_filter.SelectionChanged += self._apply_filters
         self.section_filter.TextChanged += self._apply_filters
@@ -55,17 +56,81 @@ class SteelReusePanel(forms.WPFWindow):
         if demand:
             self.demand_box.Text = demand if isinstance(demand, str) else "; ".join(demand)
         self.objective_combo.SelectedIndex = 0
+        self.counterfactual_combo.SelectedIndex = 0
+        self.solver_combo.SelectedIndex = 0
         self.status_filter.SelectedIndex = 0
 
     # -- form -> options --------------------------------------------------------------------------
+    def _num(self, box):
+        """A text box's value as float, or None when blank/unparseable (so the CLI default stands)."""
+        text = box.Text.strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    def _int(self, box):
+        """A text box's value as int, or None when blank/unparseable."""
+        text = box.Text.strip()
+        if not text:
+            return None
+        try:
+            return int(float(text))
+        except ValueError:
+            return None
+
     def collect_options(self):
-        """Read the controls into the plain options dict :func:`runner.build_command` consumes."""
+        """Read every control into the plain options dict :func:`runner.build_command` consumes.
+
+        Blank numeric fields map to None -> the flag is omitted -> the CLI's own default applies, so
+        an untouched form reproduces the canonical case-study run.
+        """
         demand = [p.strip() for p in self.demand_box.Text.split(";") if p.strip()]
         return {
             "donor": self.donor_box.Text.strip(),
             "demand": demand,
             "objective": self.objective_combo.SelectedItem.Content,
             "cut": not bool(self.no_cut_check.IsChecked),
+            # Policy
+            "min_util": self._num(self.min_util_box),
+            "max_distinct_sections": self._int(self.max_sections_box),
+            "w_overspec": self._num(self.w_overspec_box),
+            "reserve": self._num(self.reserve_box),
+            "connections": bool(self.connections_check.IsChecked),
+            "verify_match": bool(self.verify_check.IsChecked),
+            "pareto": bool(self.pareto_check.IsChecked),
+            # Carbon
+            "counterfactual": self.counterfactual_combo.SelectedItem.Content,
+            "disposition": bool(self.disposition_check.IsChecked),
+            # Loads
+            "dead": self._num(self.dead_box),
+            "live": self._num(self.live_box),
+            "gamma_g": self._num(self.gamma_g_box),
+            "gamma_q": self._num(self.gamma_q_box),
+            "trib_width": self._num(self.trib_width_box),
+            "col_trib_area": self._num(self.col_trib_box),
+            "col_floors": self._num(self.col_floors_box),
+            "col_ecc": self._num(self.col_ecc_box),
+            "trib_from_geometry": bool(self.trib_geom_check.IsChecked),
+            "all_demand": bool(self.all_demand_check.IsChecked),
+            # Load cases
+            "phi": self._num(self.phi_box),
+            "construction": bool(self.construction_check.IsChecked),
+            "construction_live": self._num(self.construction_live_box),
+            "wind_uplift": self._num(self.wind_uplift_box),
+            # Frame
+            "frame_analysis": bool(self.frame_check.IsChecked),
+            "solver": self.solver_combo.SelectedItem.Content,
+            "pdelta": bool(self.pdelta_check.IsChecked),
+            "wind": self._num(self.wind_box),
+            "seismic": self._num(self.seismic_box),
+            # Audit & checks
+            "pda": self.pda_box.Text.strip() or None,
+            "include_unverified": bool(self.include_unverified_check.IsChecked),
+            "knockdown": self._num(self.knockdown_box),
+            "moment_shape": bool(self.moment_shape_check.IsChecked),
         }
 
     def _pick_donor(self, sender, args):
@@ -77,6 +142,11 @@ class SteelReusePanel(forms.WPFWindow):
         picked = forms.pick_file(file_ext="json", title="New-design (demand) JSON", multi_file=True)
         if picked:
             self.demand_box.Text = "; ".join(picked) if isinstance(picked, list) else picked
+
+    def _pick_pda(self, sender, args):
+        path = forms.pick_file(file_ext="csv", title="Pre-demolition audit CSV")
+        if path:
+            self.pda_box.Text = path
 
     # -- run (background thread) ------------------------------------------------------------------
     def _on_run(self, sender, args):

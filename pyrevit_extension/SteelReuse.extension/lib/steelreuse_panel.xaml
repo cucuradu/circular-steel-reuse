@@ -53,6 +53,111 @@
         <Button x:Name="run_button" Content="Run Match" Background="#00A651" Foreground="White"
                 FontWeight="Bold" Margin="22,0,0,0" Padding="18,5"/>
       </StackPanel>
+
+      <Expander Header="Advanced options" Margin="0,10,0,0" IsExpanded="False">
+        <TabControl Height="206" Margin="0,6,0,0">
+          <TabItem Header="Policy">
+            <StackPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Min utilisation" Width="170"/>
+                <TextBox x:Name="min_util_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Max distinct sections" Width="170"/>
+                <TextBox x:Name="max_sections_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Over-spec penalty" Width="170"/>
+                <TextBox x:Name="w_overspec_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Scarcity reserve (exp.)" Width="170"/>
+                <TextBox x:Name="reserve_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="connections_check" Content="Connection screen" Margin="0,0,14,0"/>
+                <CheckBox x:Name="verify_check" Content="Verify optimal" Margin="0,0,14,0"/>
+                <CheckBox x:Name="pareto_check" Content="Pareto trade-off"/></StackPanel>
+            </StackPanel>
+          </TabItem>
+          <TabItem Header="Carbon">
+            <StackPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="End-of-life counterfactual" Width="190"/>
+                <ComboBox x:Name="counterfactual_combo" Width="120">
+                  <ComboBoxItem Content="none"/>
+                  <ComboBoxItem Content="recycling"/>
+                  <ComboBoxItem Content="rerolling"/></ComboBox></StackPanel>
+              <CheckBox x:Name="disposition_check" Content="Stock disposition advisory" Margin="0,8,0,0"/>
+            </StackPanel>
+          </TabItem>
+          <TabItem Header="Loads">
+            <WrapPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="Dead g_k (kN/m2)" Width="150"/><TextBox x:Name="dead_box" Width="70" Text="3.5"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="Live q_k (kN/m2)" Width="150"/><TextBox x:Name="live_box" Width="70" Text="3.0"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="gamma_G" Width="150"/><TextBox x:Name="gamma_g_box" Width="70" Text="1.35"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="gamma_Q" Width="150"/><TextBox x:Name="gamma_q_box" Width="70" Text="1.5"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="Beam trib width (m)" Width="150"/><TextBox x:Name="trib_width_box" Width="70" Text="3.0"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="Col trib area (m2)" Width="150"/><TextBox x:Name="col_trib_box" Width="70" Text="9.0"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="Col floors" Width="150"/><TextBox x:Name="col_floors_box" Width="70" Text="1"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
+                <Label Content="Col eccentricity (mm)" Width="150"/><TextBox x:Name="col_ecc_box" Width="70" Text="0"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="510" Margin="0,8,0,0">
+                <CheckBox x:Name="trib_geom_check" Content="Tributary from geometry" Margin="0,0,16,0"/>
+                <CheckBox x:Name="all_demand_check" Content="Include non-steel demand"/></StackPanel>
+            </WrapPanel>
+          </TabItem>
+          <TabItem Header="Load cases">
+            <StackPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Sway imperfection phi" Width="190"/>
+                <TextBox x:Name="phi_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Construction live (kN/m2)" Width="190"/>
+                <TextBox x:Name="construction_live_box" Width="70" Text="0.75"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Wind uplift (kN/m2)" Width="190"/>
+                <TextBox x:Name="wind_uplift_box" Width="70"/></StackPanel>
+              <CheckBox x:Name="construction_check" Content="Construction (bare-steel) stage" Margin="0,8,0,0"/>
+            </StackPanel>
+          </TabItem>
+          <TabItem Header="Frame">
+            <StackPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Solver" Width="190"/>
+                <ComboBox x:Name="solver_combo" Width="120">
+                  <ComboBoxItem Content="pynite"/>
+                  <ComboBoxItem Content="sap2000"/></ComboBox></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Wind (kN/m2)" Width="190"/>
+                <TextBox x:Name="wind_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Seismic Cs" Width="190"/>
+                <TextBox x:Name="seismic_box" Width="70"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="frame_check" Content="Global frame analysis" Margin="0,0,16,0"/>
+                <CheckBox x:Name="pdelta_check" Content="P-Delta"/></StackPanel>
+            </StackPanel>
+          </TabItem>
+          <TabItem Header="Audit &amp; checks">
+            <StackPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Pre-demolition audit CSV" Width="170"/>
+                <TextBox x:Name="pda_box" Width="220"/>
+                <Button x:Name="pda_browse" Content="Browse..."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Default knockdown" Width="170"/>
+                <TextBox x:Name="knockdown_box" Width="70" Text="1.0"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="include_unverified_check" Content="Admit unverified" Margin="0,0,16,0"/>
+                <CheckBox x:Name="moment_shape_check" Content="Moment-shape C1/Cm"/></StackPanel>
+            </StackPanel>
+          </TabItem>
+        </TabControl>
+      </Expander>
     </StackPanel>
 
     <!-- KPI header -->
