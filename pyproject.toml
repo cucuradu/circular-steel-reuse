@@ -20,9 +20,10 @@ dependencies = []
 steelreuse = "steelreuse.cli:main"
 steelreuse-validate = "steelreuse.validate_extraction:main"
 steelreuse-bench-sap2000 = "steelreuse.benchmark.sap2000_bench:main"
+steelreuse-sensitivity = "steelreuse.sensitivity:main"
 
 [project.optional-dependencies]
-analysis = ["numpy>=1.26", "pandas>=2.1"]
+analysis = ["numpy>=1.26", "pandas>=2.1", "matplotlib>=3.8"]  # matplotlib: sensitivity tornado chart
 fea = ["PyNiteFEA>=0.0.9"]              # license-free frame solver (default force backend)
 sap2000 = ["comtypes>=1.3; sys_platform == 'win32'", "pywin32>=306; sys_platform == 'win32'"]
 ml = ["scikit-learn>=1.4", "xgboost>=2.0"]
@@ -43,7 +44,7 @@ packages = ["src/steelreuse"]
 line-length = 110
 target-version = "py311"
 src = ["src", "tests"]
-# Agent-harness artifacts (.claude/ isolated worktrees etc.) are not project code.
+# Local tooling state (isolated worktrees etc.) is not project code.
 extend-exclude = [".claude"]
 
 [tool.ruff.lint]

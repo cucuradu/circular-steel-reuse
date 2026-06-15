@@ -2085,6 +2085,7 @@ source = { editable = "." }
 
 [package.optional-dependencies]
 analysis = [
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
 ]
@@ -2127,6 +2128,7 @@ requires-dist = [
     { name = "google-genai", marker = "extra == 'llm'", specifier = ">=0.3" },
     { name = "ifcopenshell", marker = "extra == 'bim'", specifier = ">=0.7" },
     { name = "jinja2", marker = "extra == 'report'", specifier = ">=3.1" },
+    { name = "matplotlib", marker = "extra == 'analysis'", specifier = ">=3.8" },
     { name = "numpy", marker = "extra == 'analysis'", specifier = ">=1.26" },
     { name = "ortools", marker = "extra == 'opt'", specifier = ">=9.9" },
     { name = "pandas", marker = "extra == 'analysis'", specifier = ">=2.1" },
