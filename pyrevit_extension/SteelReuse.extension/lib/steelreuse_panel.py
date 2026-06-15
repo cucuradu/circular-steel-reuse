@@ -17,6 +17,7 @@ import json
 import os
 import threading
 
+import steelreuse_apply as apply_mod  # shared Apply-Matches logic (also used by the ribbon button)
 import steelreuse_panel_model as panelmodel  # extension lib/ is on the engine path
 import steelreuse_runner as runner
 from Autodesk.Revit.DB import ElementId
@@ -69,6 +70,37 @@ class _ZoomHandler(IExternalEventHandler):
         return "SteelReuse: zoom to element"
 
 
+class _ApplyHandler(IExternalEventHandler):
+    """Apply the colour overrides + reuse-passport params to the active model, off an ExternalEvent.
+
+    The transaction must run in a valid Revit API context, which a modeless window is not -- so the
+    window stages ``statuses``/``side`` and raises this. Reuses the shared ``steelreuse_apply`` code
+    the ribbon button uses, then reports the outcome.
+    """
+
+    def __init__(self):
+        self.statuses = None
+        self.side = None
+
+    def Execute(self, uiapp):
+        uidoc = uiapp.ActiveUIDocument
+        if uidoc is None:
+            return
+        doc = uidoc.Document
+        try:
+            result = apply_mod.apply_matches(doc, doc.ActiveView, self.statuses, self.side)
+        except Exception as ex:  # noqa: BLE001 -- surface a failed apply, never crash Revit
+            forms.alert("Apply Matches failed:\n" + str(ex), title="SteelReuse")
+            return
+        forms.alert("Applied %s %s element(s) in '%s'.\n%s id(s) were not in this model "
+                    "(open the other side's model to colour those)."
+                    % (result["applied"], self.side, doc.ActiveView.Name, result["missing"]),
+                    title="SteelReuse: Apply Matches")
+
+    def GetName(self):
+        return "SteelReuse: apply matches"
+
+
 class SteelReusePanel(forms.WPFWindow):
     """The run+review window. One instance per open; remembers the last inputs via the runner config."""
 
@@ -94,6 +126,9 @@ class SteelReusePanel(forms.WPFWindow):
         self._zoom_event = ExternalEvent.Create(self._zoom_handler)
         self.zoom_button.Click += self._on_zoom
         self.grid.MouseDoubleClick += self._on_zoom
+        self._apply_handler = _ApplyHandler()
+        self._apply_event = ExternalEvent.Create(self._apply_handler)
+        self.apply_button.Click += self._on_apply
         # Optional result tabs start hidden; a run reveals the ones whose data is present.
         for tab in (self.tab_unfilled, self.tab_portfolio, self.tab_pareto,
                     self.tab_disposition, self.tab_audit, self.tab_warnings):
@@ -404,6 +439,30 @@ class SteelReusePanel(forms.WPFWindow):
             return
         self._zoom_handler.ids = ids
         self._zoom_event.Raise()  # Revit runs the select+zoom when it next reaches a valid context
+
+    def _on_apply(self, sender, args):
+        status_path = self._view.paths.get("status") if self._view else None
+        if not status_path or not os.path.isfile(status_path):
+            forms.alert("Run a match first (no status.json to apply).", title="SteelReuse")
+            return
+        try:
+            with open(status_path) as handle:
+                data = json.load(handle)
+        except Exception as ex:  # noqa: BLE001
+            forms.alert("Could not read status.json:\n" + str(ex), title="SteelReuse")
+            return
+        side = forms.CommandSwitchWindow.show(
+            ["demand", "donor"],
+            message="Is the OPEN model the DEMAND (new design) or the DONOR (supply)?")
+        if not side:
+            return
+        statuses = data.get(side, {})
+        if not statuses:
+            forms.alert("No '%s' entries in the status file." % side, title="SteelReuse")
+            return
+        self._apply_handler.statuses = statuses
+        self._apply_handler.side = side
+        self._apply_event.Raise()  # the colouring transaction runs in a valid Revit context
 
     # -- footer actions ---------------------------------------------------------------------------
     def _report_path(self):
