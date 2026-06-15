@@ -12,8 +12,8 @@ You register the *parent* folder of `SteelReuse.extension` as a pyRevit extensio
 
 1. In Revit: **pyRevit tab → Settings**.
 2. Scroll to **Custom Extension Directories** → **Add Folder** →
-   pick this folder:
-   `c:\Users\Radu\Projects\Python\circular-steel-reuse\pyrevit_extension`
+   pick this folder (the `pyrevit_extension` directory inside your clone of the repository):
+   `<repo>\pyrevit_extension`
 3. **Save Settings**, then **pyRevit → Reload** (or restart Revit).
 4. A new **SteelReuse** tab appears with the **Extract Steel** button.
 

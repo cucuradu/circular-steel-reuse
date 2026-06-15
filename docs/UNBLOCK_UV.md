@@ -1,9 +1,10 @@
 # Unblocking `uv` (and other unsigned binaries) on Windows
 
-On the development machine, [`uv`](https://docs.astral.sh/uv/) and uv-managed Python interpreters
-fail to run: Windows refuses to execute them because they are **unsigned**. This note records what is
-actually doing the blocking and how to unblock it. It is Windows-specific and only relevant if you hit
-the same wall; the project itself installs fine with plain `pip` (see [README](../README.md)).
+On some locked-down Windows machines, [`uv`](https://docs.astral.sh/uv/) and uv-managed Python
+interpreters fail to run: Windows refuses to execute them because they are **unsigned**. This note
+records what is actually doing the blocking and how to unblock it. It is Windows-specific and only
+relevant if you hit the same wall; the project itself installs fine with plain `pip` (see
+[README](../README.md)).
 
 > ⚠️ Everything in the "fix" sections changes a **system code-integrity policy** and needs an
 > **elevated (Administrator) PowerShell**. Read the cautions first. If the machine is managed by an
@@ -27,14 +28,14 @@ CiTool --list-policies --json | ConvertFrom-Json |
   Select-Object FriendlyName, IsEnforced, IsSystemPolicy, PolicyID
 ```
 
-**On this machine (2026-06-09):**
+**Interpreting the output:**
 - Smart App Control = **0 (off)** → not the cause.
 - AppLocker = **0 rules** → not the cause.
-- **WDAC is active**: eight enforced policies live in
-  `C:\Windows\System32\CodeIntegrity\CiPolicies\Active\*.cip`. WDAC is what blocks unsigned `uv.exe`
-  and the unsigned uv-managed `python.exe`.
+- **WDAC active**: enforced policies live in
+  `C:\Windows\System32\CodeIntegrity\CiPolicies\Active\*.cip`. When WDAC is the active feature, it is
+  what blocks the unsigned `uv.exe` and the unsigned uv-managed `python.exe`.
 
-Most of those eight are **Microsoft's own signed base policies** (Windows mode, the driver block list,
+Most active policies are typically **Microsoft's own signed base policies** (Windows mode, the driver block list,
 the SecureBoot/Code-Integrity defaults) — **do not touch those**. The blocker is whichever **custom,
 enforced, non-system** policy is in the list. Identify it with the `CiTool` command above (run
 elevated): note the `FriendlyName` and `PolicyID` of any policy where `IsSystemPolicy = False` and

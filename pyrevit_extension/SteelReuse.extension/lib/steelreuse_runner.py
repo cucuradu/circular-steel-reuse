@@ -7,8 +7,9 @@ rules as the extractor/Apply-Matches buttons (the default IronPython 3 engine; p
 3.12 errors under Revit 2026).
 
 The heavy matching engine never runs in Revit (docs/DESIGN_PRINCIPLES.md hard rule 2). Instead this module shells out
-to the **signed CPython venv** via ``python -m steelreuse.cli`` -- never the pip ``steelreuse.exe``
-launcher, which Windows Application Control (WDAC) blocks as an unsigned binary.
+to a configured CPython interpreter via ``python -m steelreuse.cli`` -- not the pip-generated
+``steelreuse.exe`` launcher, which can be blocked as an unsigned binary on locked-down Windows
+(Application Control / WDAC).
 
 Split of concerns (so most of this is testable without Revit):
   * ``build_command`` / ``output_paths`` / ``find_interpreter`` / settings -- pure, unit-tested.

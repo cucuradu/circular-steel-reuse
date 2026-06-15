@@ -19,20 +19,21 @@ There are **two different things** you can do with the SAP2000 backend. Don't co
 
 1. **Check the licence.** Open SAP2000 → **Help → About**. If it says **"Educational"**, the model-size
    cap blocks the OAPI — the backend will fall back to analytic. A full trial/licence works.
-2. **The COM bridge is already installed** in the signed venv (`comtypes`, `pywin32`). If you ever
-   rebuild the venv, reinstall with:
+2. **Install the COM bridge** (`comtypes`, `pywin32`) via the `[sap2000]` extra:
    ```
-   & "C:\Users\Radu\Projects\Python\.venv-signed\Scripts\python.exe" -m pip install comtypes pywin32
+   pip install -e ".[sap2000]"
    ```
 
-> **Why `python -m …` and not the `steelreuse-bench-sap2000` command?** On this WDAC-locked machine the
-> pip-generated `*.exe` launchers are unsigned and blocked. Always call through the **signed venv
-> Python** with `-m`. On a normal machine the console commands (`steelreuse-bench-sap2000`,
-> `steelreuse …`) work directly.
+> **Invoking the commands.** The examples below call the modules through Python (`python -m …`) rather
+> than the `steelreuse-bench-sap2000` / `steelreuse …` console scripts. On a normal machine either form
+> works; on a locked-down Windows machine the pip-generated `*.exe` launchers may be unsigned and
+> blocked (see [UNBLOCK_UV.md](../UNBLOCK_UV.md)), in which case `python -m` through a signed
+> interpreter is the reliable path.
 
-For brevity below, set the interpreter once per PowerShell session:
+For brevity below, set the interpreter once per PowerShell session (use `python`, or the full path to
+a signed interpreter on a locked-down machine):
 ```powershell
-$py = "C:\Users\Radu\Projects\Python\.venv-signed\Scripts\python.exe"
+$py = "python"
 ```
 
 ---
