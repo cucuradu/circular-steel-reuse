@@ -213,9 +213,11 @@ class SteelReusePanel(forms.WPFWindow):
             % (k.get("reused", "?"), k.get("slots", "?"), k.get("co2_saved_kg", "?"),
                k.get("mass_reused_kg", "?"),
                "proven optimal" if k.get("proven_optimal") else "heuristic (not proven)"))
-        tail = "\n".join((stdout or "").strip().splitlines()[-6:])
+        # Show the FULL engine log (scrollable), so the "Forces: frame analysis (solver) -- N nodes"
+        # line and other run details are visible -- the tail alone hid which backend actually ran.
         warn = "" if self._view.schema_ok else "WARNING: unexpected results schema version.\n"
-        self.progress_box.Text = warn + "Done.\n" + tail
+        self.progress_box.Text = warn + "Done.\n\n" + (stdout or "").strip()
+        self.progress_box.ScrollToHome()
         self._apply_filters(None, None)
 
     # -- display filters (never re-run the match) -------------------------------------------------

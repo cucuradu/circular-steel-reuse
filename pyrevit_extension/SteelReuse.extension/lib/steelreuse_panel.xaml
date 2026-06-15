@@ -196,7 +196,7 @@
     </DataGrid>
 
     <!-- Progress / log -->
-    <TextBox Grid.Row="4" x:Name="progress_box" Height="74" Margin="0,10,0,0" IsReadOnly="True"
+    <TextBox Grid.Row="4" x:Name="progress_box" Height="104" Margin="0,10,0,0" IsReadOnly="True"
              TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
              Background="#1E1E1E" Foreground="#DDDDDD" FontFamily="Consolas"/>
 
