@@ -69,6 +69,39 @@ def test_command_omits_zero_valued_optional_flags():
         assert flag not in cmd
 
 
+def test_command_emits_carbon_and_policy_flags():
+    opts = {"donor": "d", "demand": "m", "counterfactual": "recycling", "pareto": True,
+            "disposition": True, "w_overspec": 1.5, "reserve": 0.4, "connections": True,
+            "moment_shape": True, "max_distinct_sections": 8}
+    cmd = runner.build_command("py", opts, "o")
+    assert _pair(cmd, "--counterfactual") == "recycling"
+    assert "--pareto" in cmd and "--disposition" in cmd and "--connections" in cmd
+    assert "--moment-shape" in cmd
+    assert _pair(cmd, "--w-overspec") == "1.5"
+    assert _pair(cmd, "--reserve") == "0.4"
+    assert _pair(cmd, "--max-distinct-sections") == "8"
+
+
+def test_command_emits_load_and_frame_flags():
+    opts = {"donor": "d", "demand": "m", "dead": 4.0, "live": 2.5, "gamma_g": 1.35, "gamma_q": 1.5,
+            "trib_width": 2.5, "col_trib_area": 12.0, "col_floors": 3, "col_ecc": 50,
+            "construction": True, "construction_live": 0.9, "wind_uplift": 1.2,
+            "solver": "sap2000", "pdelta": True, "all_demand": True, "knockdown": 0.9}
+    cmd = runner.build_command("py", opts, "o")
+    assert _pair(cmd, "--dead") == "4.0" and _pair(cmd, "--live") == "2.5"
+    assert _pair(cmd, "--col-floors") == "3" and _pair(cmd, "--col-ecc") == "50"
+    assert "--construction" in cmd and _pair(cmd, "--construction-live") == "0.9"
+    assert _pair(cmd, "--wind-uplift") == "1.2"
+    assert _pair(cmd, "--solver") == "sap2000" and "--pdelta" in cmd
+    assert "--all-demand" in cmd and _pair(cmd, "--knockdown") == "0.9"
+
+
+def test_command_supports_several_demand_models_for_portfolio():
+    cmd = runner.build_command("py", {"donor": "d", "demand": ["a.json", "b.json"]}, "o")
+    i = cmd.index("--demand")
+    assert cmd[i + 1] == "a.json" and cmd[i + 2] == "b.json"
+
+
 def test_candidate_interpreters_finds_a_venv_up_the_tree(tmp_path):
     # <root>/.venv-signed/Scripts/python.exe, started from a few levels below (like the extension dir)
     scripts = tmp_path / ".venv-signed" / "Scripts"

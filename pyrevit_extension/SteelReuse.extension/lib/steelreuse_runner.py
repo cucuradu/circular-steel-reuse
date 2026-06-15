@@ -44,9 +44,12 @@ def build_command(interpreter, opts, out_dir):
     results.json for the dockable panel).
     """
     paths = output_paths(out_dir)
+    # --demand takes one or several models (several -> portfolio matching). Accept a string or a list.
+    demand = opts["demand"]
+    demand_args = list(demand) if isinstance(demand, (list, tuple)) else [demand]
     cmd = [interpreter, "-m", "steelreuse.cli",
            "--donor", opts["donor"],
-           "--demand", opts["demand"],
+           "--demand"] + demand_args + [
            "--apply-matches-out", paths["status"],
            "--out", paths["report"],
            "--results-out", paths["results"],
@@ -55,17 +58,32 @@ def build_command(interpreter, opts, out_dir):
     # Boolean toggles (default off; cutting-stock is the one default-on policy -> --no-cut to disable).
     if not opts.get("cut", True):
         cmd.append("--no-cut")
-    for key, flag in (("frame_analysis", "--frame-analysis"),
-                      ("trib_from_geometry", "--trib-from-geometry"),
-                      ("include_unverified", "--include-unverified"),
+    for key, flag in (("frame_analysis", "--frame-analysis"), ("pdelta", "--pdelta"),
+                      ("trib_from_geometry", "--trib-from-geometry"), ("all_demand", "--all-demand"),
+                      ("include_unverified", "--include-unverified"), ("construction", "--construction"),
+                      ("connections", "--connections"), ("moment_shape", "--moment-shape"),
+                      ("pareto", "--pareto"), ("disposition", "--disposition"),
                       ("verify_match", "--verify-match")):
         if opts.get(key):
             cmd.append(flag)
 
-    # Numeric options, emitted only when set to a non-zero value (else the CLI default stands).
+    # Choice options (emit the value only when set).
+    for key, flag in (("counterfactual", "--counterfactual"), ("solver", "--solver")):
+        val = opts.get(key)
+        if val:
+            cmd.append(flag)
+            cmd.append(str(val))
+
+    # Numeric options, emitted only when truthy (else the CLI default stands).
     for key, flag in (("min_util", "--min-util"), ("phi", "--phi"),
                       ("wind", "--wind"), ("seismic", "--seismic"),
-                      ("dead", "--dead"), ("live", "--live"), ("trib_width", "--trib-width")):
+                      ("dead", "--dead"), ("live", "--live"),
+                      ("gamma_g", "--gamma-g"), ("gamma_q", "--gamma-q"),
+                      ("trib_width", "--trib-width"), ("col_trib_area", "--col-trib-area"),
+                      ("col_floors", "--col-floors"), ("col_ecc", "--col-ecc"),
+                      ("construction_live", "--construction-live"), ("wind_uplift", "--wind-uplift"),
+                      ("w_overspec", "--w-overspec"), ("reserve", "--reserve"),
+                      ("knockdown", "--knockdown")):
         val = opts.get(key)
         if val:
             cmd.append(flag)
@@ -80,6 +98,11 @@ def build_command(interpreter, opts, out_dir):
     if pda:
         cmd.append("--pda")
         cmd.append(pda)
+
+    dcsv = opts.get("disposition_csv")
+    if dcsv:
+        cmd.append("--disposition-csv")
+        cmd.append(dcsv)
 
     return cmd
 
