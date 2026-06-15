@@ -33,8 +33,9 @@ steelreuse_reports/
 # Scratch
 _commitmsg.txt
 
-# Local tooling state (editor/agent worktrees, local settings)
+# Local tooling state (editor/agent worktrees, local settings, agent instructions)
 .claude/
+AGENTS.md
 
 # Editor / OS
 .vscode/
