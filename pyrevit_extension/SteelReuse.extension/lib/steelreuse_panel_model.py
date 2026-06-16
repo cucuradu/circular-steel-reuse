@@ -173,3 +173,21 @@ def diff(baseline_data, current_data):
             slots.append({"slot_id": slot_id, "change": "donor",
                           "detail": "donor " + str(b) + " -> " + str(c)})
     return {"kpis": kpis, "slots": slots}
+
+
+def kpi_table(named_runs):
+    """Compare N runs' KPIs side by side.
+
+    ``named_runs = [(name, data), ...]`` (each ``data`` a results.json v2 dict). Returns
+    ``{"columns": [name, ...], "rows": [{"label", "values": [...]}, ...]}`` over the same KPI set as
+    :func:`diff` (members reused, CO2e saved, mass reused, distinct sections, unfilled count). Pure,
+    so it is unit-tested headless.
+    """
+    columns = [name for name, _ in named_runs]
+    rows = []
+    for label, key in _DIFF_KPIS:
+        rows.append({"label": label,
+                     "values": [d.get("kpis", {}).get(key, 0) for _, d in named_runs]})
+    rows.append({"label": "Unfilled slots",
+                 "values": [len(d.get("unfilled", [])) for _, d in named_runs]})
+    return {"columns": columns, "rows": rows}

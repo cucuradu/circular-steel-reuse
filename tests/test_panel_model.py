@@ -117,3 +117,14 @@ def test_diff_slot_detail_strings():
     cur = _data(1, 1.0, 1.0, 1, [("S_donor#0", "D9")], [])
     detail = model.diff(base, cur)["slots"][0]["detail"]
     assert "D3" in detail and "D9" in detail
+
+
+def test_kpi_table_columns_and_aligned_values():
+    a = _data(90, 1000.0, 800.0, 8, [("N1#0", "D1")], ["N2#0"])
+    b = _data(71, 700.0, 600.0, 6, [("N1#0", "D1")], ["N2#0", "N3#0"])
+    t = model.kpi_table([("baseline", a), ("no-cut", b)])
+    assert t["columns"] == ["baseline", "no-cut"]
+    rows = {r["label"]: r["values"] for r in t["rows"]}
+    assert rows["Members reused"] == [90, 71]
+    assert rows["CO2e saved (kg)"] == [1000.0, 700.0]
+    assert rows["Unfilled slots"] == [1, 2]
