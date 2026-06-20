@@ -27,6 +27,73 @@ from dataclasses import dataclass, field
 
 from .forces import Load
 
+# EN 1991-1-1 6.3.1.2 reference area for the αA imposed-load reduction.
+A0_M2 = 10.0
+
+
+@dataclass(frozen=True)
+class ZoneSpec:
+    """Characteristic loads + reduction parameters for one load zone.
+
+    ``g_k`` is a *typical buildup assumption* (slab + finishes), NOT an EN
+    occupancy value — EN 1991-1-1 tabulates only the imposed ``q_k``. ``psi0`` is
+    the EN 1990 Table A1.1 combination factor used by the αA/αn reductions.
+    ``reducible`` is True only for EN categories A–D (the scope of §6.3.1.2);
+    roofs, storage, traffic and placeholders set it False so no reduction applies.
+    """
+
+    g_k: float
+    q_k: float
+    psi0: float = 0.7
+    reducible: bool = False
+
+
+# EN 1991-1-1:2002 *recommended* q_k: Table 6.2 (floors A–E), Table 6.8 (traffic
+# F,G), Table 6.10 (roofs H,I,K). q_k MUST be re-verified line-by-line against the
+# tables — these are from memory of the recommended (boxed) values and a National
+# Annex may override them. g_k is a typical assumption, overridable with --dead.
+OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
+    "residential-A": ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A floors (1.5–2.0)
+    "stairs-A":      ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A stairs
+    "balcony-A":     ZoneSpec(2.0, 2.5, 0.7, True),   # T6.2 cat A balconies (2.5–4.0)
+    "office-B":      ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 cat B offices (2.0–3.0) — today's default
+    "congress-C1":   ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 tables: cafés/restaurants
+    "congress-C2":   ZoneSpec(3.5, 4.0, 0.7, True),   # T6.2 fixed seats
+    "congress-C3":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 open circulation
+    "congress-C4":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 physical activity
+    "congress-C5":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 crowds (5.0–7.5)
+    "retail-D1":     ZoneSpec(3.5, 4.0, 0.7, True),   # T6.2 general retail (4.0–5.0)
+    "retail-D2":     ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 department stores
+    "storage-E1":    ZoneSpec(5.0, 7.5, 1.0, False),  # T6.2 storage; outside A–D reduction scope
+    "industrial-E2": ZoneSpec(5.0, 7.5, 1.0, False),  # T6.2 industrial — use-specific PLACEHOLDER
+    "traffic-F":     ZoneSpec(3.5, 2.0, 0.7, False),  # T6.8 vehicles ≤30 kN (1.5–2.5)
+    "traffic-G":     ZoneSpec(3.5, 5.0, 0.7, False),  # T6.8 vehicles 30–160 kN
+    "roof-H":        ZoneSpec(1.0, 0.4, 0.0, False),  # T6.10 not accessible (0.0–1.0)
+    "roof-I":        ZoneSpec(3.5, 3.0, 0.7, False),  # T6.10 accessible ~ floor; pick matching A–D
+    "roof-K":        ZoneSpec(1.0, 0.0, 0.0, False),  # T6.10 helicopter — class-specific PLACEHOLDER
+}
+
+
+def alpha_A(area_m2: float, psi0: float) -> float:
+    """EN 1991-1-1 eq. 6.1 area reduction factor, capped at 1.0.
+
+    ``αA = (5/7)·ψ0 + A0/A ≤ 1.0``. ``area_m2 <= 0`` (no geometry) → 1.0.
+    """
+    if area_m2 <= 0:
+        return 1.0
+    return min(1.0, (5.0 / 7.0) * psi0 + A0_M2 / area_m2)
+
+
+def alpha_n(n_floors: float, psi0: float) -> float:
+    """EN 1991-1-1 eq. 6.2 storey reduction factor for columns carrying n>2 floors.
+
+    ``αn = (2 + (n − 2)·ψ0) / n``; ``n ≤ 2`` → 1.0 (no reduction).
+    """
+    n = int(n_floors)
+    if n <= 2:
+        return 1.0
+    return (2.0 + (n - 2) * psi0) / n
+
 
 @dataclass
 class AreaLoadModel:
@@ -53,6 +120,21 @@ class AreaLoadModel:
     column_area_overrides: dict[str, float] = field(default_factory=dict)       # col id -> area (m^2)
     column_floor_overrides: dict[str, float] = field(default_factory=dict)      # col id -> floor count
 
+    # --- Zone-based loads (WS "real loads" step 2) -------------------------------
+    # dead_kpa/live_kpa above ARE the default "floor" zone (back-compat). The roof
+    # zone defaults to a light, not-accessible roof (EN cat H). Custom named zones
+    # (balcony, etc.) live in custom_zones. member_zone is auto-filled by
+    # assign_zones(); zone_overrides is the user's per-member tag (wins over auto).
+    roof_dead_kpa: float = 1.0     # roof zone g_k (typical light roof buildup)
+    roof_live_kpa: float = 0.4     # roof zone q_k (EN cat H recommended)
+    roof_psi0: float = 0.0         # roof not reducible
+    floor_psi0: float = 0.7        # default floor zone ψ0 (EN cat A–D)
+    floor_reducible: bool = True   # default floor zone is a reducible category
+    load_reduction: bool = True    # master switch for αA/αn (EN 6.3.1.2)
+    custom_zones: dict[str, ZoneSpec] = field(default_factory=dict)   # name -> spec
+    member_zone: dict[str, str] = field(default_factory=dict)         # id -> zone (auto)
+    zone_overrides: dict[str, str] = field(default_factory=dict)      # id -> zone (user)
+
     # Alias so the pipeline can treat this and the legacy flat model uniformly.
     @property
     def beam_flange_restrained(self) -> bool:
@@ -65,6 +147,60 @@ class AreaLoadModel:
     def characteristic_area_kpa(self) -> float:
         """Unfactored g_k + q_k (kN/m^2), used for the SLS deflection check."""
         return self.dead_kpa + self.live_kpa
+
+    def _zone_name(self, member_id: str) -> str:
+        """Resolve a member's zone: override → auto (elevation) → default 'floor'."""
+        if member_id in self.zone_overrides:
+            return self.zone_overrides[member_id]
+        return self.member_zone.get(member_id, "floor")
+
+    def _zone_spec(self, name: str) -> ZoneSpec:
+        if name == "floor":
+            return ZoneSpec(self.dead_kpa, self.live_kpa, self.floor_psi0, self.floor_reducible)
+        if name == "roof":
+            return ZoneSpec(self.roof_dead_kpa, self.roof_live_kpa, self.roof_psi0, False)
+        if name in self.custom_zones:
+            return self.custom_zones[name]
+        if name in OCCUPANCY_PRESETS:          # allow tagging straight to a preset key
+            return OCCUPANCY_PRESETS[name]
+        return self._zone_spec("floor")        # unknown zone -> safe floor default
+
+    def _spec_by_id(self, member_id: str) -> ZoneSpec:
+        return self._zone_spec(self._zone_name(member_id))
+
+    def _beam_udl_for(self, member, width_m: float) -> tuple[float, float]:
+        """(ULS udl, SLS service udl) in N/mm for a beam, zone- and αA-aware.
+
+        Permanent term is never reduced; the imposed term is multiplied by αA
+        (EN eq. 6.1) over the beam's loaded area = width × span, but only for a
+        reducible zone with load_reduction on. SLS stays unreduced.
+        """
+        spec = self._spec_by_id(member.id)
+        span_mm = member.length_mm or (sum(member.spans_mm) if member.spans_mm else 0.0)
+        area_m2 = width_m * (span_mm / 1000.0)
+        a = alpha_A(area_m2, spec.psi0) if (self.load_reduction and spec.reducible) else 1.0
+        uls = self.gamma_g * spec.g_k * width_m + self.gamma_q * a * spec.q_k * width_m
+        sls = (spec.g_k + spec.q_k) * width_m
+        return uls, sls
+
+    def _column_axial_for(self, member, area_m2: float, floors: float) -> float:
+        """Zone- and αn-aware column axial (N).
+
+        A column whose auto zone is 'roof' carries one roof level (light, never
+        reduced) plus (floors − 1) floor levels; otherwise all floor levels. αn
+        (EN eq. 6.2) reduces the floor-level imposed only, for a reducible zone
+        with load_reduction on. Permanent is never reduced. Columns use roof/floor
+        zones only in v1 (a custom override on a column falls back to floor).
+        """
+        floor_spec = self._zone_spec("floor")
+        roof_spec = self._zone_spec("roof")
+        roof_levels = 1.0 if self.member_zone.get(member.id) == "roof" else 0.0
+        floor_levels = max(0.0, floors - roof_levels)
+        a_n = (alpha_n(floor_levels, floor_spec.psi0)
+               if (self.load_reduction and floor_spec.reducible) else 1.0)
+        perm = self.gamma_g * (roof_spec.g_k * roof_levels + floor_spec.g_k * floor_levels)
+        imp = self.gamma_q * (roof_spec.q_k * roof_levels + a_n * floor_spec.q_k * floor_levels)
+        return (perm + imp) * area_m2 * 1.0e3   # kN -> N
 
     def beam_udl_Npmm(self, tributary_width_m: float | None = None) -> float:
         w = self.beam_tributary_width_m if tributary_width_m is None else tributary_width_m
@@ -80,7 +216,8 @@ class AreaLoadModel:
         trib = self.tributary_overrides.get(member_id) if (
             member_id and self.tributary_overrides) else None
         width = self.beam_tributary_width_m if trib is None else trib
-        return (self.gamma_g * self.dead_kpa + self.gamma_q * self.construction_live_kpa) * width
+        g_k = self._spec_by_id(member_id).g_k if member_id else self.dead_kpa
+        return (self.gamma_g * g_k + self.gamma_q * self.construction_live_kpa) * width
 
     def uplift_udl_Npmm(self, member_id: str | None = None) -> float:
         """Net UPWARD line load for the wind-uplift reversal case (N/mm); <= 0 means no reversal.
@@ -93,7 +230,8 @@ class AreaLoadModel:
         trib = self.tributary_overrides.get(member_id) if (
             member_id and self.tributary_overrides) else None
         width = self.beam_tributary_width_m if trib is None else trib
-        return (self.gamma_q * self.uplift_kpa - 1.0 * self.dead_kpa) * width
+        g_k = self._spec_by_id(member_id).g_k if member_id else self.dead_kpa
+        return (self.gamma_q * self.uplift_kpa - 1.0 * g_k) * width
 
     def column_axial_N(self, tributary_area_m2: float | None = None,
                        floors: float | None = None) -> float:
@@ -106,14 +244,12 @@ class AreaLoadModel:
         if member.role == "column":
             area = self.column_area_overrides.get(member.id, self.column_tributary_area_m2)
             floors = self.column_floor_overrides.get(member.id, self.column_floors)
-            n = self.column_axial_N(area, floors)
+            n = self._column_axial_for(member, area, floors)
             return Load(axial_N=n, axial_moment_Nmm=n * self.column_eccentricity_mm)
         trib = self.tributary_overrides.get(member.id) if self.tributary_overrides else None
         width = self.beam_tributary_width_m if trib is None else trib
-        return Load(
-            udl_Npmm=self.beam_udl_Npmm(trib),
-            w_service_Npmm=self.characteristic_area_kpa() * width,
-        )
+        uls, sls = self._beam_udl_for(member, width)
+        return Load(udl_Npmm=uls, w_service_Npmm=sls)
 
     def combination_loads(self, member) -> list[tuple[str, Load]]:
         """The ULS load-combination envelope for a member: a list of (name, :class:`Load`).
@@ -336,3 +472,36 @@ def estimate_column_loads(
         for c in s["cols"]:
             area_overrides[c["id"]] = area_m2
     return area_overrides, floor_overrides
+
+
+# ---------------------------------------------------------------------------
+# Load-zone assignment by elevation (roof vs floor)
+# ---------------------------------------------------------------------------
+
+# A beam/column top within this of the highest beam belongs to the roof level.
+ROOF_LEVEL_TOL_MM = 500.0
+
+
+def assign_zones(members, roof_tol_mm: float = ROOF_LEVEL_TOL_MM) -> dict[str, str]:
+    """member_id -> 'roof' | 'floor', auto-assigned from elevation.
+
+    The top band of beams (within ``roof_tol_mm`` of the highest beam mid-height)
+    is the roof; all lower beams are floor. A column is 'roof' when its top reaches
+    that band (it carries one roof level), else 'floor'. Members without coordinates
+    are omitted, so the caller's default 'floor' zone applies to them.
+    """
+    beam_mid_z = {
+        m.id: (m.start_xyz[2] + m.end_xyz[2]) / 2.0
+        for m in members
+        if m.role == "beam" and m.start_xyz and m.end_xyz
+    }
+    out: dict[str, str] = {}
+    top = max(beam_mid_z.values()) if beam_mid_z else None
+    if top is not None:
+        for mid, z in beam_mid_z.items():
+            out[mid] = "roof" if z >= top - roof_tol_mm else "floor"
+        for m in members:
+            if m.role == "column" and m.start_xyz and m.end_xyz:
+                top_z = max(m.start_xyz[2], m.end_xyz[2])
+                out[m.id] = "roof" if top_z >= top - roof_tol_mm else "floor"
+    return out
