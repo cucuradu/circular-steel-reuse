@@ -7,6 +7,8 @@ here skips, honouring the project rule that tests must never *require* SAP2000
 the trial machine to confirm the two solvers agree on the validated canonical frame.
 """
 
+import os
+
 import pytest
 
 from steelreuse.benchmark.sap2000_bench import canonical_two_bay_frame, member_force_summary
@@ -21,6 +23,12 @@ _ABS_FLOOR = 1_000.0    # ignore components below this (N or N·mm) — numerica
 
 
 def _require_sap2000():
+    # Opt-in only: probing availability means *starting* SAP2000, which on a machine that has it
+    # launches the GUI/license check (splash pop-ups; leaked instances pile up against the trial's
+    # 3-instance cap → status 426). A plain ``pytest`` run must never do that, so parity is gated
+    # behind an explicit env flag. Set ``STEELREUSE_SAP2000_PARITY=1`` to run it on the trial machine.
+    if os.environ.get("STEELREUSE_SAP2000_PARITY") != "1":
+        pytest.skip("SAP2000 parity is opt-in: set STEELREUSE_SAP2000_PARITY=1 to run (starts SAP2000)")
     pytest.importorskip("Pynite")   # the PyNite reference itself needs the [fea] extra
     try:
         with sap2000_session():
