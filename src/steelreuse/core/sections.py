@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import csv
 import difflib
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,11 @@ _DATA = Path(__file__).resolve().parent.parent / "data" / "sections"
 DEFAULT_CATALOG = _DATA / "eu_sections.csv"        # European IPE/HE (metric source units)
 DEFAULT_US_CATALOG = _DATA / "us_sections.csv"     # US AISC W-shapes (imperial source units)
 DEFAULT_US_HSS_CATALOG = _DATA / "us_hss.csv"      # US AISC rect/square HSS (imperial source units)
+DEFAULT_UK_CATALOG = _DATA / "uk_sections.csv"     # UK UB/UC (BS EN 10365, metric source units)
+DEFAULT_US_ROUND_CATALOG = _DATA / "us_round.csv"  # US AISC round HSS + Pipe (imperial source units)
+DEFAULT_EU_CHS_CATALOG = _DATA / "eu_chs.csv"      # EN 10210 hot-finished CHS (metric source units)
+DEFAULT_CHANNELS_CATALOG = _DATA / "channels.csv"  # EU UPN channels (metric source units)
+DEFAULT_ANGLES_CATALOG = _DATA / "angles.csv"      # EN 10056 equal-leg angles (metric source units)
 
 # Nominal yield strength f_y (N/mm^2) by grade.
 #   * EN 1993-1-1 Table 3.1 (t <= 40 mm) for European grades;
@@ -103,6 +109,15 @@ class SectionProps:
     iz: float
     standard: str = "EU"   # "EU" (IPE/HE...) or "US" (AISC W...) — used to keep the new-build baseline
                            # within the slot's own design standard (see match.baseline_new_mass_kg)
+    i_min: float | None = None  # principal minor radius of gyration (mm). Only mono/asymmetric
+                                # families (angles) need a real value (principal v-axis ≠ geometric z);
+                                # everything doubly/singly-symmetric falls back to min(iy, iz).
+
+    def __post_init__(self) -> None:
+        # Fill the principal minor radius of gyration for symmetric families, where it equals the
+        # smaller geometric axis. Frozen dataclass -> set via object.__setattr__.
+        if self.i_min is None:
+            object.__setattr__(self, "i_min", min(self.iy, self.iz))
 
     @property
     def is_hollow(self) -> bool:
@@ -110,24 +125,38 @@ class SectionProps:
         return self.shape.upper() in ("HSS", "RHS", "SHS", "CHS")
 
     @property
+    def is_round(self) -> bool:
+        """True for round hollow (CHS/pipe): axisymmetric, no LTB, D/t classification."""
+        return self.shape.upper() == "CHS"
+
+    @property
     def Av_z(self) -> float:
         """Shear area A_v for load along the depth, EN 1993-1-1 cl. 6.2.6(3) (mm^2).
 
         Rolled I/H: eq. for rolled sections (web + fillet zone). Rect/square hollow of uniform
-        thickness: ``A·h/(b+h)`` (the two webs' share of the area).
+        thickness: ``A·h/(b+h)`` (the two webs' share). Round hollow (CHS): ``2A/π``.
         """
+        if self.is_round:
+            return 2.0 * self.A / math.pi
         if self.is_hollow:
             return self.A * self.h / (self.b + self.h)
         return max(self.A - 2 * self.b * self.tf + (self.tw + 2 * self.r) * self.tf,
                    1.0 * (self.h - 2 * self.tf) * self.tw)
 
 
-def load_catalog(path: str | Path = DEFAULT_CATALOG) -> dict[str, SectionProps]:
-    """Read the catalog CSV, converting cm-based columns into internal mm units."""
+def load_catalog(path: str | Path = DEFAULT_CATALOG, standard: str = "EU") -> dict[str, SectionProps]:
+    """Read a metric catalog CSV (mm / cm² / cm³ / cm⁴ / kg/m), converting to internal mm units.
+
+    Used for both the European IPE/HE catalog (``standard="EU"``) and the UK UB/UC catalog
+    (``standard="GB"``); they share the same column schema, differing only in the ``standard`` tag
+    that keeps the avoided-new baseline within a slot's own market (see ``match.baseline_new_mass_kg``).
+    """
     out: dict[str, SectionProps] = {}
     with Path(path).open(newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             name = row["name"].strip().upper()
+            i_min_cm = row.get("i_min_cm")  # angles carry a real principal i_v; others omit it
+            i_min = float(i_min_cm) * 10 if i_min_cm not in (None, "") else None
             out[name] = SectionProps(
                 name=name,
                 shape=row["shape"].strip(),
@@ -146,7 +175,8 @@ def load_catalog(path: str | Path = DEFAULT_CATALOG) -> dict[str, SectionProps]:
                 Wel_z=float(row["Wel_z_cm3"]) * 1e3,
                 Wpl_z=float(row["Wpl_z_cm3"]) * 1e3,
                 iz=float(row["iz_cm"]) * 10,
-                standard="EU",
+                standard=standard,
+                i_min=i_min,
             )
     return out
 
@@ -233,21 +263,78 @@ def load_catalog_hss(path: str | Path = DEFAULT_US_HSS_CATALOG) -> dict[str, Sec
     return out
 
 
+def load_catalog_round(
+    path: str | Path, metric: bool = False, standard: str | None = None
+) -> dict[str, SectionProps]:
+    """Read a round hollow (CHS / pipe) catalog CSV -> internal mm units.
+
+    Round sections are axisymmetric, so a single outer diameter ``OD`` and wall ``t`` describe them:
+    ``h = b = OD``, ``tw = tf = t``, ``r = 0``, and the major/minor properties are equal
+    (``Iy = Iz``, etc.). ``i_min`` is the (single) radius of gyration.
+
+    Two source schemas, selected by ``metric``:
+      * imperial (``metric=False``, AISC v15 Pipe / round HSS): columns ``OD_in, tdes_in, A_in2,
+        mass_lbft, I_in4, S_in3, Z_in3, r_in`` — converted on load; ``standard`` defaults to ``US``;
+      * metric (``metric=True``, EN 10210 CHS): columns ``OD_mm, t_mm, A_cm2, mass_kgm, I_cm4,
+        Wel_cm3, Wpl_cm3, i_cm`` — ``standard`` defaults to ``EU``.
+    """
+    std = standard or ("EU" if metric else "US")
+    out: dict[str, SectionProps] = {}
+    with Path(path).open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            name = row["name"].strip().upper()
+            if metric:
+                D = float(row["OD_mm"])
+                t = float(row["t_mm"])
+                A = float(row["A_cm2"]) * 1e2
+                mass = float(row["mass_kgm"])
+                I = float(row["I_cm4"]) * 1e4          # noqa: E741
+                Wel = float(row["Wel_cm3"]) * 1e3
+                Wpl = float(row["Wpl_cm3"]) * 1e3
+                i = float(row["i_cm"]) * 10
+            else:
+                D = float(row["OD_in"]) * _IN_MM
+                t = float(row["tdes_in"]) * _IN_MM
+                A = float(row["A_in2"]) * _IN2_MM2
+                mass = float(row["mass_lbft"]) * _LBFT_KGM
+                I = float(row["I_in4"]) * _IN4_MM4      # noqa: E741
+                Wel = float(row["S_in3"]) * _IN3_MM3
+                Wpl = float(row["Z_in3"]) * _IN3_MM3
+                i = float(row["r_in"]) * _IN_MM
+            out[name] = SectionProps(
+                name=name, shape="CHS", h=D, b=D, tw=t, tf=t, r=0.0, A=A, mass_kgm=mass,
+                Iy=I, Wel_y=Wel, Wpl_y=Wpl, iy=i, Iz=I, Wel_z=Wel, Wpl_z=Wpl, iz=i,
+                standard=std, i_min=i,
+            )
+    return out
+
+
 def load_default_catalog(
     eu_path: str | Path = DEFAULT_CATALOG,
     us_path: str | Path = DEFAULT_US_CATALOG,
     us_hss_path: str | Path = DEFAULT_US_HSS_CATALOG,
+    uk_path: str | Path = DEFAULT_UK_CATALOG,
 ) -> dict[str, SectionProps]:
-    """Combined catalog: European IPE/HE + US AISC W-shapes + US HSS (disjoint names, safe to merge).
+    """Combined catalog: European IPE/HE + US AISC W-shapes + US HSS + UK UB/UC (disjoint names).
 
-    This is what the CLI/pipeline use by default so a single run can read either a metric/EU model or
-    an imperial/US model. Tests that need a fixed standard still call :func:`load_catalog` directly.
+    This is what the CLI/pipeline use by default so a single run can read a metric/EU, imperial/US or
+    UK model. Tests that need a fixed standard still call :func:`load_catalog` directly.
     """
     catalog = load_catalog(eu_path)
     if Path(us_path).exists():
         catalog.update(load_catalog_imperial(us_path))
     if Path(us_hss_path).exists():
         catalog.update(load_catalog_hss(us_hss_path))
+    if Path(uk_path).exists():
+        catalog.update(load_catalog(uk_path, standard="GB"))
+    if Path(DEFAULT_US_ROUND_CATALOG).exists():
+        catalog.update(load_catalog_round(DEFAULT_US_ROUND_CATALOG, metric=False))
+    if Path(DEFAULT_EU_CHS_CATALOG).exists():
+        catalog.update(load_catalog_round(DEFAULT_EU_CHS_CATALOG, metric=True))
+    if Path(DEFAULT_CHANNELS_CATALOG).exists():
+        catalog.update(load_catalog(DEFAULT_CHANNELS_CATALOG, standard="EU"))
+    if Path(DEFAULT_ANGLES_CATALOG).exists():
+        catalog.update(load_catalog(DEFAULT_ANGLES_CATALOG, standard="EU"))
     return catalog
 
 
@@ -300,12 +387,52 @@ _PROFILE = re.compile(r"^([A-Z]+)0*(\d+)$")
 # the designation token (letters + size, joined by 'x'); the family words around it carry no size and
 # never match. Order matters: multi-letter prefixes (HSS/WT/MC/...) are tried before single letters.
 _AISC_DESIG = re.compile(
-    r"HSS\d+(?:\.\d+)?X\d+(?:\.\d+)?X[\d./]+"          # tube: HSS6X6X5/8
+    r"HSS\d+(?:\.\d+)?X\d+(?:\.\d+)?X[\d./]+"          # rect tube: HSS6X6X5/8 (3-token, tried first)
+    r"|HSS\d+(?:\.\d+)?X\d+(?:\.\d+)?"                  # round HSS: HSS6.625X0.280 (2-token, one X)
     r"|(?:WT|MT|ST|MC|HP)\d+(?:\.\d+)?X[\d.]+"          # tees, misc. channel, bearing pile
     r"|L\d+(?:\.\d+)?X\d+(?:\.\d+)?X[\d./]+"            # angle: L4X4X1/4
     r"|PIPE\d+(?:STD|XS|XXS|X[\d.]+)?"                  # pipe: PIPE4STD
     r"|[CWMS]\d+(?:\.\d+)?X[\d.]+",                      # I-shapes & channels: W18X55, C8X11.5
 )
+
+
+# EN/UK round hollow (CHS) designations: "CHS168.3X5", "CHS 168.3x6.3", "168.3X6.3 CHS". A leading
+# ``CHS`` token (word-boundary before) plus an ``OD x t`` pair canonicalises to ``CHS<OD>X<t>``.
+_CHS_TOKEN = re.compile(r"\bCHS")
+_CHS_PAIR = re.compile(r"(\d+(?:\.\d+)?)\s*X\s*(\d+(?:\.\d+)?)")
+
+
+def _chs_designation(raw_upper: str) -> str | None:
+    """Canonical round-hollow designation (``CHS168.3X6.3``) from a raw upper-cased name, or ``None``.
+
+    Requires both a ``CHS`` token and a single ``d x d`` size pair (outer diameter × wall); decimals
+    are preserved verbatim so ``168.3`` stays ``168.3``.
+    """
+    if not _CHS_TOKEN.search(raw_upper):
+        return None
+    m = _CHS_PAIR.search(raw_upper)
+    return f"CHS{m.group(1)}X{m.group(2)}" if m else None
+
+
+# UK UB/UC designations (BS EN 10365), canonical form "UC305X305X97". Real models write the prefix
+# many ways: "UKC 305x305x97", "305x305x137 UC", "UB 457x191x74", and the UKB/UKC variants. The B/C
+# token must lead at a word boundary (so "TUBE 100x100x5" is *not* read as "UB100x100x5"), and this is
+# tried before AISC so the trailing 'C' in "UKC..." can't be mis-read as an AISC channel.
+_UK_TOKEN = re.compile(r"\bUK?([BC])")
+_UK_TRIPLE = re.compile(r"(\d+)\s*X\s*(\d+)\s*X\s*(\d+)")
+
+
+def _uk_designation(raw_upper: str) -> str | None:
+    """Canonical UK designation (``UC305X305X97``) from a raw upper-cased name, or ``None``.
+
+    Requires both a ``UB``/``UC``/``UKB``/``UKC`` token *and* a ``d x d x d`` size triple; the prefix
+    is canonicalised to ``UB``/``UC`` and the size is emitted with an ``X`` separator.
+    """
+    tok = _UK_TOKEN.search(raw_upper)
+    tri = _UK_TRIPLE.search(raw_upper)
+    if tok and tri:
+        return f"U{tok.group(1)}{int(tri.group(1))}X{int(tri.group(2))}X{int(tri.group(3))}"
+    return None
 
 
 def _aisc_designation(raw_upper: str) -> str | None:
@@ -325,6 +452,12 @@ def normalize_name(raw: str) -> str:
     (upper-case, 'X' separator); otherwise the European IPE/HE normalization applies.
     """
     upper = (raw or "").upper().replace("×", "X")  # normalize the unicode multiplication sign
+    uk = _uk_designation(upper)
+    if uk:
+        return uk
+    chs = _chs_designation(upper)
+    if chs:
+        return chs
     aisc = _aisc_designation(upper)
     if aisc:
         return aisc

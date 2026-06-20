@@ -257,15 +257,32 @@ def _slot_standard(slot: DemandSlot, catalog: dict[str, SectionProps]) -> str | 
     return None
 
 
-def _slot_wants_hollow(slot: DemandSlot, catalog: dict[str, SectionProps]) -> bool:
-    """Whether the slot's new-build baseline should be a hollow section.
+def _shape_family(sec: SectionProps) -> str:
+    """Coarse shape family for the new-build baseline: 'open' (I/H), 'hollow' (any tube), 'channel',
+    or 'angle'. You would replace a design section with new steel of the *same typology* — never an
+    angle for an I-column or a tube for a channel — so the baseline search is confined to this family.
+    I and H are one family (IPE/HE/W interchangeable); all hollow (rect + round) group together as
+    before, so existing tube models are unaffected by the newer channel/angle catalogues.
+    """
+    if sec.is_hollow:
+        return "hollow"
+    s = sec.shape.upper()
+    if s == "C":
+        return "channel"
+    if s == "L":
+        return "angle"
+    return "open"   # I, H, and any unrecognised open shape
 
-    Only when the design explicitly specifies one: the baseline is "the new member you would otherwise
-    buy", and that is an open I/H section unless the design says tube. Keeps results for all existing
-    (open-section) models unchanged by the presence of HSS rows in the catalog.
+
+def _slot_shape_family(slot: DemandSlot, catalog: dict[str, SectionProps]) -> str:
+    """Shape family the slot's new-build baseline must stay within (see :func:`_shape_family`).
+
+    Taken from the demand's mapped design section; defaults to 'open' (I/H) when it can't be
+    determined, so existing open-section models are unchanged by the presence of channel/angle/tube
+    rows in the catalogue.
     """
     sec = catalog.get(slot.design_section) if slot.design_section else None
-    return bool(sec is not None and sec.is_hollow)
+    return _shape_family(sec) if sec is not None else "open"
 
 
 def baseline_new_mass_kg(
@@ -302,12 +319,12 @@ def lightest_adequate_section(
         return None
     grade = slot.grade or new_build_grade
     target_std = _slot_standard(slot, catalog)
-    want_hollow = _slot_wants_hollow(slot, catalog)
+    want_family = _slot_shape_family(slot, catalog)
     best: SectionProps | None = None
     for sec in catalog.values():
         if target_std is not None and sec.standard != target_std:
             continue
-        if sec.is_hollow != want_hollow:
+        if _shape_family(sec) != want_family:
             continue
         if _passes_all(sec, grade, slot) and (best is None or sec.mass_kgm < best.mass_kgm):
             best = sec

@@ -9,9 +9,11 @@ from pathlib import Path
 import pytest
 
 from steelreuse.core.sections import (
+    SectionProps,
     default_grade_for_section,
     load_catalog,
     load_catalog_imperial,
+    load_catalog_round,
     load_default_catalog,
     map_section,
     normalize_name,
@@ -56,6 +58,27 @@ def test_catalog_loads_and_converts_units(catalog):
 )
 def test_normalize_name(raw, expected):
     assert normalize_name(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("UC254x254x73", "UC254X254X73"),         # already canonical
+        ("UKC 305x305x97", "UC305X305X97"),       # UKC prefix -> UC
+        ("305x305x137 UC", "UC305X305X137"),      # trailing designation
+        ("UB 457x191x74", "UB457X191X74"),        # spaced prefix
+        ("UKB 457x152x52", "UB457X152X52"),       # UKB prefix -> UB
+        ("UC 356x406x1299", "UC356X406X1299"),    # leading-zero-free, large mass
+    ],
+)
+def test_normalize_name_uk(raw, expected):
+    assert normalize_name(raw) == expected
+
+
+def test_uk_does_not_hijack_hss_or_eu():
+    # "TUBE" contains "UB" but not at a word boundary; HSS triples have no U[BC] token.
+    assert normalize_name("HSS6x6x5/8") == "HSS6X6X5/8"
+    assert normalize_name("HEB300") == "HEB300"
 
 
 # --- mapping ---------------------------------------------------------------
@@ -237,7 +260,7 @@ def test_schema_roundtrip(tmp_path):
 # --- catalog data integrity ------------------------------------------------
 
 def test_catalog_property_consistency():
-    """Every catalog row (EU + the 283-shape US import) must obey the physical relations between its
+    """Every catalog row (EU IPE/HE + 283-shape US + UK UB/UC) must obey the physical relations between its
     properties, so a transcription slip (cm vs mm, an Iy/Wpl swap, a strong/weak-axis mix-up) fails
     loudly instead of silently corrupting a capacity check. This also guards any future catalog
     expansion: add rows and this recomputes the derived quantities from the primaries.
@@ -251,16 +274,109 @@ def test_catalog_property_consistency():
     ``tdes = 0.93·tnom`` (A500 ERW), so for tubes the expected mass is ``0.785·A/0.93``.
     """
     cat = load_default_catalog()
-    assert len(cat) > 250                                   # EU + US merged
+    assert len(cat) > 250                                   # EU + US + UK merged
     for s in cat.values():
+        shp = s.shape.upper()
         A, Iy, Iz = s.A / 1e2, s.Iy / 1e4, s.Iz / 1e4       # -> cm^2, cm^4
         Wely, Welz = s.Wel_y / 1e3, s.Wel_z / 1e3           # -> cm^3
         Wply, Wplz = s.Wpl_y / 1e3, s.Wpl_z / 1e3
         h, b, iy, iz = s.h / 10, s.b / 10, s.iy / 10, s.iz / 10  # -> cm
-        mass_expected = 0.785 * A / (0.93 if s.is_hollow else 1.0)
+        # ERW nominal-wall weight on design-wall area applies to US *rectangular* HSS only; round
+        # hollow (CHS/Pipe) and every EN/GB section tabulate mass on the same wall -> 0.785*A.
+        erw = s.is_hollow and not s.is_round and s.standard == "US"
+        mass_expected = 0.785 * A / (0.93 if erw else 1.0)
         assert s.mass_kgm == pytest.approx(mass_expected, rel=0.05), f"{s.name}: mass vs area"
-        assert Wely == pytest.approx(Iy / (h / 2), rel=0.03), f"{s.name}: Wel_y vs Iy/(h/2)"
+        # The Wel = I/(half-depth) relation assumes the centroid sits at mid-depth. True about both
+        # axes for doubly-symmetric sections; about the major axis only for channels (symmetric there);
+        # never for angles (centroid offset on both legs). Radius of gyration holds for all.
+        if shp != "L":
+            assert Wely == pytest.approx(Iy / (h / 2), rel=0.03), f"{s.name}: Wel_y vs Iy/(h/2)"
+        if shp not in ("C", "L"):
+            assert Welz == pytest.approx(Iz / (b / 2), rel=0.03), f"{s.name}: Wel_z vs Iz/(b/2)"
         assert iy == pytest.approx(math.sqrt(Iy / A), rel=0.03), f"{s.name}: iy vs sqrt(Iy/A)"
-        assert Welz == pytest.approx(Iz / (b / 2), rel=0.03), f"{s.name}: Wel_z vs Iz/(b/2)"
         assert iz == pytest.approx(math.sqrt(Iz / A), rel=0.03), f"{s.name}: iz vs sqrt(Iz/A)"
         assert Wply >= Wely and Wplz >= Welz, f"{s.name}: Wpl < Wel"
+
+
+# --- round hollow (CHS) + i_min --------------------------------------------
+
+def _chs(name="CHS200X5", D=200.0, t=5.0):
+    """A round-section SectionProps built like the round loader does (D->h=b, t->tw=tf)."""
+    import math as _m
+    r_out, r_in = D / 2.0, D / 2.0 - t
+    A = _m.pi * (r_out**2 - r_in**2)
+    I = _m.pi / 4.0 * (r_out**4 - r_in**4)
+    Wel = I / r_out
+    Wpl = 4.0 / 3.0 * (r_out**3 - r_in**3)
+    i = _m.sqrt(I / A)
+    return SectionProps(
+        name=name, shape="CHS", h=D, b=D, tw=t, tf=t, r=0.0, A=A,
+        mass_kgm=A * 7.85e-3, Iy=I, Wel_y=Wel, Wpl_y=Wpl, iy=i,
+        Iz=I, Wel_z=Wel, Wpl_z=Wpl, iz=i, standard="EU",
+    )
+
+
+def test_i_min_defaults_to_min_geometric_axis():
+    # I/H section: principal == geometric, so i_min falls back to min(iy, iz) when not supplied.
+    ipe = load_catalog()["IPE300"]
+    assert ipe.i_min == pytest.approx(min(ipe.iy, ipe.iz))
+
+
+def test_i_min_uses_supplied_value_for_angles():
+    # Angles carry a real principal-axis i_min (i_v) below their geometric iz.
+    s = SectionProps(
+        name="L100X100X10", shape="L", h=100.0, b=100.0, tw=10.0, tf=10.0, r=12.0,
+        A=1920.0, mass_kgm=15.0, Iy=1.77e6, Wel_y=24700.0, Wpl_y=44000.0, iy=30.4,
+        Iz=1.77e6, Wel_z=24700.0, Wpl_z=44000.0, iz=30.4, standard="EU", i_min=19.4,
+    )
+    assert s.i_min == pytest.approx(19.4)
+    assert s.i_min < s.iz
+
+
+def test_chs_shear_area_is_2A_over_pi():
+    # EN 1993-1-1 6.2.6(3): round hollow A_v = 2A/pi.
+    s = _chs()
+    assert s.is_hollow is True
+    assert s.Av_z == pytest.approx(2.0 * s.A / math.pi)
+
+
+def test_round_loader_converts_and_sets_symmetric_axes(tmp_path):
+    # Imperial round CSV (OD/wall in inches) -> internal mm, with Iy==Iz and i_min==r_gyr.
+    csv_text = (
+        "name,shape,OD_in,tdes_in,A_in2,mass_lbft,I_in4,S_in3,Z_in3,r_in\n"
+        "HSS6.000X0.250,CHS,6.0,0.233,4.22,14.35,17.6,5.87,7.79,2.04\n"
+    )
+    p = tmp_path / "round.csv"
+    p.write_text(csv_text, encoding="utf-8")
+    cat = load_catalog_round(p, metric=False)
+    s = cat["HSS6.000X0.250"]
+    assert s.shape == "CHS" and s.is_hollow
+    assert s.h == pytest.approx(152.4) and s.b == pytest.approx(152.4)   # 6 in -> mm, h=b=OD
+    assert s.tw == pytest.approx(s.tf) and s.r == 0.0
+    assert s.Iy == s.Iz and s.Wel_y == s.Wel_z                           # axisymmetric
+    assert s.A == pytest.approx(4.22 * 645.16, rel=1e-4)
+    assert s.i_min == pytest.approx(2.04 * 25.4, rel=1e-4)
+    assert s.Av_z == pytest.approx(2.0 * s.A / math.pi)
+
+
+# --- new-family name mapping against the default (merged) catalog -----------
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("Round HSS HSS6.625X0.280", "HSS6.625X0.280"),   # 2-token round HSS (one X)
+        ("HSS6.625x0.280", "HSS6.625X0.280"),
+        ("PIPE6STD", "PIPE6STD"),                          # AISC pipe
+        ("Pipe-Column PIPE4XS", "PIPE4XS"),
+        ("CHS168.3X6.3", "CHS168.3X6.3"),                 # canonical EN CHS
+        ("CHS 168.3x6.3", "CHS168.3X6.3"),                 # spaced + lowercase x
+        ("168.3X6.3 CHS", "CHS168.3X6.3"),                 # trailing CHS token
+        ("UPN200", "UPN200"),                              # channel via generic profile path
+        ("UPN 200", "UPN200"),
+        ("L100x100x10", "L100X100X10"),                    # angle (AISC L pattern)
+    ],
+)
+def test_map_new_families(raw, expected):
+    cat = load_default_catalog()
+    r = map_section(raw, cat)
+    assert r.canonical == expected, f"{raw} -> {r.canonical} ({r.method})"

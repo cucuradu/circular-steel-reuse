@@ -84,6 +84,54 @@ def tube_class(sec: SectionProps, eps: float, mode: str) -> int:
     return max(flange, web)
 
 
+def chs_class(sec: SectionProps, eps: float) -> int:
+    """Class of a round hollow section (CHS/pipe) from ``D/t``, EN 1993-1-1 Table 5.2 sheet 3.
+
+    Tubular limits are on ``d/t`` against ``50 eps^2 / 70 eps^2 / 90 eps^2`` and apply to bending
+    and/or compression alike (axisymmetric), so no ``mode`` is needed.
+    """
+    dt = sec.h / sec.tf                      # outer diameter / wall
+    e2 = eps * eps
+    for cls, lim in zip((1, 2, 3), (50 * e2, 70 * e2, 90 * e2), strict=True):
+        if dt <= lim:
+            return cls
+    return 4
+
+
+def channel_class(sec: SectionProps, eps: float, mode: str) -> int:
+    """Class of a rolled channel (U/PFC/C): single-outstand flange + internal web (Table 5.2).
+
+    The channel flange is a one-sided outstand from the web (``c = b - tw - r``), unlike the I-section
+    flange whose outstand is measured each side of the web. The web is an internal part like the I web.
+    """
+    cf = max(sec.b - sec.tw - sec.r, 0.0)
+    ratio_f = cf / sec.tf
+    if ratio_f <= 9 * eps:
+        flange = 1
+    elif ratio_f <= 10 * eps:
+        flange = 2
+    elif ratio_f <= 14 * eps:
+        flange = 3
+    else:
+        flange = 4
+    web = _internal_part_class(max(sec.h - 2 * sec.tf - 2 * sec.r, 0.0) / sec.tw, eps, mode)
+    return max(flange, web)
+
+
+def angle_class(sec: SectionProps, eps: float) -> int:
+    """Class of an equal/unequal-leg angle, EN 1993-1-1 Table 5.2 sheet 3.
+
+    Angles have no plastic (class 1/2) range for the leg: a leg is **class 3** when both
+    ``h/t <= 15 eps`` and ``(b + h)/(2t) <= 11.5 eps``, otherwise **class 4** (slender). The tool
+    only checks angles in axial action; bending is flagged REVIEW (principal-axis biaxial),
+    so this class drives the compression-resistance/effective-area path only.
+    """
+    t = sec.tf  # uniform leg thickness
+    if sec.h / t <= 15 * eps and (sec.b + sec.h) / (2 * t) <= 11.5 * eps:
+        return 3
+    return 4
+
+
 def classify(sec: SectionProps, fy: float, N_Ed: float = 0.0, My_Ed: float = 0.0) -> int:
     """Overall section class = worst of flange and web.
 
@@ -97,8 +145,15 @@ def classify(sec: SectionProps, fy: float, N_Ed: float = 0.0, My_Ed: float = 0.0
         mode = "compression"   # combined N+M -> conservative
     else:
         mode = "bending"
+    shape = sec.shape.upper()
+    if sec.is_round:
+        return chs_class(sec, eps)
     if sec.is_hollow:
         return tube_class(sec, eps, mode)
+    if shape == "C":
+        return channel_class(sec, eps, mode)
+    if shape == "L":
+        return angle_class(sec, eps)
     return max(flange_class(sec, eps), web_class(sec, eps, mode))
 
 
@@ -204,11 +259,16 @@ def _buckling_alpha(sec: SectionProps, axis: str) -> float:
       * h/b <= 1.2, t_f <= 100 mm     -> y: b, z: c.
     """
     a = {"a": 0.21, "b": 0.34, "c": 0.49, "d": 0.76}
+    shape = sec.shape.upper()
     if sec.is_hollow:
         # Cold-formed hollow sections -> curve c, both axes (Table 6.2). AISC HSS (A500) are
         # cold-formed; hot-finished tube (curve a) would need a fabrication flag we don't have,
         # so the conservative curve is used for all hollow stock.
         return a["c"]
+    if shape == "L":
+        return a["b"]   # angles -> curve b (Table 6.2)
+    if shape == "C":
+        return a["c"]   # channels ("other sections") -> curve c, both axes (Table 6.2)
     if sec.tf > 100.0:
         curve = "d"
     elif sec.h / sec.b > 1.2:
@@ -242,6 +302,20 @@ def _flexural_params(sec: SectionProps, fy: float, L: float, k: float, axis: str
 def N_b_Rd(sec: SectionProps, fy: float, L: float, k: float, axis: str) -> tuple[float, float]:
     """Flexural-buckling resistance about ``axis`` ('y'|'z'), eq. (6.47). Returns (N_b_Rd, chi)."""
     _, chi = _flexural_params(sec, fy, L, k, axis)
+    return chi * sec.A * fy / GAMMA_M1, chi
+
+
+def N_b_Rd_minor(sec: SectionProps, fy: float, L: float, k: float) -> tuple[float, float]:
+    """Flexural buckling about the **principal minor (v) axis** via ``i_min``, eq. (6.47).
+
+    For angles the weak axis is rotated off the geometric axes, so the governing slenderness uses
+    the principal minimum radius of gyration ``i_min`` (``i_v``), not ``iy``/``iz``. Curve from
+    :func:`_buckling_alpha` (curve b for angles). Returns (N_b_Rd, chi).
+    """
+    Lcr = k * L
+    Ncr = math.pi**2 * E_STEEL * (sec.A * sec.i_min**2) / Lcr**2
+    lambda_bar = math.sqrt(sec.A * fy / Ncr)
+    chi = _chi(lambda_bar, _buckling_alpha(sec, "z"))
     return chi * sec.A * fy / GAMMA_M1, chi
 
 
@@ -384,23 +458,47 @@ def check_member(
     if section_class == 4:
         warnings.append("Class 4 (slender): effective-section design required; using W_el (approximate)")
 
+    # Angles are checked in axial action only: their bending response is biaxial about rotated
+    # principal axes (no doubly/singly-symmetric simplification holds), so any bending demand is
+    # flagged REVIEW rather than given a capacity number (see the bending blocks below).
+    is_angle = sec.shape.upper() == "L"
+    angle_bending = is_angle and (abs(demand.My_Ed) > 0 or abs(demand.Mz_Ed) > 0)
+    if angle_bending:
+        warnings.append(
+            "angle under bending: biaxial about rotated principal axes — not auto-checked; "
+            "status REVIEW (verify by hand / principal-axis analysis)"
+        )
+    if sec.shape.upper() == "C" and abs(demand.My_Ed) > 0:
+        warnings.append(
+            "channel: mono-symmetric — M_cr/LTB uses the doubly-symmetric I_t/I_w approximation "
+            "(shear-centre offset and load position not modelled); verify restraints"
+        )
+
     checks: list[CheckResult] = []
 
     # Axial
     if demand.N_Ed < 0:  # tension
         r = N_t_Rd(sec, fy)
         checks.append(CheckResult("tension", abs(demand.N_Ed) / r, {"N_Rd": r}))
-    elif demand.N_Ed > 0:  # compression -> governed by buckling (weaker of two axes)
-        nb_y, chi_y = N_b_Rd(sec, fy, demand.L, demand.ky, "y")
-        nb_z, chi_z = N_b_Rd(sec, fy, demand.L, demand.kz, "z")
-        nb = min(nb_y, nb_z)
-        checks.append(CheckResult(
-            "compression_buckling", demand.N_Ed / nb,
-            {"N_b_Rd": nb, "chi_y": chi_y, "chi_z": chi_z, "axis": "z" if nb_z < nb_y else "y"},
-        ))
+    elif demand.N_Ed > 0:  # compression -> governed by buckling (weakest axis)
+        if is_angle:
+            # Angle: governing buckling is about the principal minor (v) axis via i_min.
+            nb, chi_v = N_b_Rd_minor(sec, fy, demand.L, max(demand.ky, demand.kz))
+            checks.append(CheckResult(
+                "compression_buckling", demand.N_Ed / nb,
+                {"N_b_Rd": nb, "chi_v": chi_v, "axis": "v (principal min, i_min)"},
+            ))
+        else:
+            nb_y, chi_y = N_b_Rd(sec, fy, demand.L, demand.ky, "y")
+            nb_z, chi_z = N_b_Rd(sec, fy, demand.L, demand.kz, "z")
+            nb = min(nb_y, nb_z)
+            checks.append(CheckResult(
+                "compression_buckling", demand.N_Ed / nb,
+                {"N_b_Rd": nb, "chi_y": chi_y, "chi_z": chi_z, "axis": "z" if nb_z < nb_y else "y"},
+            ))
 
     # Bending (major axis), with LTB when the compression flange is unrestrained
-    if abs(demand.My_Ed) > 0:
+    if abs(demand.My_Ed) > 0 and not is_angle:
         mc = M_c_Rd(sec, fy, section_class)
         if sec.is_hollow:
             # Closed sections are torsionally stiff: lambda_bar_LT stays far below the 0.4 plateau
@@ -432,13 +530,13 @@ def check_member(
         checks.append(CheckResult("bending_y", abs(demand.My_Ed) / mrd, detail))
 
     # Bending (minor axis) — no LTB about z; plastic/elastic modulus per class
-    if abs(demand.Mz_Ed) > 0:
+    if abs(demand.Mz_Ed) > 0 and not is_angle:
         mz = M_z_Rd(sec, fy, section_class)
         checks.append(CheckResult("bending_z", abs(demand.Mz_Ed) / mz, {"M_z_Rd": mz}))
 
     # Cross-section biaxial bending without axial: conservative linear sum, cl. 6.2.1(7)
     # (the full 6.2.9 alpha/beta exponents would allow more; linear is always on the safe side)
-    if demand.N_Ed <= 0 and abs(demand.My_Ed) > 0 and abs(demand.Mz_Ed) > 0:
+    if demand.N_Ed <= 0 and abs(demand.My_Ed) > 0 and abs(demand.Mz_Ed) > 0 and not is_angle:
         u = (abs(demand.My_Ed) / M_c_Rd(sec, fy, section_class)
              + abs(demand.Mz_Ed) / M_z_Rd(sec, fy, section_class))
         checks.append(CheckResult("biaxial_M", u, {"method": "linear cross-section sum, cl. 6.2.1(7)"}))
@@ -453,9 +551,13 @@ def check_member(
     # coincident here (conservative for a UDL span, where they occur at different points). Rolled
     # I/H use eq. (6.30) (modulus reduced by rho*A_w^2/(4 t_w)); hollow sections take the plainly
     # conservative (1 - rho) on the whole bending resistance.
-    if abs(demand.My_Ed) > 0 and abs(demand.Vz_Ed) > 0.5 * V_c_Rd(sec, fy):
+    if abs(demand.My_Ed) > 0 and not is_angle and abs(demand.Vz_Ed) > 0.5 * V_c_Rd(sec, fy):
         vrd = V_c_Rd(sec, fy)
-        rho = (2.0 * abs(demand.Vz_Ed) / vrd - 1.0) ** 2
+        # rho is the shear-yield reduction (1 - rho) on the bending resistance; it is physically
+        # bounded at 1.0 (a 100% reduction). Uncapped, V_Ed > V_pl,Rd gives rho > 1 -> a *negative*
+        # reduced resistance and a negative utilisation. Cap it; for V_Ed >= V_pl,Rd the shear_z check
+        # already reports utilisation >= 1 and governs.
+        rho = min((2.0 * abs(demand.Vz_Ed) / vrd - 1.0) ** 2, 1.0)
         mc = M_c_Rd(sec, fy, section_class)
         if sec.is_hollow:
             m_v = (1.0 - rho) * mc
@@ -463,21 +565,22 @@ def check_member(
             Wy = sec.Wpl_y if section_class <= 2 else sec.Wel_y
             Aw = (sec.h - 2.0 * sec.tf) * sec.tw
             m_v = min(mc, (Wy - rho * Aw**2 / (4.0 * sec.tw)) * fy / GAMMA_M0)
-        checks.append(CheckResult(
-            "bending_shear_MV", abs(demand.My_Ed) / m_v,
-            {"method": "cl. 6.2.8, eq. (6.30)", "rho": round(rho, 4), "M_y_V_Rd": m_v},
-        ))
-        warnings.append(
-            f"high shear (V_Ed > 0.5 V_pl,Rd): bending resistance reduced per cl. 6.2.8 "
-            f"(rho={rho:.2f})"
-        )
+        if m_v > 0.0:                       # m_v == 0 only in the degenerate V_Ed = V_pl,Rd case
+            checks.append(CheckResult(
+                "bending_shear_MV", abs(demand.My_Ed) / m_v,
+                {"method": "cl. 6.2.8, eq. (6.30)", "rho": round(rho, 4), "M_y_V_Rd": m_v},
+            ))
+            warnings.append(
+                f"high shear (V_Ed > 0.5 V_pl,Rd): bending resistance reduced per cl. 6.2.8 "
+                f"(rho={rho:.2f})"
+            )
 
     # Combined compression + bending: member buckling interaction, EN 1993-1-1 6.3.3 eq. (6.61)/(6.62)
     # with Annex B (Method 2) interaction factors. All C_m = 1.0 (uniform equivalent moment, the
     # Table B.3 upper bound -> conservative for any real moment shape). LTB-aware: chi_LT multiplies
     # M_y,Rk exactly as in eq. (6.61)/(6.62), so an unrestrained beam-column can never pass on a
     # moment that lateral-torsional buckling would govern.
-    if demand.N_Ed > 0 and (abs(demand.My_Ed) > 0 or abs(demand.Mz_Ed) > 0):
+    if demand.N_Ed > 0 and (abs(demand.My_Ed) > 0 or abs(demand.Mz_Ed) > 0) and not is_angle:
         lam_y, x_y = _flexural_params(sec, fy, demand.L, demand.ky, "y")
         lam_z, x_z = _flexural_params(sec, fy, demand.L, demand.kz, "z")
         N_Rk = sec.A * fy
@@ -518,8 +621,8 @@ def check_member(
 
     if util > 1.0:
         status = "FAIL"
-    elif section_class == 4:
-        status = "REVIEW"  # slender section needs effective-properties design
+    elif section_class == 4 or angle_bending:
+        status = "REVIEW"  # slender section / angle under bending needs hand verification
     else:
         status = "OK"
 

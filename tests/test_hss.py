@@ -50,8 +50,10 @@ def test_hss_catalog_loads_and_converts_units(hss):
 
 
 def test_hss_merged_into_default_catalog(catalog):
+    # 388 US rectangular/square HSS + 29 round CHS (15 US round HSS/Pipe + 14 EN 10210 CHS).
     n_hss = sum(1 for s in catalog.values() if s.is_hollow)
-    assert n_hss == 388
+    assert n_hss == 417
+    assert sum(1 for s in catalog.values() if s.is_round) == 29
     assert len(load_catalog_hss()) == 388
     # W-shapes and EU sections are untouched by the merge
     assert not catalog["IPE300"].is_hollow and not catalog["W14X30"].is_hollow

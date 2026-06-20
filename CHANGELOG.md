@@ -6,6 +6,71 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Section-family expansion — round hollow (CHS), channels, angles** (`core/sections.py`,
+  `core/ec3_checks.py`, `match/optimize.py`, `data/sections/`). Three new families ingest, classify,
+  and check end-to-end alongside the existing I/H + rectangular-hollow stock:
+  - **CHS (round HSS / pipe).** AISC v15 round HSS + Pipe (`us_round.csv`) and EN 10210 hot-finished
+    CHS (`eu_chs.csv`), loaded by `load_catalog_round`. EN 1993-1-1 `D/t` classification
+    (`chs_class`, Table 5.2 sheet 3), shear area `A_v = 2A/π` (6.2.6(3)), no LTB (axisymmetric),
+    conservative buckling curve c. Names map via a 2-token round-HSS pattern and a `CHS` token
+    detector (`HSS6.625X0.280`, `CHS168.3X6.3`, `168.3X6.3 CHS`).
+  - **Channels (UPN).** `channels.csv` with single-outstand-flange classification (`channel_class`);
+    LTB uses the doubly-symmetric `I_t/I_w` approximation, explicitly warned as mono-symmetric.
+  - **Angles (L), axial-only.** `angles.csv` carrying a real principal `i_min` (`i_v`). Compression
+    buckling about the principal minor axis (`N_b_Rd_minor`, curve b); **bending demand is flagged
+    `REVIEW`, never given a capacity number** (principal-axis biaxial response is not auto-checked).
+  - New `SectionProps.i_min` (principal minor radius of gyration; defaults to `min(iy, iz)`) and
+    `is_round`. The new-build baseline search is confined to the slot's **shape family**
+    (`_shape_family` in `match/optimize.py`: open I/H · hollow · channel · angle), so a channel or
+    angle can never become the avoided-new baseline for an I-section slot (existing I/H and tube
+    results are unchanged). Catalog consistency test made family-aware (centroid-offset `Wel`
+    relations apply only where valid; the ERW `/0.93` mass basis is US-rectangular-HSS only). Guarded
+    by `tests/test_sections.py`, `tests/test_ec3.py`, `tests/test_hss.py`. Tees, cold-formed Z/C,
+    K-series joists, and the EU small-size catalogue fill remain out of scope (see
+    FUTURE_IMPROVEMENTS).
+- **UK section name normalisation** (`core/sections.py` `normalize_name`): real UK Revit/IFC
+  designations now ingest end-to-end without manual overrides. `UKC 305x305x97`, `305x305x137 UC`,
+  `UB 457x191x74`, and the `UKB`/`UKC` prefixes canonicalise to the catalogue form (`UC305X305X97`,
+  resolving as `normalized`, confidence 1.0). UK detection runs before AISC so the trailing `C` in
+  `UKC…` is not mis-read as an AISC channel; the `UB`/`UC` token must lead at a word boundary so
+  `TUBE 100x100x5` is not read as `UB100x100x5`. Guarded by `tests/test_sections.py`
+  (`test_normalize_name_uk`, `test_uk_does_not_hijack_hss_or_eu`).
+- **Dashboard ingests IFC from any BIM tool.** The Streamlit app (`app.py`) now accepts an `.ifc`
+  upload (donor and/or demand) alongside extraction JSON: the file is run through the Revit-free IFC
+  extractor on upload (`extract_ifc` → schema JSON → pipeline), so Tekla / Advance Steel / ArchiCAD /
+  Bentley models can be matched without Revit or the CLI. Needs the `[bim]` extra (ifcopenshell); a
+  missing extra or unreadable model is reported in the UI rather than crashing. The IFC path resolves
+  member-axis coordinates (so the frame solve runs) and reads measured dimensions for I-shapes.
+- **Revit run history + Compare Runs panel** (`pyrevit_extension/.../lib/steelreuse_runs.py`,
+  `steelreuse_compare.py`, `CompareRuns.pushbutton`): every match run is auto-saved under a name
+  (its `results.json` copied into a history folder under a run id; reloadable / deletable). A new
+  **Compare Runs** window reads that history and sets scenarios side by side without re-running the
+  engine — an N-run **KPI table** (members reused / CO₂e saved / mass reused / distinct sections /
+  unfilled slots) plus, for exactly two runs, a **per-slot diff** of what changed. Pure view over the
+  headless result model. See OVERVIEW.md §10.2.1.
+- **Sensitivity & uncertainty study** (`steelreuse-sensitivity`, `src/steelreuse/sensitivity.py`): a
+  one-at-a-time **tornado** + optional **Monte-Carlo P5–P95 band** of net CO₂ saved over knockdown /
+  γ-factors / loads / end-of-life counterfactual. Re-runs `run_pipeline` and reads its result (no
+  arithmetic of its own, so the no-LLM-math rule holds). Headline finding: the end-of-life
+  counterfactual dominates the uncertainty. Direction-guarded by `tests/test_sensitivity.py`. See
+  METHODOLOGY §10.1.
+- **Independently published worked examples** (`tests/test_published_examples.py`): reproduces three
+  **JRC/ECCS** examples (Brussels 2014, "Design of Members") — HEB340 buckling, IPE400 `M_c,Rd`/
+  `V_pl,Rd` + LTB constants, HEB320 **6.3.3** (Annex B `k_yy`/`k_zy`) — external authority beyond the
+  project's own hand algebra. See VALIDATION.md §6.
+- **UK UB/UC catalogue** (`data/sections/uk_sections.csv`, `standard="GB"`): 153 sections from the
+  SCI/Tata Blue Book (EC3 UK NA / BS EN 10365), converted from the raw exports by
+  `scripts/convert_uk_bluebook.py`, every row validated by the property-consistency test. Catalogue is
+  now **864 rows** (40 EU + 283 US W + 388 US HSS + 153 UK). UB/UC reuse the doubly-symmetric I-section
+  code path, so the JRC validation covers their checks. See METHODOLOGY §3.
+- **Property-based / adversarial test suite** (`tests/test_properties_*.py`,
+  `docs/PROPERTY_TEST_FINDINGS.md`): fixed-seed `hypothesis` properties over the EC3 checker, the
+  matcher (independent re-verifier), the area-load model, frame topology, and schema robustness.
+  **Caught a real bug:** the cl. 6.2.8 shear–moment check returned a *negative* utilisation under shear
+  overload (`V_Ed > V_pl,Rd` left `ρ = (2V/V_pl − 1)²` uncapped) — fixed in `core/ec3_checks.py` by
+  capping `ρ ≤ 1.0`, with a focused regression in `tests/test_ec3.py`.
+
 ### Removed
 - **Repository hygiene for delivery.** Removed the local-only `maid/` dev-automation worker and
   `build_thesis_pdf.py` (with its release-workflow step and ruff exception) from the tracked tree —

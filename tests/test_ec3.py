@@ -17,10 +17,91 @@ from steelreuse.core.ec3_checks import (
     N_t_Rd,
     V_c_Rd,
     check_member,
+    chs_class,
     classify,
     epsilon,
 )
-from steelreuse.core.sections import FY_BY_GRADE, load_catalog
+from steelreuse.core.sections import FY_BY_GRADE, SectionProps, load_catalog
+
+
+def _round(name="CHS200X10", D=200.0, t=10.0):
+    r_out, r_in = D / 2.0, D / 2.0 - t
+    A = math.pi * (r_out**2 - r_in**2)
+    I = math.pi / 4.0 * (r_out**4 - r_in**4)
+    Wel = I / r_out
+    Wpl = 4.0 / 3.0 * (r_out**3 - r_in**3)
+    i = math.sqrt(I / A)
+    return SectionProps(name=name, shape="CHS", h=D, b=D, tw=t, tf=t, r=0.0, A=A,
+                        mass_kgm=A * 7.85e-3, Iy=I, Wel_y=Wel, Wpl_y=Wpl, iy=i,
+                        Iz=I, Wel_z=Wel, Wpl_z=Wpl, iz=i, standard="EU", i_min=i)
+
+
+def _angle(name="L100X100X10"):
+    # EN equal-leg angle 100x100x10: A=1920 mm^2, geometric iy=iz=30.4 mm, principal i_v=19.4 mm.
+    return SectionProps(name=name, shape="L", h=100.0, b=100.0, tw=10.0, tf=10.0, r=12.0,
+                        A=1920.0, mass_kgm=15.1, Iy=1.77e6, Wel_y=24700.0, Wpl_y=44000.0, iy=30.4,
+                        Iz=1.77e6, Wel_z=24700.0, Wpl_z=44000.0, iz=30.4, standard="EU", i_min=19.4)
+
+
+def _channel(name="UPN200"):
+    # EN UPN200: h=200, b=75, tw=8.5, tf=11.5, r=11.5, A=3220 mm^2.
+    return SectionProps(name=name, shape="C", h=200.0, b=75.0, tw=8.5, tf=11.5, r=11.5,
+                        A=3220.0, mass_kgm=25.3, Iy=1910e4, Wel_y=191e3, Wpl_y=228e3, iy=77.0,
+                        Iz=148e4, Wel_z=27e3, Wpl_z=51e3, iz=21.4, standard="EU")
+
+
+# --- CHS (round hollow) classification + checks ----------------------------
+
+@pytest.mark.parametrize(
+    "D,t,fy,expected",
+    [
+        (200.0, 10.0, 355.0, 1),   # D/t=20  < 50 eps^2 (=33.1) -> class 1
+        (200.0, 4.0, 355.0, 3),    # D/t=50: >70eps^2? 46.4<50<59.6 -> class 3
+        (200.0, 3.0, 355.0, 4),    # D/t=66.7 > 90 eps^2 (=59.6) -> class 4 (slender)
+    ],
+)
+def test_chs_classification_by_Dt(D, t, fy, expected):
+    sec = _round(D=D, t=t)
+    eps = epsilon(fy)
+    assert chs_class(sec, eps) == expected
+    # classify() must route a round section to the D/t rule, not the rectangular flat-width rule.
+    assert classify(sec, fy, N_Ed=1.0) == expected
+
+
+def test_chs_bending_has_no_ltb(cat):
+    sec = _round(D=200.0, t=10.0)
+    chk = check_member(sec, "S355", MemberDemand(My_Ed=50e6, L=6000.0))
+    bending = next(c for c in chk.checks if c.name == "bending_y")
+    assert bending.detail.get("chi_LT") == 1.0          # tube: LTB not a design case
+    assert bending.detail.get("hollow") is True
+
+
+# --- channel classification ------------------------------------------------
+
+def test_channel_classifies_via_outstand_flange(cat):
+    sec = _channel()
+    # UPN200 is a stocky class-1 section in bending; the flange is a single outstand (c = b - tw - r),
+    # not the I-section two-sided outstand.
+    assert classify(sec, 235.0, My_Ed=1e6) in (1, 2)
+
+
+# --- angles: axial only, bending -> REVIEW ---------------------------------
+
+def test_angle_compression_uses_principal_i_min():
+    sec = _angle()
+    chk = check_member(sec, "S235", MemberDemand(N_Ed=100e3, L=2000.0))
+    comp = next(c for c in chk.checks if c.name == "compression_buckling")
+    # Buckling must use the principal i_min (19.4), giving chi ~0.54; using geometric iz (30.4)
+    # would over-predict (chi ~0.78). Hand calc with i_min: chi ~ 0.536, N_b ~ 242 kN.
+    assert comp.detail["N_b_Rd"] == pytest.approx(242e3, rel=0.03)
+
+
+def test_angle_bending_is_review_not_a_number():
+    sec = _angle()
+    chk = check_member(sec, "S235", MemberDemand(My_Ed=20e6, L=2000.0))
+    assert chk.status == "REVIEW"
+    assert not any(c.name.startswith("bending") or c.name == "biaxial_M" for c in chk.checks)
+    assert any("angle" in w.lower() for w in chk.warnings)
 
 
 @pytest.fixture(scope="module")
@@ -302,3 +383,19 @@ def test_shear_moment_interaction_engages_above_half_vpl(cat):
     low = check_member(sec, "S275", MemberDemand(
         My_Ed=150e6, Vz_Ed=100e3, L=2000, compression_flange_restrained=True))
     assert not any(c.name == "bending_shear_MV" for c in low.checks)
+
+
+def test_shear_overload_does_not_make_mv_resistance_negative(cat):
+    # Regression (caught by tests/test_properties_ec3.py): cl. 6.2.8 rho = (2 V_Ed/V_pl,Rd - 1)^2 must be
+    # capped at 1.0. Uncapped, V_Ed > V_pl,Rd gave rho > 1 -> (1 - rho) < 0 -> a NEGATIVE reduced bending
+    # resistance and a negative utilisation. Above V_pl the shear check governs (utilisation >= 1).
+    from steelreuse.core.ec3_checks import V_c_Rd
+    sec = cat["IPE300"]
+    vpl = V_c_Rd(sec, 275.0)
+    res = check_member(sec, "S275", MemberDemand(
+        My_Ed=50e6, Vz_Ed=1.5 * vpl, L=6000, compression_flange_restrained=True))
+    assert all(c.utilization >= 0.0 for c in res.checks)   # no negative resistance anywhere
+    assert res.utilization >= 1.0                          # shear overload governs (the member fails)
+    mv = next((c for c in res.checks if c.name == "bending_shear_MV"), None)
+    if mv is not None:
+        assert mv.detail["rho"] <= 1.0 and mv.detail["M_y_V_Rd"] > 0.0
