@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Zone-based loads** (`core/loads.py`, `pipeline.py`, `cli.py`, panel). Each member is assigned a
+  load zone (roof vs floor, auto by elevation via `assign_zones`, with per-member overrides) and each
+  zone carries EN 1991-1-1 occupancy pressures, replacing the single hardcoded office pressure that
+  over-loaded light buildings and rejected reusable donors.
+  - `OCCUPANCY_PRESETS` covers every EN 1991-1-1 use category A–K (q_k from Tables 6.2/6.8/6.10;
+    g_k a typical buildup assumption, overridable). CLI `--occupancy` / `--roof-occupancy` /
+    `--zone-override`; panel gains Floor/Roof occupancy dropdowns.
+  - **EN 1991-1-1 §6.3.1.2 αA/αn imposed-load reduction** (large areas; columns under many floors),
+    reducing the imposed term only — a direct reuse gain for heavy multi-floor columns.
+  - **Behaviour change (on by default):** the top framing level now uses a light roof (`roof-H`) and
+    imposed loads are reduced — both reduce over-loading, so more donors qualify. Reproduce the old
+    baseline with `--roof-occupancy office-B --no-load-reduction`.
 - **Section-family expansion — round hollow (CHS), channels, angles** (`core/sections.py`,
   `core/ec3_checks.py`, `match/optimize.py`, `data/sections/`). Three new families ingest, classify,
   and check end-to-end alongside the existing I/H + rectangular-hollow stock:
