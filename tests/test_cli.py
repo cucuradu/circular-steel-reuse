@@ -38,7 +38,7 @@ def test_occupancy_flags_build_zone_specs():
         "--zone-override", "b7=balcony-A", "--no-load-reduction",
     ])
     loads = _loads_from_args(args)
-    assert (loads.dead_kpa, loads.live_kpa) == (3.5, 1.5)            # residential-A (EN cat A floors)
+    assert (loads.dead_kpa, loads.live_kpa) == (3.5, 2.0)            # residential-A (EN cat A floors)
     assert (loads.roof_dead_kpa, loads.roof_live_kpa) == (3.5, 3.0)  # roof-I
     assert loads.zone_overrides == {"b7": "balcony-A"}
     assert loads.load_reduction is False
@@ -58,12 +58,15 @@ def test_default_run_reproduces_office_floor_and_light_roof():
 def test_national_annex_applies_to_occupancy():
     from steelreuse.cli import _loads_from_args, build_parser
 
-    args = build_parser().parse_args(
+    # Italy: roof override (coperture H1) flows to the roof zone
+    it = _loads_from_args(build_parser().parse_args(
+        ["--donor", "d.json", "--demand", "m.json", "--national-annex", "it"]))
+    assert it.roof_live_kpa == 0.5        # Italy coperture H1 (EN base roof-H 0.4)
+    # UK: residential q_k reduced 2.0 -> 1.5 by the NA
+    uk = _loads_from_args(build_parser().parse_args(
         ["--donor", "d.json", "--demand", "m.json",
-         "--national-annex", "it", "--occupancy", "residential-A"])
-    loads = _loads_from_args(args)
-    assert loads.live_kpa == 2.0          # Italy NTC residential q_k (EN base is 1.5)
-    assert loads.roof_live_kpa == 0.5     # Italy coperture H1 (EN base roof-H 0.4)
+         "--national-annex", "uk", "--occupancy", "residential-A"]))
+    assert uk.live_kpa == 1.5
 
 
 def test_dead_live_override_occupancy_preset():

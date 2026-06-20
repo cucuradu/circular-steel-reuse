@@ -40,21 +40,26 @@ def test_occupancy_presets_cover_every_en_category():
 
 
 def test_alpha_A_area_reduction():
-    # EN eq. 6.1: (5/7)*psi0 + A0/A, capped at 1.0, A0 = 10 m^2
+    # EN eq. 6.1: (5/7)*psi0 + A0/A, in [0.6, 1.0], A0 = 10 m^2
     assert alpha_A(40.0, 0.7) == pytest.approx(0.5 + 10.0 / 40.0)   # 0.75
     assert alpha_A(10.0, 0.7) == pytest.approx(1.0)                 # 0.5+1.0=1.5 -> capped
     assert alpha_A(0.0, 0.7) == pytest.approx(1.0)                  # no area info -> no reduction
+    assert alpha_A(200.0, 0.7) == pytest.approx(0.6)               # 0.55 -> EN C/D floor 0.6
 
 
 def test_national_annex_overrides_qk_only():
     base = OCCUPANCY_PRESETS
     it = presets_for_na("it")
-    # Italy NTC overrides residential q_k 1.5 -> 2.0, keeps g_k/psi0/reducible
-    assert it["residential-A"].q_k == pytest.approx(2.0)
-    assert it["residential-A"].g_k == base["residential-A"].g_k
+    # Italy NTC overrides roof + storage q_k, keeps g_k/psi0/reducible
     assert it["roof-H"].q_k == pytest.approx(0.5)        # coperture cat H1
+    assert it["roof-H"].g_k == base["roof-H"].g_k
+    assert it["storage-E1"].q_k == pytest.approx(6.0)
     # categories the NA doesn't touch are identical to EN base
     assert it["congress-C2"] == base["congress-C2"]
+    # UK NA overlay: residential + office reduced
+    uk = presets_for_na("uk")
+    assert uk["residential-A"].q_k == pytest.approx(1.5)   # NA A1 (EN base 2.0)
+    assert uk["office-B"].q_k == pytest.approx(2.5)        # NA office (EN base 3.0)
     # "en" (and unpopulated NAs) return the EN base unchanged
     assert presets_for_na("en")["office-B"] == base["office-B"]
     assert presets_for_na("de")["office-B"] == base["office-B"]

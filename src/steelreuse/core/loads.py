@@ -49,17 +49,20 @@ class ZoneSpec:
 
 
 # q_k is a Nationally Determined Parameter: EN 1991-1-1:2002 Table 6.2 (floors A–E),
-# Table 6.8 (traffic F,G) and Table 6.10 (roofs H,I,K) give RANGES, and the National
-# Annex picks the value (published "recommended" values vary by source/NA). The trailing
-# comment on each row records the EN range; the encoded number is a defensible value
-# within it. Cross-checked 2026-06-20 against published EN 1991-1-1 reproductions
-# (structville.com, JRC eurocodes, calcdomain) — all values are in-range. Two notes:
-#   * office-B q_k is kept at the upper bound 3.0 (EN-recommended 2.5) as the tool's
-#     historical default; set --occupancy/--live for the NA value.
+# Table 6.4 (storage E1), Table 6.8 (traffic F,G) and Table 6.10 (roofs H,I,K) give
+# RANGES; the National Annex picks the value within each (the recommended values are
+# underlined in the standard). The trailing comment on each row records the EN range;
+# the encoded number is a defensible value within it. VERIFIED 2026-06-20 against the
+# EN 1991-1-1:2002 base standard (text extracted from the JRC/published English PDF):
+# all ranges match; Table 6.10 roof-H qk=0.4, Table 6.4 E1 qk=7.5 and Table 6.8 G qk=5.0
+# are exact. The underlined recommended values inside ranges are not machine-extractable,
+# so conservative within-range picks are used. Notes:
+#   * office-B q_k kept at upper bound 3.0 as the tool's historical default (EN range
+#     2.0–3.0); set --occupancy/--live or a National Annex for another value.
 #   * For certified use, confirm every q_k against the governing National Annex.
 # g_k is NOT an EN occupancy value — a typical slab/finishes buildup, overridable --dead.
 OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
-    "residential-A": ZoneSpec(3.5, 1.5, 0.7, True),   # T6.2 cat A floors, range 1.5–2.0
+    "residential-A": ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A floors, range 1.5–2.0 (UK NA 1.5)
     "stairs-A":      ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A stairs, range 2.0–4.0
     "balcony-A":     ZoneSpec(2.0, 2.5, 0.7, True),   # T6.2 cat A balconies, range 2.5–4.0
     "office-B":      ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 cat B offices, range 2.0–3.0 (rec 2.5) — default
@@ -89,11 +92,11 @@ OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
 NATIONAL_ANNEXES: dict[str, dict[str, float]] = {
     "en": {},  # EN 1991-1-1 base recommended values (default)
     "it": {    # Italy — NTC 2018 Tab. 3.1.II
-        "residential-A": 2.0,   # cat A residenziale
         "storage-E1": 6.0,      # cat E magazzini/depositi (ground)
         "roof-H": 0.5,          # coperture cat H1 (accessibile sola manutenzione)
     },
-    "uk": {    # United Kingdom — BS EN 1991-1-1 NA  (PARTIAL — office only)
+    "uk": {    # United Kingdom — BS EN 1991-1-1 NA  (PARTIAL)
+        "residential-A": 1.5,   # NA A1 self-contained dwellings
         "office-B": 2.5,        # NA.3 offices
     },
     # Recognized choices, NOT yet populated — they currently inherit the EN base.
@@ -119,13 +122,16 @@ def presets_for_na(na: str) -> dict[str, ZoneSpec]:
 
 
 def alpha_A(area_m2: float, psi0: float) -> float:
-    """EN 1991-1-1 eq. 6.1 area reduction factor, capped at 1.0.
+    """EN 1991-1-1 eq. 6.1 area reduction factor, in [0.6, 1.0].
 
-    ``αA = (5/7)·ψ0 + A0/A ≤ 1.0``. ``area_m2 <= 0`` (no geometry) → 1.0.
+    ``αA = (5/7)·ψ0 + A0/A``, capped at 1.0. EN restricts ``αA ≥ 0.6`` for
+    categories C and D; applied here for all categories (conservative for A/B,
+    exact for C/D — it only bites for tributary areas above ~100 m²).
+    ``area_m2 <= 0`` (no geometry) → 1.0.
     """
     if area_m2 <= 0:
         return 1.0
-    return min(1.0, (5.0 / 7.0) * psi0 + A0_M2 / area_m2)
+    return max(0.6, min(1.0, (5.0 / 7.0) * psi0 + A0_M2 / area_m2))
 
 
 def alpha_n(n_floors: float, psi0: float) -> float:
