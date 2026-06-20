@@ -62,6 +62,21 @@ def test_command_toggles_conditional_flags():
     assert "--verify-match" in cmd
 
 
+def test_command_forwards_occupancy_and_load_reduction():
+    opts = {"donor": "d", "demand": "m", "occupancy": "residential-A",
+            "roof_occupancy": "roof-I", "load_reduction": False}
+    cmd = runner.build_command("py", opts, "o")
+    assert _pair(cmd, "--occupancy") == "residential-A"
+    assert _pair(cmd, "--roof-occupancy") == "roof-I"
+    assert "--no-load-reduction" in cmd
+
+
+def test_command_omits_load_reduction_flag_when_on():
+    # reduction is ON by default -> the disable flag must NOT be emitted
+    cmd = runner.build_command("py", {"donor": "d", "demand": "m", "load_reduction": True}, "o")
+    assert "--no-load-reduction" not in cmd
+
+
 def test_command_omits_zero_valued_optional_flags():
     opts = {"donor": "d", "demand": "m", "phi": 0.0, "wind": 0.0, "seismic": 0.0, "min_util": 0.0}
     cmd = runner.build_command("py", opts, "o")

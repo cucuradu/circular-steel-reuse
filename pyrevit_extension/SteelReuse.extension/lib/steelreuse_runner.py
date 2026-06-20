@@ -68,11 +68,16 @@ def build_command(interpreter, opts, out_dir):
             cmd.append(flag)
 
     # Choice options (emit the value only when set).
-    for key, flag in (("counterfactual", "--counterfactual"), ("solver", "--solver")):
+    for key, flag in (("counterfactual", "--counterfactual"), ("solver", "--solver"),
+                      ("occupancy", "--occupancy"), ("roof_occupancy", "--roof-occupancy")):
         val = opts.get(key)
         if val:
             cmd.append(flag)
             cmd.append(str(val))
+
+    # Imposed-load reduction is ON by default; emit the disable flag only when turned off.
+    if opts.get("load_reduction") is False:
+        cmd.append("--no-load-reduction")
 
     # Numeric options, emitted only when truthy (else the CLI default stands).
     for key, flag in (("min_util", "--min-util"), ("phi", "--phi"),

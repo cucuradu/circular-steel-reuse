@@ -133,12 +133,31 @@
           </TabItem>
           <TabItem Header="Loads">
             <WrapPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Width="320" Margin="0,3">
+                <Label Content="Floor occupancy" Width="150"/>
+                <ComboBox x:Name="occupancy_combo" Width="125" SelectedIndex="0">
+                  <ComboBoxItem Content="office-B"/><ComboBoxItem Content="residential-A"/>
+                  <ComboBoxItem Content="balcony-A"/><ComboBoxItem Content="retail-D1"/>
+                  <ComboBoxItem Content="retail-D2"/><ComboBoxItem Content="congress-C3"/>
+                  <ComboBoxItem Content="congress-C5"/><ComboBoxItem Content="storage-E1"/>
+                </ComboBox>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="EN 1991-1-1 occupancy for floor members; sets g_k/q_k. The Dead/Live boxes below override it."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="320" Margin="0,3">
+                <Label Content="Roof occupancy" Width="150"/>
+                <ComboBox x:Name="roof_occupancy_combo" Width="125" SelectedIndex="0">
+                  <ComboBoxItem Content="roof-H"/><ComboBoxItem Content="roof-I"/>
+                  <ComboBoxItem Content="office-B"/>
+                </ComboBox>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="EN 1991-1-1 occupancy for the top framing level. Default roof-H is a light, non-accessible roof. Pick office-B to load the roof as a floor (pre-change behaviour)."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="320" Margin="0,3">
+                <CheckBox x:Name="no_load_reduction_check" VerticalAlignment="Center" Content="Disable alphaA/alphaN load reduction"/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="EN 1991-1-1 6.3.1.2 reduces imposed load on large areas (alphaA) and columns under many floors (alphaN). On by default; tick to run fully conservative."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Dead g_k (kN/m2)" Width="150"/><TextBox x:Name="dead_box" Width="55" Text="3.5"/>
-                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Permanent (dead) area load g_k in kN/m2 - self-weight, finishes, services. Distributed to beams via the tributary width and to columns via tributary area."/></StackPanel>
+                <Label Content="Dead g_k (kN/m2)" Width="150"/><TextBox x:Name="dead_box" Width="55" Text=""/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Permanent (dead) area load g_k in kN/m2 - self-weight, finishes, services. Overrides the Floor occupancy preset. Distributed to beams via the tributary width and to columns via tributary area."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
-                <Label Content="Live q_k (kN/m2)" Width="150"/><TextBox x:Name="live_box" Width="55" Text="3.0"/>
-                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Imposed (live) area load q_k in kN/m2 - occupancy / use. Combined with the dead load at the EN 1990 ULS factors below."/></StackPanel>
+                <Label Content="Live q_k (kN/m2)" Width="150"/><TextBox x:Name="live_box" Width="55" Text=""/>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Imposed (live) area load q_k in kN/m2 - occupancy / use. Overrides the Floor occupancy preset. Combined with the dead load at the EN 1990 ULS factors below."/></StackPanel>
               <StackPanel Orientation="Horizontal" Width="250" Margin="0,3">
                 <Label Content="gamma_G" Width="150"/><TextBox x:Name="gamma_g_box" Width="55" Text="1.35"/>
                 <TextBlock Style="{StaticResource InfoIcon}" ToolTip="Partial safety factor on the permanent action at ULS (EN 1990, typically 1.35)."/></StackPanel>
