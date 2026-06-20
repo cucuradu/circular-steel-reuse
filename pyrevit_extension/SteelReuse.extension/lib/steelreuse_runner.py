@@ -79,6 +79,12 @@ def build_command(interpreter, opts, out_dir):
     if opts.get("load_reduction") is False:
         cmd.append("--no-load-reduction")
 
+    # National Annex defaults to EN base; emit only when a different NA is chosen.
+    na = opts.get("national_annex")
+    if na and na != "en":
+        cmd.append("--national-annex")
+        cmd.append(str(na))
+
     # Numeric options, emitted only when truthy (else the CLI default stands).
     for key, flag in (("min_util", "--min-util"), ("phi", "--phi"),
                       ("wind", "--wind"), ("seismic", "--seismic"),

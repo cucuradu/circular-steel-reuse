@@ -71,6 +71,13 @@ def test_command_forwards_occupancy_and_load_reduction():
     assert "--no-load-reduction" in cmd
 
 
+def test_command_forwards_national_annex_only_when_not_en():
+    on = runner.build_command("py", {"donor": "d", "demand": "m", "national_annex": "it"}, "o")
+    assert _pair(on, "--national-annex") == "it"
+    off = runner.build_command("py", {"donor": "d", "demand": "m", "national_annex": "en"}, "o")
+    assert "--national-annex" not in off
+
+
 def test_command_omits_load_reduction_flag_when_on():
     # reduction is ON by default -> the disable flag must NOT be emitted
     cmd = runner.build_command("py", {"donor": "d", "demand": "m", "load_reduction": True}, "o")

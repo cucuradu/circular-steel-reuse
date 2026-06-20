@@ -80,6 +80,44 @@ OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
 }
 
 
+# National Annex q_k overrides (kN/m^2), layered over OCCUPANCY_PRESETS. q_k is a
+# Nationally Determined Parameter, so each country's NA may set its own value; only
+# categories that DIFFER from the EN base are listed (the rest inherit EN). These
+# numbers are from general engineering knowledge, NOT freshly verified line-by-line
+# against each NA — confirm against the official National Annex before certified use.
+# Correcting or adding a value is a single dict entry.
+NATIONAL_ANNEXES: dict[str, dict[str, float]] = {
+    "en": {},  # EN 1991-1-1 base recommended values (default)
+    "it": {    # Italy — NTC 2018 Tab. 3.1.II
+        "residential-A": 2.0,   # cat A residenziale
+        "storage-E1": 6.0,      # cat E magazzini/depositi (ground)
+        "roof-H": 0.5,          # coperture cat H1 (accessibile sola manutenzione)
+    },
+    "uk": {    # United Kingdom — BS EN 1991-1-1 NA  (PARTIAL — office only)
+        "office-B": 2.5,        # NA.3 offices
+    },
+    # Recognized choices, NOT yet populated — they currently inherit the EN base.
+    # Enter verified q_k from each NA here (one line per differing category):
+    "de": {},  # Germany     — DIN EN 1991-1-1/NA
+    "fr": {},  # France      — NF EN 1991-1-1/NA
+    "es": {},  # Spain       — UNE EN 1991-1-1/NA
+    "nl": {},  # Netherlands — NEN-EN 1991-1-1/NB
+    "ie": {},  # Ireland     — I.S. EN 1991-1-1/NA
+}
+
+
+def presets_for_na(na: str) -> dict[str, ZoneSpec]:
+    """OCCUPANCY_PRESETS with a National Annex's q_k overrides applied (q_k only)."""
+    overrides = NATIONAL_ANNEXES.get(na, {})
+    if not overrides:
+        return dict(OCCUPANCY_PRESETS)
+    return {
+        key: (ZoneSpec(spec.g_k, overrides[key], spec.psi0, spec.reducible)
+              if key in overrides else spec)
+        for key, spec in OCCUPANCY_PRESETS.items()
+    }
+
+
 def alpha_A(area_m2: float, psi0: float) -> float:
     """EN 1991-1-1 eq. 6.1 area reduction factor, capped at 1.0.
 

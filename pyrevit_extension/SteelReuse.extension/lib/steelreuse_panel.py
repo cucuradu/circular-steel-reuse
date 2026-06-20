@@ -194,6 +194,7 @@ class SteelReusePanel(forms.WPFWindow):
             "counterfactual": self.counterfactual_combo.SelectedItem.Content,
             "disposition": bool(self.disposition_check.IsChecked),
             # Loads
+            "national_annex": self.national_annex_combo.SelectedItem.Content,
             "occupancy": self.occupancy_combo.SelectedItem.Content,
             "roof_occupancy": self.roof_occupancy_combo.SelectedItem.Content,
             "load_reduction": not bool(self.no_load_reduction_check.IsChecked),

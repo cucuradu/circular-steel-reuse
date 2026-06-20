@@ -134,6 +134,15 @@
           <TabItem Header="Loads">
             <WrapPanel Margin="10">
               <StackPanel Orientation="Horizontal" Width="320" Margin="0,3">
+                <Label Content="National Annex" Width="150"/>
+                <ComboBox x:Name="national_annex_combo" Width="125" SelectedIndex="0">
+                  <ComboBoxItem Content="en"/><ComboBoxItem Content="it"/>
+                  <ComboBoxItem Content="uk"/><ComboBoxItem Content="de"/>
+                  <ComboBoxItem Content="fr"/><ComboBoxItem Content="es"/>
+                  <ComboBoxItem Content="nl"/><ComboBoxItem Content="ie"/>
+                </ComboBox>
+                <TextBlock Style="{StaticResource InfoIcon}" ToolTip="National Annex q_k override set for the occupancy presets. 'en' = EN base (default). it &amp; uk are populated; de/fr/es/nl/ie inherit EN until verified values are added. Confirm against the official NA before certified use."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Width="320" Margin="0,3">
                 <Label Content="Floor occupancy" Width="150"/>
                 <ComboBox x:Name="occupancy_combo" Width="125" SelectedIndex="0">
                   <ComboBoxItem Content="office-B"/><ComboBoxItem Content="residential-A"/>

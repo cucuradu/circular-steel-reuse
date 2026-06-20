@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .core.loads import OCCUPANCY_PRESETS, AreaLoadModel, ZoneSpec
+from .core.loads import NATIONAL_ANNEXES, OCCUPANCY_PRESETS, AreaLoadModel, ZoneSpec, presets_for_na
 from .llm.providers import select_provider
 from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
@@ -73,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="permanent area load g_k (kN/m^2) for the FLOOR zone; overrides --occupancy")
     ap.add_argument("--live", type=float, default=None,
                     help="imposed area load q_k (kN/m^2) for the FLOOR zone; overrides --occupancy")
+    ap.add_argument("--national-annex", choices=sorted(NATIONAL_ANNEXES), default="en",
+                    help="National Annex q_k override set applied to the occupancy presets "
+                         "(en = EN base, default; it & uk populated; de/fr/es/nl/ie recognized but "
+                         "inherit EN until verified values are added). q_k is a Nationally Determined "
+                         "Parameter — confirm against the official NA before certified use")
     ap.add_argument("--occupancy",
                     help="EN 1991-1-1 occupancy preset for the FLOOR zone (e.g. residential-A, "
                          "office-B, retail-D1, storage-E1); sets g_k/q_k. --dead/--live override it. "
@@ -238,20 +243,22 @@ def _loads_from_args(args: argparse.Namespace) -> "LoadModel | AreaLoadModel":
             beam_udl_Npmm=args.beam_udl if args.beam_udl is not None else 15.0,
             column_axial_N=(args.column_axial if args.column_axial is not None else 400.0) * 1e3,
         )
+    # Occupancy presets, with any National Annex q_k overrides applied first.
+    presets = presets_for_na(getattr(args, "national_annex", "en"))
     # Floor zone: an occupancy preset seeds g_k/q_k/psi0; --dead/--live then override.
-    floor = OCCUPANCY_PRESETS.get(args.occupancy) if args.occupancy else None
+    floor = presets.get(args.occupancy) if args.occupancy else None
     dead = args.dead if args.dead is not None else (floor.g_k if floor else 3.5)
     live = args.live if args.live is not None else (floor.q_k if floor else 3.0)
     floor_psi0 = args.psi0 if args.psi0 is not None else (floor.psi0 if floor else 0.7)
     floor_reducible = floor.reducible if floor else True
-    roof = OCCUPANCY_PRESETS.get(args.roof_occupancy, OCCUPANCY_PRESETS["roof-H"])
+    roof = presets.get(args.roof_occupancy, presets["roof-H"])
     overrides: dict[str, str] = {}
     custom: dict[str, ZoneSpec] = {}
     for item in args.zone_override:
         mid, _, key = item.partition("=")
         overrides[mid] = key
-        if key in OCCUPANCY_PRESETS:
-            custom[key] = OCCUPANCY_PRESETS[key]
+        if key in presets:
+            custom[key] = presets[key]
     return AreaLoadModel(
         dead_kpa=dead, live_kpa=live, gamma_g=args.gamma_g, gamma_q=args.gamma_q,
         beam_tributary_width_m=args.trib_width, column_tributary_area_m2=args.col_trib_area,
@@ -328,7 +335,8 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             parts.append(f"wind uplift ({args.wind_uplift:g} kN/m^2, roof beams, unrestrained)")
         combos = " + ".join(parts) if len(parts) > 1 else "gravity only"
         red = "on" if args.load_reduction else "off"
-        print(f"Loads: area-based, floor {loads.dead_kpa:g}+{loads.live_kpa:g}, "
+        na = f"NA {args.national_annex}; " if args.national_annex != "en" else ""
+        print(f"Loads: area-based, {na}floor {loads.dead_kpa:g}+{loads.live_kpa:g}, "
               f"roof {loads.roof_dead_kpa:g}+{loads.roof_live_kpa:g} kN/m^2 (G+Q), "
               f"ULS {args.gamma_g:g}G+{args.gamma_q:g}Q, tributary {trib}; "
               f"alphaA/alphaN reduction {red}; "

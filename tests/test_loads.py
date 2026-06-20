@@ -4,6 +4,7 @@ import pytest
 
 from steelreuse.core.forces import member_demands
 from steelreuse.core.loads import (
+    NATIONAL_ANNEXES,
     OCCUPANCY_PRESETS,
     AreaLoadModel,
     ZoneSpec,
@@ -12,9 +13,9 @@ from steelreuse.core.loads import (
     assign_zones,
     estimate_column_loads,
     estimate_tributary_widths,
+    presets_for_na,
 )
 from steelreuse.schema import ExtractedMember
-
 
 # ---------------------------------------------------------------------------
 # Zone-based loads: presets + αA/αn reduction helpers
@@ -43,6 +44,22 @@ def test_alpha_A_area_reduction():
     assert alpha_A(40.0, 0.7) == pytest.approx(0.5 + 10.0 / 40.0)   # 0.75
     assert alpha_A(10.0, 0.7) == pytest.approx(1.0)                 # 0.5+1.0=1.5 -> capped
     assert alpha_A(0.0, 0.7) == pytest.approx(1.0)                  # no area info -> no reduction
+
+
+def test_national_annex_overrides_qk_only():
+    base = OCCUPANCY_PRESETS
+    it = presets_for_na("it")
+    # Italy NTC overrides residential q_k 1.5 -> 2.0, keeps g_k/psi0/reducible
+    assert it["residential-A"].q_k == pytest.approx(2.0)
+    assert it["residential-A"].g_k == base["residential-A"].g_k
+    assert it["roof-H"].q_k == pytest.approx(0.5)        # coperture cat H1
+    # categories the NA doesn't touch are identical to EN base
+    assert it["congress-C2"] == base["congress-C2"]
+    # "en" (and unpopulated NAs) return the EN base unchanged
+    assert presets_for_na("en")["office-B"] == base["office-B"]
+    assert presets_for_na("de")["office-B"] == base["office-B"]
+    # every advertised NA key is selectable
+    assert {"en", "it", "uk", "de", "fr", "es", "nl", "ie"} <= set(NATIONAL_ANNEXES)
 
 
 def test_alpha_n_storey_reduction():
