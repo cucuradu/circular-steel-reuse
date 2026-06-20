@@ -15,7 +15,7 @@ from .core.connections import ConnectionPolicy
 from .core.ec3_checks import MemberDemand, c1_moment_gradient
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
 from .core.frame import FrameOptions, FrameResult, analyze_frame
-from .core.loads import AreaLoadModel, estimate_column_loads, estimate_tributary_widths
+from .core.loads import AreaLoadModel, assign_zones, estimate_column_loads, estimate_tributary_widths
 from .core.sections import (
     SectionProps,
     ValidationReport,
@@ -151,24 +151,16 @@ def _uplift_demand(loads, member_id: str, span_mm: float,
     ))
 
 
-# Beams whose mid-height is within this of the highest beam belong to the roof level (wind uplift).
-_ROOF_LEVEL_TOL_MM = 500.0
-
-
 def _roof_beam_ids(members) -> set[str]:
     """Ids of beams at the model's top framing level (the only ones wind uplift acts on).
 
-    Needs geometry: members without coordinates can't be placed on a level and are left out —
-    documented limitation (an all-roof single-storey model without coordinates sees no uplift case).
+    Delegates to :func:`assign_zones` (the single roof-band definition); members without
+    coordinates can't be placed on a level and are left out — documented limitation (an all-roof
+    single-storey model without coordinates sees no uplift case).
     """
-    mid_z: dict[str, float] = {}
-    for m in members:
-        if m.role == "beam" and m.start_xyz and m.end_xyz:
-            mid_z[m.id] = (m.start_xyz[2] + m.end_xyz[2]) / 2.0
-    if not mid_z:
-        return set()
-    top = max(mid_z.values())
-    return {i for i, z in mid_z.items() if z >= top - _ROOF_LEVEL_TOL_MM}
+    zones = assign_zones(members)
+    beams = {m.id for m in members if m.role == "beam"}
+    return {mid for mid, z in zones.items() if z == "roof" and mid in beams}
 
 
 # How close a column endpoint must be (3-D) to a span joint for the joint to count as a real support.
@@ -429,6 +421,11 @@ def run_pipeline(
         # Optionally refine per-member loads from the model geometry: beam tributary widths, and
         # column tributary areas + floor counts (each falls back to the configured default where the
         # geometry is insufficient); per demand model, since the overrides are member-keyed.
+        # Assign each member a load zone (roof vs floor by elevation) so loads follow what the
+        # member carries — a light roof is no longer loaded as an office floor. Per demand model.
+        if isinstance(loads, AreaLoadModel):
+            loads.member_zone = assign_zones(demand.members)
+
         if tributary_from_geometry and isinstance(loads, AreaLoadModel):
             loads.tributary_overrides = estimate_tributary_widths(
                 demand.members, default_m=loads.beam_tributary_width_m
