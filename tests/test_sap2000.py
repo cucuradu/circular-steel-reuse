@@ -7,6 +7,8 @@ table/%diff assembly. The OAPI glue itself and PyNite↔SAP2000 parity live in
 "tests must not require SAP2000" rule (docs/DESIGN_PRINCIPLES.md).
 """
 
+import sys
+
 import pytest
 
 from steelreuse.benchmark.sap2000_bench import (
@@ -29,6 +31,23 @@ from steelreuse.core.frame import (
 from steelreuse.core.frame_sap2000 import _SapMemberForces, analyze_frame_sap2000
 from steelreuse.core.loads import AreaLoadModel
 from steelreuse.schema import ExtractedMember
+
+
+@pytest.fixture(autouse=True)
+def _force_sap2000_absent(monkeypatch):
+    """Make these tests exercise the SAP2000-*absent* fallback path on *any* machine.
+
+    The whole module is written for a host without SAP2000 (see the module docstring): it asserts the
+    backend refuses/falls back when SAP2000 can't be reached. On a machine where SAP2000 + comtypes
+    *are* installed, calling the backend for real would launch the SAP2000 GUI (license/splash
+    pop-ups, and the trial's 3-instance cap → status 426) and make the "unavailable" assertions
+    environment-dependent. Forcing the ``comtypes`` import to fail reproduces the absent condition
+    deterministically and before anything launches — ``connect_sap2000`` raises ``Sap2000Unavailable``
+    at its import guard. Real OAPI/parity coverage lives in ``test_sap2000_parity.py`` (skipped unless
+    SAP2000 is present).
+    """
+    monkeypatch.setitem(sys.modules, "comtypes", None)
+    monkeypatch.setitem(sys.modules, "comtypes.client", None)
 
 
 def _col(cid, x, y, z0, z1, section="IPE300", grade="S275"):
