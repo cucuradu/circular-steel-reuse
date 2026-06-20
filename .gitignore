@@ -25,6 +25,14 @@ models/
 # SteelReuse Revit add-on: machine-specific interpreter config + per-run match outputs
 steelreuse_runner_config.json
 steelreuse_reports/
+steelreuse_runs/
+pyrevit_extension/*_test_*.json
+
+# Internal planning/spec scratch (kept out of the public docs tree)
+docs/superpowers/
+
+# Agent instruction placeholder
+CLAUDE.md
 
 # Secrets (LLM API keys etc.)
 .env

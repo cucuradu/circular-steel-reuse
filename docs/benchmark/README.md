@@ -27,8 +27,8 @@ There are **two different things** you can do with the SAP2000 backend. Don't co
 > **Invoking the commands.** The examples below call the modules through Python (`python -m …`) rather
 > than the `steelreuse-bench-sap2000` / `steelreuse …` console scripts. On a normal machine either form
 > works; on a locked-down Windows machine the pip-generated `*.exe` launchers may be unsigned and
-> blocked (see [UNBLOCK_UV.md](../UNBLOCK_UV.md)), in which case `python -m` through a signed
-> interpreter is the reliable path.
+> blocked (Windows Application Control / WDAC / Smart App Control), in which case `python -m` through
+> a signed interpreter is the reliable path.
 
 For brevity below, set the interpreter once per PowerShell session (use `python`, or the full path to
 a signed interpreter on a locked-down machine):

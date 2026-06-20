@@ -15,7 +15,7 @@ put a defensible *number* on that option value instead of a hand-tuned weight.
 The repo is deliberate about where machine learning may and may not sit (DESIGN_PRINCIPLES.md rule 3): the
 certified result path is entirely deterministic — EN 1993-1-1 checks → carbon accounting → MILP — and
 nothing learned is ever allowed to *gate* a structural decision. The existing capacity surrogate
-([`ml/surrogate.py`](../src/steelreuse/ml/surrogate.py)) makes that point by counter-example: its
+([`experiments/ml/surrogate.py`](../experiments/ml/surrogate.py)) makes that point by counter-example: its
 test R² ≈ 1.0 is **circular**, because its labels are produced by the EN 1993 checker it imitates, so
 the score only shows it can reproduce a function we already compute exactly. It predicts nothing new.
 
@@ -53,7 +53,7 @@ Drawn entirely from data the tool already has on a `SupplyItem` / audited donor:
 - length, and length *class* (how many standard spans it can be cut to);
 - material grade and the audit knockdown (a derated heavy member is worth less held);
 - a standardization proxy — how common the family is in the wider reclaimed-steel market, not just
-  this stock (the [`ml/reuse_score.py`](../src/steelreuse/ml/reuse_score.py) standardization term is
+  this stock (the [`experiments/ml/reuse_score.py`](../experiments/ml/reuse_score.py) standardization term is
   the in-stock version of this).
 
 ### Label (the target to learn)
@@ -62,7 +62,7 @@ Drawn entirely from data the tool already has on a `SupplyItem` / audited donor:
 
 1. Fit or assume a distribution over future projects — span ranges, load levels, grade mix, project
    size, and how often each demand *section class* appears. The bootstrap source is the existing
-   synthetic sweep ([`synthetic.py`](../src/steelreuse/synthetic.py) already enumerates
+   synthetic sweep ([`synthetic.py`](../experiments/ml/synthetic.py) already enumerates
    section × grade × span × load through the real EN 1993 checks), refined with the case-study demand
    models (`data/case_study/demand.json` and the bundled sample) as empirical anchors for what real structures
    actually ask for.
@@ -80,7 +80,7 @@ the actual MILP is what runs.
 ### Estimator
 
 A gradient-boosted regressor (the `xgboost` dependency is already an optional extra and
-`ml/train.py`/`surrogate.py` show the pattern) or any interpretable model — feature importances and
+`experiments/ml/train.py`/`surrogate.py` show the pattern) or any interpretable model — feature importances and
 partial-dependence plots matter more than squared error here, because the output must be *explainable*
 to an engineer deciding to store steel. Quantile regression gives a conservative (e.g. 25th-percentile)
 option value for risk-averse storage decisions.

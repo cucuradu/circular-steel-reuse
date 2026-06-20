@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .core.loads import AreaLoadModel
+from .core.loads import OCCUPANCY_PRESETS, AreaLoadModel, ZoneSpec
 from .llm.providers import select_provider
 from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
@@ -39,7 +39,7 @@ def load_dotenv(path: str = ".env") -> None:
         os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Circular structural steel-reuse matcher")
     ap.add_argument("--version", action="version", version=f"steelreuse {__version__}")
     ap.add_argument("--demo", action="store_true",
@@ -69,8 +69,26 @@ def main(argv: list[str] | None = None) -> int:
                     help="admit donor members that the audit could not verify (at a conservative "
                          "knockdown) instead of quarantining them; off by default")
     # Area-based load model (default). Floor pressures + tributary geometry + EN 1990 ULS factors.
-    ap.add_argument("--dead", type=float, default=3.5, help="permanent area load g_k (kN/m^2)")
-    ap.add_argument("--live", type=float, default=3.0, help="imposed area load q_k (kN/m^2)")
+    ap.add_argument("--dead", type=float, default=None,
+                    help="permanent area load g_k (kN/m^2) for the FLOOR zone; overrides --occupancy")
+    ap.add_argument("--live", type=float, default=None,
+                    help="imposed area load q_k (kN/m^2) for the FLOOR zone; overrides --occupancy")
+    ap.add_argument("--occupancy",
+                    help="EN 1991-1-1 occupancy preset for the FLOOR zone (e.g. residential-A, "
+                         "office-B, retail-D1, storage-E1); sets g_k/q_k. --dead/--live override it. "
+                         "Keys: " + ", ".join(sorted(OCCUPANCY_PRESETS)))
+    ap.add_argument("--roof-occupancy", default="roof-H",
+                    help="EN 1991-1-1 occupancy preset for the ROOF zone (default roof-H, light); "
+                         "use 'office-B' to load the roof as a floor (pre-change behaviour)")
+    ap.add_argument("--zone-override", action="append", default=[], metavar="ID=KEY",
+                    help="tag a member into a zone/preset, e.g. --zone-override b7=balcony-A "
+                         "(repeatable); wins over the auto roof/floor assignment")
+    ap.add_argument("--no-load-reduction", dest="load_reduction", action="store_false",
+                    help="disable EN 1991-1-1 6.3.1.2 alphaA/alphaN imposed-load reduction (fully "
+                         "conservative run); reduction is ON by default")
+    ap.set_defaults(load_reduction=True)
+    ap.add_argument("--psi0", type=float, default=None,
+                    help="override the psi0 used by the alphaA/alphaN reduction (default per category)")
     ap.add_argument("--gamma-g", type=float, default=1.35, help="permanent partial factor (EN 1990)")
     ap.add_argument("--gamma-q", type=float, default=1.5, help="variable partial factor (EN 1990)")
     ap.add_argument("--trib-width", type=float, default=3.0, help="default beam tributary width (m)")
@@ -180,6 +198,11 @@ def main(argv: list[str] | None = None) -> int:
     # Legacy flat model: if either is given, override the area model with one UDL / one axial.
     ap.add_argument("--beam-udl", type=float, default=None, help="[legacy] flat beam UDL (kN/m == N/mm)")
     ap.add_argument("--column-axial", type=float, default=None, help="[legacy] flat column axial (kN)")
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = build_parser()
     args = ap.parse_args(argv)
 
     # Resolve the input models: --demo uses the bundled samples, otherwise both paths are required.
@@ -208,23 +231,45 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
-def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> int:
-    load_dotenv()  # pick up GEMINI_API_KEY etc. from a .env in the working directory
-
+def _loads_from_args(args: argparse.Namespace) -> "LoadModel | AreaLoadModel":
+    """Build the load model from parsed CLI args (legacy flat model, or zone-based area model)."""
     if args.beam_udl is not None or args.column_axial is not None:
-        loads: LoadModel | AreaLoadModel = LoadModel(
+        return LoadModel(
             beam_udl_Npmm=args.beam_udl if args.beam_udl is not None else 15.0,
             column_axial_N=(args.column_axial if args.column_axial is not None else 400.0) * 1e3,
         )
-    else:
-        loads = AreaLoadModel(
-            dead_kpa=args.dead, live_kpa=args.live, gamma_g=args.gamma_g, gamma_q=args.gamma_q,
-            beam_tributary_width_m=args.trib_width, column_tributary_area_m2=args.col_trib_area,
-            column_floors=args.col_floors, column_eccentricity_mm=args.col_ecc,
-            notional_phi=args.phi,
-            construction_stage=args.construction, construction_live_kpa=args.construction_live,
-            uplift_kpa=args.wind_uplift,
-        )
+    # Floor zone: an occupancy preset seeds g_k/q_k/psi0; --dead/--live then override.
+    floor = OCCUPANCY_PRESETS.get(args.occupancy) if args.occupancy else None
+    dead = args.dead if args.dead is not None else (floor.g_k if floor else 3.5)
+    live = args.live if args.live is not None else (floor.q_k if floor else 3.0)
+    floor_psi0 = args.psi0 if args.psi0 is not None else (floor.psi0 if floor else 0.7)
+    floor_reducible = floor.reducible if floor else True
+    roof = OCCUPANCY_PRESETS.get(args.roof_occupancy, OCCUPANCY_PRESETS["roof-H"])
+    overrides: dict[str, str] = {}
+    custom: dict[str, ZoneSpec] = {}
+    for item in args.zone_override:
+        mid, _, key = item.partition("=")
+        overrides[mid] = key
+        if key in OCCUPANCY_PRESETS:
+            custom[key] = OCCUPANCY_PRESETS[key]
+    return AreaLoadModel(
+        dead_kpa=dead, live_kpa=live, gamma_g=args.gamma_g, gamma_q=args.gamma_q,
+        beam_tributary_width_m=args.trib_width, column_tributary_area_m2=args.col_trib_area,
+        column_floors=args.col_floors, column_eccentricity_mm=args.col_ecc,
+        notional_phi=args.phi,
+        construction_stage=args.construction, construction_live_kpa=args.construction_live,
+        uplift_kpa=args.wind_uplift,
+        roof_dead_kpa=roof.g_k, roof_live_kpa=roof.q_k, roof_psi0=roof.psi0,
+        floor_psi0=floor_psi0, floor_reducible=floor_reducible,
+        load_reduction=args.load_reduction,
+        custom_zones=custom, zone_overrides=overrides,
+    )
+
+
+def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> int:
+    load_dotenv()  # pick up GEMINI_API_KEY etc. from a .env in the working directory
+
+    loads: LoadModel | AreaLoadModel = _loads_from_args(args)
     res = run_pipeline(
         donor, demand, loads=loads, knockdown=args.knockdown,
         include_unverified=args.include_unverified, pda_csv=args.pda,
@@ -282,8 +327,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         if args.wind_uplift > 0:
             parts.append(f"wind uplift ({args.wind_uplift:g} kN/m^2, roof beams, unrestrained)")
         combos = " + ".join(parts) if len(parts) > 1 else "gravity only"
-        print(f"Loads: area-based, {args.dead:g}+{args.live:g} kN/m^2 (G+Q), "
+        red = "on" if args.load_reduction else "off"
+        print(f"Loads: area-based, floor {loads.dead_kpa:g}+{loads.live_kpa:g}, "
+              f"roof {loads.roof_dead_kpa:g}+{loads.roof_live_kpa:g} kN/m^2 (G+Q), "
               f"ULS {args.gamma_g:g}G+{args.gamma_q:g}Q, tributary {trib}; "
+              f"alphaA/alphaN reduction {red}; "
               f"combinations: {combos}; "
               f"demand={'steel only' if not args.all_demand else 'all members'}")
     if res.frame is not None:

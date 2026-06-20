@@ -29,6 +29,42 @@ def test_bundled_samples_resolve():
     assert sample_path("demand.json").exists()
 
 
+def test_occupancy_flags_build_zone_specs():
+    from steelreuse.cli import _loads_from_args, build_parser
+
+    args = build_parser().parse_args([
+        "--donor", "d.json", "--demand", "m.json",
+        "--occupancy", "residential-A", "--roof-occupancy", "roof-I",
+        "--zone-override", "b7=balcony-A", "--no-load-reduction",
+    ])
+    loads = _loads_from_args(args)
+    assert (loads.dead_kpa, loads.live_kpa) == (3.5, 2.0)            # residential-A
+    assert (loads.roof_dead_kpa, loads.roof_live_kpa) == (3.5, 3.0)  # roof-I
+    assert loads.zone_overrides == {"b7": "balcony-A"}
+    assert loads.load_reduction is False
+    assert "balcony-A" in loads.custom_zones
+
+
+def test_default_run_reproduces_office_floor_and_light_roof():
+    from steelreuse.cli import _loads_from_args, build_parser
+
+    args = build_parser().parse_args(["--donor", "d.json", "--demand", "m.json"])
+    loads = _loads_from_args(args)
+    assert (loads.dead_kpa, loads.live_kpa) == (3.5, 3.0)            # office-B == today
+    assert (loads.roof_dead_kpa, loads.roof_live_kpa) == (1.0, 0.4)  # light roof-H
+    assert loads.load_reduction is True
+
+
+def test_dead_live_override_occupancy_preset():
+    from steelreuse.cli import _loads_from_args, build_parser
+
+    args = build_parser().parse_args(
+        ["--donor", "d.json", "--demand", "m.json", "--occupancy", "storage-E1", "--dead", "9"])
+    loads = _loads_from_args(args)
+    assert loads.dead_kpa == 9.0          # --dead wins
+    assert loads.live_kpa == 7.5          # storage-E1 q_k still seeded
+
+
 def test_missing_file_exits_one_with_message(tmp_path, capsys):
     missing = str(tmp_path / "nope.json")
     assert main(["--donor", missing, "--demand", missing]) == 1
