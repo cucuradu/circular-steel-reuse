@@ -48,28 +48,34 @@ class ZoneSpec:
     reducible: bool = False
 
 
-# EN 1991-1-1:2002 *recommended* q_k: Table 6.2 (floors A–E), Table 6.8 (traffic
-# F,G), Table 6.10 (roofs H,I,K). q_k MUST be re-verified line-by-line against the
-# tables — these are from memory of the recommended (boxed) values and a National
-# Annex may override them. g_k is a typical assumption, overridable with --dead.
+# q_k is a Nationally Determined Parameter: EN 1991-1-1:2002 Table 6.2 (floors A–E),
+# Table 6.8 (traffic F,G) and Table 6.10 (roofs H,I,K) give RANGES, and the National
+# Annex picks the value (published "recommended" values vary by source/NA). The trailing
+# comment on each row records the EN range; the encoded number is a defensible value
+# within it. Cross-checked 2026-06-20 against published EN 1991-1-1 reproductions
+# (structville.com, JRC eurocodes, calcdomain) — all values are in-range. Two notes:
+#   * office-B q_k is kept at the upper bound 3.0 (EN-recommended 2.5) as the tool's
+#     historical default; set --occupancy/--live for the NA value.
+#   * For certified use, confirm every q_k against the governing National Annex.
+# g_k is NOT an EN occupancy value — a typical slab/finishes buildup, overridable --dead.
 OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
-    "residential-A": ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A floors (1.5–2.0)
-    "stairs-A":      ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A stairs
-    "balcony-A":     ZoneSpec(2.0, 2.5, 0.7, True),   # T6.2 cat A balconies (2.5–4.0)
-    "office-B":      ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 cat B offices (2.0–3.0) — today's default
-    "congress-C1":   ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 tables: cafés/restaurants
-    "congress-C2":   ZoneSpec(3.5, 4.0, 0.7, True),   # T6.2 fixed seats
-    "congress-C3":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 open circulation
-    "congress-C4":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 physical activity
-    "congress-C5":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 crowds (5.0–7.5)
-    "retail-D1":     ZoneSpec(3.5, 4.0, 0.7, True),   # T6.2 general retail (4.0–5.0)
-    "retail-D2":     ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 department stores
-    "storage-E1":    ZoneSpec(5.0, 7.5, 1.0, False),  # T6.2 storage; outside A–D reduction scope
-    "industrial-E2": ZoneSpec(5.0, 7.5, 1.0, False),  # T6.2 industrial — use-specific PLACEHOLDER
-    "traffic-F":     ZoneSpec(3.5, 2.0, 0.7, False),  # T6.8 vehicles ≤30 kN (1.5–2.5)
-    "traffic-G":     ZoneSpec(3.5, 5.0, 0.7, False),  # T6.8 vehicles 30–160 kN
-    "roof-H":        ZoneSpec(1.0, 0.4, 0.0, False),  # T6.10 not accessible (0.0–1.0)
-    "roof-I":        ZoneSpec(3.5, 3.0, 0.7, False),  # T6.10 accessible ~ floor; pick matching A–D
+    "residential-A": ZoneSpec(3.5, 1.5, 0.7, True),   # T6.2 cat A floors, range 1.5–2.0
+    "stairs-A":      ZoneSpec(3.5, 2.0, 0.7, True),   # T6.2 cat A stairs, range 2.0–4.0
+    "balcony-A":     ZoneSpec(2.0, 2.5, 0.7, True),   # T6.2 cat A balconies, range 2.5–4.0
+    "office-B":      ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 cat B offices, range 2.0–3.0 (rec 2.5) — default
+    "congress-C1":   ZoneSpec(3.5, 3.0, 0.7, True),   # T6.2 tables (cafés/restaurants), range 2.0–3.0
+    "congress-C2":   ZoneSpec(3.5, 4.0, 0.7, True),   # T6.2 fixed seats, range 3.0–4.0
+    "congress-C3":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 open circulation, range 3.0–5.0
+    "congress-C4":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 physical activity, range 4.5–5.0
+    "congress-C5":   ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 crowds, range 5.0–7.5 (raise for stadia)
+    "retail-D1":     ZoneSpec(3.5, 4.0, 0.7, True),   # T6.2 general retail, range 4.0–5.0
+    "retail-D2":     ZoneSpec(3.5, 5.0, 0.7, True),   # T6.2 department stores, range 4.0–5.0
+    "storage-E1":    ZoneSpec(5.0, 7.5, 1.0, False),  # T6.2 cat E1 storage, qk 7.5; outside A–D reduction
+    "industrial-E2": ZoneSpec(5.0, 7.5, 1.0, False),  # T6.2 cat E2 industrial — use-specific PLACEHOLDER
+    "traffic-F":     ZoneSpec(3.5, 2.0, 0.7, False),  # T6.8 vehicles ≤30 kN, range 1.5–2.5
+    "traffic-G":     ZoneSpec(3.5, 5.0, 0.7, False),  # T6.8 vehicles 30–160 kN, qk 5.0
+    "roof-H":        ZoneSpec(1.0, 0.4, 0.0, False),  # T6.10 not accessible, range 0.0–1.0 (rec 0.4)
+    "roof-I":        ZoneSpec(3.5, 3.0, 0.7, False),  # T6.10 accessible — takes the matching A–D qk
     "roof-K":        ZoneSpec(1.0, 0.0, 0.0, False),  # T6.10 helicopter — class-specific PLACEHOLDER
 }
 

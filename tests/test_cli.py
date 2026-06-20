@@ -38,7 +38,7 @@ def test_occupancy_flags_build_zone_specs():
         "--zone-override", "b7=balcony-A", "--no-load-reduction",
     ])
     loads = _loads_from_args(args)
-    assert (loads.dead_kpa, loads.live_kpa) == (3.5, 2.0)            # residential-A
+    assert (loads.dead_kpa, loads.live_kpa) == (3.5, 1.5)            # residential-A (EN cat A floors)
     assert (loads.roof_dead_kpa, loads.roof_live_kpa) == (3.5, 3.0)  # roof-I
     assert loads.zone_overrides == {"b7": "balcony-A"}
     assert loads.load_reduction is False
