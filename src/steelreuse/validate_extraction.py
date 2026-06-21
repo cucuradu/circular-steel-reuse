@@ -16,29 +16,24 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
-from collections import Counter
 from pathlib import Path
 
-from .core.sections import load_default_catalog, resolve_members
+from .core.sections import load_default_catalog
+from .extraction_review import extraction_review
 from .schema import ExtractedModel, ExtractionError
 
 
 def summarize(model: ExtractedModel) -> dict:
-    """Counts useful for validating an extraction (resolves sections against the default catalog)."""
-    roles = Counter(m.role for m in model.members)
-    n_cols = roles.get("column", 0)
-    cols_with_xyz = sum(1 for m in model.members if m.role == "column" and m.start_xyz)
-    with_xyz = sum(1 for m in model.members if m.start_xyz and m.end_xyz)
-    resolve_members(model.members, load_default_catalog())  # sets m.section where it maps
-    mapped = sum(1 for m in model.members if m.section)
+    """Counts useful for validating an extraction (delegates to the review core)."""
+    rv = extraction_review(model, load_default_catalog())
     return {
-        "total": len(model.members),
-        "roles": dict(roles),
-        "mapped": mapped,
-        "unknown": len(model.members) - mapped,
-        "with_coords": with_xyz,
-        "columns": n_cols,
-        "columns_with_coords": cols_with_xyz,
+        "total": rv.total,
+        "roles": rv.roles,
+        "mapped": rv.mapped,
+        "unknown": rv.total - rv.mapped,   # legacy semantics: fuzzy counts as not-mapped here
+        "with_coords": rv.with_coords,
+        "columns": rv.columns,
+        "columns_with_coords": rv.columns_with_coords,
     }
 
 

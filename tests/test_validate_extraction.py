@@ -1,6 +1,7 @@
 """Tests for the extraction-validation helper (steelreuse.validate_extraction)."""
 
-from steelreuse.validate_extraction import main
+from steelreuse.schema import ExtractedMember, ExtractedModel
+from steelreuse.validate_extraction import main, summarize
 
 _MODEL = (
     '{"kind": "donor", "members": ['
@@ -34,3 +35,36 @@ def test_schedule_row_count_match(tmp_path, capsys):
 def test_missing_file_exits_one(tmp_path, capsys):
     assert main([str(tmp_path / "nope.json")]) == 1
     assert "not found" in capsys.readouterr().err.lower()
+
+
+def test_summarize_counts_match_legacy_semantics():
+    """Regression baseline: must stay numerically identical after summarize() is refactored
+    to delegate to the review core (extraction_review)."""
+    members = [
+        ExtractedMember(id="A", role="beam", raw_section="IPE300",
+                        start_xyz=[0, 0, 0], end_xyz=[6000, 0, 0]),
+        ExtractedMember(id="B", role="column", raw_section="HEB300",
+                        start_xyz=[0, 0, 0], end_xyz=[0, 0, 3000]),
+        ExtractedMember(id="C", role="beam", raw_section="BAR JOIST 18K3"),  # unknown, no coords
+    ]
+    s = summarize(ExtractedModel(kind="donor", members=members))
+    assert s["total"] == 3
+    assert s["roles"] == {"beam": 2, "column": 1}
+    assert s["mapped"] == 2          # IPE300 + HEB300
+    assert s["unknown"] == 1         # total - mapped (fuzzy would also count here)
+    assert s["with_coords"] == 2
+    assert s["columns"] == 1
+    assert s["columns_with_coords"] == 1
+
+
+def test_summarize_fuzzy_quarantined_counts_as_unknown():
+    """The subtle reason summarize uses total - mapped (not rv.unknown): a fuzzy-quarantined
+    near-miss keeps section=None and must count as 'unknown' in this legacy field."""
+    members = [
+        ExtractedMember(id="A", role="beam", raw_section="IPE300"),    # exact -> mapped
+        ExtractedMember(id="B", role="beam", raw_section="IPE-300"),   # fuzzy near-miss, quarantined
+    ]
+    s = summarize(ExtractedModel(kind="donor", members=members))
+    assert s["total"] == 2
+    assert s["mapped"] == 1
+    assert s["unknown"] == 1   # fuzzy member counts here, even though rv.unknown alone would be 0
