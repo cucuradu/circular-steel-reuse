@@ -1,0 +1,7 @@
+title: |-
+  Set
+  Audit
+tooltip: >-
+  Enter pre-demolition-audit data (condition grade, verification basis, knockdown, recoverable
+  length, defects) for the currently selected framing/columns. Saved to schedulable SteelReuse
+  shared parameters; the next Extract reads them back so the audit flows into the match.

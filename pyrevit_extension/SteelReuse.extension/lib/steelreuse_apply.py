@@ -10,6 +10,7 @@ API, no f-strings.
 
 import os
 
+import steelreuse_pda_params as pdaparams
 from pyrevit import DB
 
 # Statuses worth a clickable element list after applying (the ribbon button linkifies these).
@@ -75,7 +76,7 @@ def _insert_binding(doc, defn, binding):
     doc.ParameterBindings.Insert(defn, binding)
 
 
-def _ensure_shared_params(doc, sp_file):
+def _ensure_shared_params(doc, sp_file, params=SHARED_PARAMS):
     """Create + bind the SteelReuse instance parameters on framing/columns (no-op when already bound).
 
     Must run inside an open transaction. Restores the user's shared-parameter-file setting afterwards.
@@ -84,7 +85,7 @@ def _ensure_shared_params(doc, sp_file):
     it = doc.ParameterBindings.ForwardIterator()
     while it.MoveNext():
         bound.add(it.Key.Name)
-    missing = [(n, k) for n, k in SHARED_PARAMS if n not in bound]
+    missing = [(n, k) for n, k in params if n not in bound]
     if not missing:
         return
 
@@ -247,3 +248,36 @@ def clear_overrides(doc, view, element_ids):
             t.RollBack()
         raise
     return {"cleared": cleared, "missing": missing}
+
+
+def write_pda(doc, element_ids, values, sp_file=None):
+    """Write PDA shared parameters onto each element in ``element_ids``, in one transaction.
+
+    ``values`` is ``{field: coerced_value}`` already coerced by steelreuse_pda_params.coerce_field
+    (None values are skipped, leaving that parameter untouched). Ensures the PDA params exist/are
+    bound first. Returns ``{written, missing}``.
+    """
+    if sp_file is None:
+        sp_file = DEFAULT_SP_FILE
+    field_to_param = dict((v, k) for k, v in pdaparams.FIELD_BY_PARAM.items())
+    written, missing = 0, 0
+    t = DB.Transaction(doc, "SteelReuse: Set Audit")
+    t.Start()
+    try:
+        _ensure_shared_params(doc, sp_file, params=pdaparams.PDA_SHARED_PARAMS)
+        for eid in element_ids:
+            elem = doc.GetElement(eid)
+            if elem is None:
+                missing += 1
+                continue
+            for field, val in values.items():
+                if val is None:
+                    continue
+                _set_param(elem, field_to_param[field], val)
+            written += 1
+        t.Commit()
+    except Exception:
+        if t.HasStarted() and not t.HasEnded():
+            t.RollBack()
+        raise
+    return {"written": written, "missing": missing}
