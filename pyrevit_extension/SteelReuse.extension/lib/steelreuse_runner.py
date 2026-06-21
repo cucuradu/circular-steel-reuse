@@ -35,6 +35,38 @@ def output_paths(out_dir):
     return paths
 
 
+# Review-mode artifact filenames (a review run, no match).
+_REVIEW_NAMES = {"review_json": "review.json", "problems": "problems.html",
+                 "pda_html": "pda.html", "pda_csv": "audit.csv"}
+
+
+def review_paths(out_dir):
+    """The four review artifact paths under ``out_dir``."""
+    paths = {}
+    for key in _REVIEW_NAMES:
+        paths[key] = os.path.join(out_dir, _REVIEW_NAMES[key])
+    return paths
+
+
+def build_review_command(interpreter, opts, out_dir):
+    """argv for a review run: ``python -m steelreuse.validate_extraction donor ...artifacts``.
+
+    Review needs only the donor model -- no demand, no match. ``opts`` carries ``donor`` (required)
+    and optional ``pda``. All four artifacts are always written so the buttons are self-contained.
+    """
+    paths = review_paths(out_dir)
+    cmd = [interpreter, "-m", "steelreuse.validate_extraction", opts["donor"],
+           "--review-json", paths["review_json"],
+           "--report", paths["problems"],
+           "--pda-report", paths["pda_html"],
+           "--pda-out", paths["pda_csv"]]
+    pda = opts.get("pda")
+    if pda:
+        cmd.append("--pda")
+        cmd.append(pda)
+    return cmd
+
+
 def build_command(interpreter, opts, out_dir):
     """Build the argv for one match run: ``[interpreter, -m, steelreuse.cli, ...flags]``.
 
@@ -235,3 +267,16 @@ def run_match(interpreter, opts, out_dir):
     out, err = proc.communicate()
     return {"ok": proc.returncode == 0, "returncode": proc.returncode,
             "stdout": out, "stderr": err, "paths": output_paths(out_dir)}
+
+
+def run_review(interpreter, opts, out_dir):
+    """Run a review synchronously via subprocess; return the same dict shape as run_match."""
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+    cmd = build_review_command(interpreter, opts, out_dir)
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            universal_newlines=True, creationflags=creationflags)
+    out, err = proc.communicate()
+    return {"ok": proc.returncode == 0, "returncode": proc.returncode,
+            "stdout": out, "stderr": err, "paths": review_paths(out_dir)}

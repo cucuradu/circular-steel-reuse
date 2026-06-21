@@ -208,3 +208,17 @@ def test_run_match_end_to_end_is_terminal_free(tmp_path):
         data = json.load(fh)
     assert data["schema_version"] == 2
     assert "assignments" in data
+
+
+def test_build_review_command_has_all_artifacts():
+    cmd = runner.build_review_command("py.exe", {"donor": "d.json"}, "/out")
+    assert cmd[:3] == ["py.exe", "-m", "steelreuse.validate_extraction"]
+    assert "d.json" in cmd
+    joined = " ".join(cmd)
+    assert "--review-json" in joined and "--report" in joined
+    assert "--pda-report" in joined and "--pda-out" in joined
+
+
+def test_build_review_command_passes_pda_when_present():
+    cmd = runner.build_review_command("py.exe", {"donor": "d.json", "pda": "a.csv"}, "/out")
+    assert "--pda" in cmd and "a.csv" in cmd
