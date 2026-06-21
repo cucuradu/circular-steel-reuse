@@ -49,22 +49,31 @@ def test_alpha_A_area_reduction():
 
 def test_national_annex_overrides_qk_only():
     base = OCCUPANCY_PRESETS
+    # Denmark (official): residential 1.5, roof H qk 0.0; keeps g_k/psi0/reducible
+    dk = presets_for_na("dk")
+    assert dk["residential-A"].q_k == pytest.approx(1.5)
+    assert dk["roof-H"].q_k == pytest.approx(0.0)
+    assert dk["residential-A"].g_k == base["residential-A"].g_k
+    assert dk["congress-C2"] == base["congress-C2"]       # untouched -> EN base
+    # Finland (official): congress reduced
+    assert presets_for_na("fi")["congress-C2"].q_k == pytest.approx(3.0)
+    assert presets_for_na("fi")["congress-C5"].q_k == pytest.approx(6.0)
+    # Cyprus (official): balcony 4.0, retail-D1 5.0
+    assert presets_for_na("cy")["balcony-A"].q_k == pytest.approx(4.0)
+    assert presets_for_na("cy")["retail-D1"].q_k == pytest.approx(5.0)
+    # Spain (official): office 2.0
+    assert presets_for_na("es")["office-B"].q_k == pytest.approx(2.0)
+    # Italy (partial): roof + storage
     it = presets_for_na("it")
-    # Italy NTC overrides roof + storage q_k, keeps g_k/psi0/reducible
-    assert it["roof-H"].q_k == pytest.approx(0.5)        # coperture cat H1
-    assert it["roof-H"].g_k == base["roof-H"].g_k
+    assert it["roof-H"].q_k == pytest.approx(0.5)
     assert it["storage-E1"].q_k == pytest.approx(6.0)
-    # categories the NA doesn't touch are identical to EN base
-    assert it["congress-C2"] == base["congress-C2"]
-    # UK NA overlay: residential + office reduced
-    uk = presets_for_na("uk")
-    assert uk["residential-A"].q_k == pytest.approx(1.5)   # NA A1 (EN base 2.0)
-    assert uk["office-B"].q_k == pytest.approx(2.5)        # NA office (EN base 3.0)
-    # "en" (and unpopulated NAs) return the EN base unchanged
+    # UK (partial): residential + office
+    assert presets_for_na("uk")["office-B"].q_k == pytest.approx(2.5)
+    # "en" and paywalled-unpopulated NAs return the EN base unchanged
     assert presets_for_na("en")["office-B"] == base["office-B"]
     assert presets_for_na("de")["office-B"] == base["office-B"]
     # every advertised NA key is selectable
-    assert {"en", "it", "uk", "de", "fr", "es", "nl", "ie"} <= set(NATIONAL_ANNEXES)
+    assert {"en", "dk", "fi", "cy", "es", "it", "uk", "de", "fr", "nl", "ie"} <= set(NATIONAL_ANNEXES)
 
 
 def test_alpha_n_storey_reduction():

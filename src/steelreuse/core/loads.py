@@ -84,26 +84,51 @@ OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
 
 
 # National Annex q_k overrides (kN/m^2), layered over OCCUPANCY_PRESETS. q_k is a
-# Nationally Determined Parameter, so each country's NA may set its own value; only
-# categories that DIFFER from the EN base are listed (the rest inherit EN). These
-# numbers are from general engineering knowledge, NOT freshly verified line-by-line
-# against each NA — confirm against the official National Annex before certified use.
-# Correcting or adding a value is a single dict entry.
+# Nationally Determined Parameter, so each country's NA sets its own value; only the
+# categories that DIFFER from the EN base are listed (the rest inherit EN). Adding or
+# correcting a value is a single dict entry.
+#   dk, fi, cy, es  — read from the official, free national documents (parsed 2026-06-20).
+#   it, uk          — PARTIAL: a few values from secondary/known sources; verify.
+#   de, fr, nl, ie  — NA is paywalled; not entered, inherit EN until verified values added.
+# For certified use, confirm against the governing National Annex.
 NATIONAL_ANNEXES: dict[str, dict[str, float]] = {
     "en": {},  # EN 1991-1-1 base recommended values (default)
-    "it": {    # Italy — NTC 2018 Tab. 3.1.II
+    "dk": {    # Denmark — DS/EN 1991-1-1 DK NA:2013 (official, free; Table 6.2/6.8/6.10)
+        "residential-A": 1.5,   # A1 floors
+        "stairs-A": 3.0,        # A4 stairs
+        "office-B": 2.5,        # cat B
+        "congress-C1": 2.5,     # C1
+        "traffic-F": 2.5,       # garages <=30 kN
+        "roof-H": 0.0,          # roof cat H (DK takes qk = 0)
+    },
+    "fi": {    # Finland — SFS-EN 1991-1-1 NA, Min. Env. Decree 4/16 (official, free)
+        "office-B": 2.5,        # cat B
+        "congress-C1": 2.5,     # C1
+        "congress-C2": 3.0,     # C2
+        "congress-C3": 4.0,     # C3
+        "congress-C5": 6.0,     # C5
+    },
+    "cy": {    # Cyprus — CYS EN 1991-1-1 NA (official, free; Table 6.2/6.8)
+        "stairs-A": 3.0,        # A stairs
+        "balcony-A": 4.0,       # A balconies
+        "retail-D1": 5.0,       # D1
+        "traffic-F": 2.5,       # cat F
+    },
+    "es": {    # Spain — CTE DB-SE-AE Tabla 3.1 (official, free)
+        "office-B": 2.0,        # B zonas administrativas
+        "retail-D1": 5.0,       # D1 locales comerciales
+    },
+    "it": {    # Italy — NTC 2018 Tab. 3.1.II  (PARTIAL)
         "storage-E1": 6.0,      # cat E magazzini/depositi (ground)
-        "roof-H": 0.5,          # coperture cat H1 (accessibile sola manutenzione)
+        "roof-H": 0.5,          # coperture cat H1
     },
-    "uk": {    # United Kingdom — BS EN 1991-1-1 NA  (PARTIAL)
+    "uk": {    # United Kingdom — BS EN 1991-1-1 NA  (PARTIAL; verify)
         "residential-A": 1.5,   # NA A1 self-contained dwellings
-        "office-B": 2.5,        # NA.3 offices
+        "office-B": 2.5,        # NA offices
     },
-    # Recognized choices, NOT yet populated — they currently inherit the EN base.
-    # Enter verified q_k from each NA here (one line per differing category):
+    # NA paywalled — inherit EN base until verified q_k are entered:
     "de": {},  # Germany     — DIN EN 1991-1-1/NA
     "fr": {},  # France      — NF EN 1991-1-1/NA
-    "es": {},  # Spain       — UNE EN 1991-1-1/NA
     "nl": {},  # Netherlands — NEN-EN 1991-1-1/NB
     "ie": {},  # Ireland     — I.S. EN 1991-1-1/NA
 }
