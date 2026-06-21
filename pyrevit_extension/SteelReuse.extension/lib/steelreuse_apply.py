@@ -182,3 +182,68 @@ def apply_matches(doc, view, statuses, side, sp_file=None):
             t.RollBack()
         raise
     return {"applied": applied, "missing": missing, "by_status": by_status, "attention": attention}
+
+
+def apply_review_overrides(doc, view, review):
+    """Colour each problem element in ``view`` by its review severity (from review.json).
+
+    ``review`` is the parsed review dict; each member carries ``id`` and ``color`` (RGB list, or
+    None when clean). Opens/commits its own transaction. Returns ``{applied, missing,
+    element_ids:[ElementId]}`` so the caller can clear them later and print a linkified list.
+    """
+    solid_fill_id = _solid_fill_pattern_id(doc)
+    applied, missing, eids = 0, 0, []
+    t = DB.Transaction(doc, "SteelReuse: Highlight Problems")
+    t.Start()
+    try:
+        for m in review.get("members", []):
+            color = m.get("color")
+            if not color:
+                continue
+            try:
+                eid = DB.ElementId(int(m["id"]))
+            except Exception:  # noqa: BLE001
+                missing += 1
+                continue
+            if doc.GetElement(eid) is None:
+                missing += 1
+                continue
+            ogs = _overrides(tuple(color), solid_fill_id)
+            if ogs is not None:
+                view.SetElementOverrides(eid, ogs)
+                applied += 1
+                eids.append(eid)
+        t.Commit()
+    except Exception:
+        if t.HasStarted() and not t.HasEnded():
+            t.RollBack()
+        raise
+    return {"applied": applied, "missing": missing, "element_ids": eids}
+
+
+def clear_overrides(doc, view, element_ids):
+    """Remove graphic overrides previously set on ``element_ids`` (a blank OverrideGraphicSettings).
+
+    Skips ids no longer in the model (deleted since Highlight) and elements the active view can't
+    override, so one stale id never rolls back the whole clear. Returns ``{cleared, missing}``.
+    """
+    cleared, missing = 0, 0
+    t = DB.Transaction(doc, "SteelReuse: Clear Highlight")
+    t.Start()
+    try:
+        blank = DB.OverrideGraphicSettings()
+        for eid in element_ids:
+            if doc.GetElement(eid) is None:
+                missing += 1
+                continue
+            try:
+                view.SetElementOverrides(eid, blank)
+                cleared += 1
+            except Exception:  # noqa: BLE001 -- view can't override this element; skip it
+                missing += 1
+        t.Commit()
+    except Exception:
+        if t.HasStarted() and not t.HasEnded():
+            t.RollBack()
+        raise
+    return {"cleared": cleared, "missing": missing}
