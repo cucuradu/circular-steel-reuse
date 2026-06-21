@@ -22,6 +22,14 @@ import re
 
 from pyrevit import DB, forms, revit, script
 
+try:
+    # The extension lib/ is on the pyRevit engine path when run from the Extract button. Guarded so
+    # the extractor still works if it is ever run without the extension lib on the path (audit
+    # read-back is then simply skipped, never a hard failure of the extraction itself).
+    import steelreuse_pda_params as _pdaparams
+except ImportError:
+    _pdaparams = None
+
 FT_TO_MM = 304.8
 SUPPORT_TOL_MM = 50.0          # how close a support point must be to the beam line to count as a split
 _GRADE_RE = re.compile(r"S\s*(235|275|355|420|460)", re.IGNORECASE)
@@ -253,6 +261,33 @@ def _split_spans_mm(curve, support_pts):
         return [_mm(curve.Length)]
 
 
+def _read_pda(elem):
+    """Read SteelReuse PDA shared params off an element into a ``{field: value}`` dict (set ones only).
+
+    Closes the in-Revit audit loop: condition/verification/knockdown/recoverable/defects authored via
+    the Set Audit button (steelreuse_pda_params) survive re-extraction and flow into the match. The
+    number params are stored unitless (SpecTypeId.Number), so ``AsDouble`` gives the raw value (no
+    ft->mm conversion, unlike the geometry dimensions). Text is normalised via ``coerce_field``.
+    """
+    if _pdaparams is None:
+        return {}
+    out = {}
+    for param_name, field in _pdaparams.FIELD_BY_PARAM.items():
+        p = elem.LookupParameter(param_name)
+        if p is None or not p.HasValue:
+            continue
+        if field in ("knockdown", "recoverable_length_mm"):
+            try:
+                out[field] = p.AsDouble()
+            except Exception:  # noqa: BLE001 -- unreadable number param; just skip it
+                continue
+        else:
+            text = p.AsString()
+            if text:
+                out[field] = _pdaparams.coerce_field(field, text)
+    return out
+
+
 def extract(kind):
     beams = _collect(DB.BuiltInCategory.OST_StructuralFraming)
     columns = _collect(DB.BuiltInCategory.OST_StructuralColumns)
@@ -274,6 +309,7 @@ def extract(kind):
             "start_xyz": s, "end_xyz": e, "notes": "",
         }
         member.update(_section_dims(col))
+        member.update(_read_pda(col))   # PDA round-trip: authored audit -> extraction
         members.append(member)
 
     for bm in beams:
@@ -293,6 +329,7 @@ def extract(kind):
             "start_xyz": s, "end_xyz": e, "notes": note,
         }
         member.update(_section_dims(bm))
+        member.update(_read_pda(bm))   # PDA round-trip: authored audit -> extraction
         members.append(member)
 
     return {
