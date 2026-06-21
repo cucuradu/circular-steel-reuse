@@ -1,0 +1,7 @@
+title: |-
+  Review
+  Extraction
+tooltip: >-
+  Run a headless review of the active model's last extraction and show the problem report (unknown
+  / fuzzy sections, missing grades, missing coordinates, audit quarantines). Click any element id to
+  select and zoom to it in Revit.
