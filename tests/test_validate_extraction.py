@@ -1,5 +1,7 @@
 """Tests for the extraction-validation helper (steelreuse.validate_extraction)."""
 
+import json
+
 from steelreuse.schema import ExtractedMember, ExtractedModel
 from steelreuse.validate_extraction import main, summarize
 
@@ -68,3 +70,40 @@ def test_summarize_fuzzy_quarantined_counts_as_unknown():
     assert s["total"] == 2
     assert s["mapped"] == 1
     assert s["unknown"] == 1   # fuzzy member counts here, even though rv.unknown alone would be 0
+
+
+def _write_model(tmp_path):
+    members = [
+        {"id": "A", "role": "beam", "raw_section": "IPE300", "material_grade": "S275",
+         "start_xyz": [0, 0, 0], "end_xyz": [6000, 0, 0]},
+        {"id": "B", "role": "beam", "raw_section": "BAR JOIST 18K3"},
+    ]
+    p = tmp_path / "donor.json"
+    p.write_text(json.dumps({"kind": "donor", "members": members}), encoding="utf-8")
+    return p
+
+
+def test_cli_writes_all_review_artifacts(tmp_path):
+    donor = _write_model(tmp_path)
+    report = tmp_path / "problems.html"
+    pda_report = tmp_path / "pda.html"
+    review_json = tmp_path / "review.json"
+    pda_out = tmp_path / "audit.csv"
+    rc = main([str(donor), "--report", str(report), "--pda-report", str(pda_report),
+               "--review-json", str(review_json), "--pda-out", str(pda_out)])
+    assert rc == 0
+    assert "UNKNOWN_SECTION" in report.read_text(encoding="utf-8")
+    assert "pre-demolition audit" in pda_report.read_text(encoding="utf-8").lower()
+    assert json.loads(review_json.read_text(encoding="utf-8"))["coverage"]["total"] == 2
+    assert "condition_grade" in pda_out.read_text(encoding="utf-8")
+
+
+def test_cli_pda_merge_changes_review(tmp_path):
+    donor = _write_model(tmp_path)
+    audit = tmp_path / "in.csv"
+    audit.write_text("id,condition_grade,verification_status\nA,D,visual_only\n", encoding="utf-8")
+    review_json = tmp_path / "review.json"
+    main([str(donor), "--pda", str(audit), "--review-json", str(review_json)])
+    data = json.loads(review_json.read_text(encoding="utf-8"))
+    a = next(m for m in data["members"] if m["id"] == "A")
+    assert any(c == "QUARANTINED_CONDITION_D" for c, _ in a["issues"])

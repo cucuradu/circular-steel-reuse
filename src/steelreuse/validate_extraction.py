@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from pathlib import Path
 
@@ -51,6 +52,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expect", type=int, default=None, help="expected total member count")
     ap.add_argument("--schedule", default=None,
                     help="Revit schedule CSV; its data-row count is compared to the member count")
+    ap.add_argument("--pda", default=None, help="audit CSV merged onto members before review")
+    ap.add_argument("--report", default=None, help="write the problem-report HTML here")
+    ap.add_argument("--pda-report", default=None, help="write the PDA QA-report HTML here")
+    ap.add_argument("--review-json", default=None, help="write the ReviewModel JSON here")
+    ap.add_argument("--pda-out", default=None,
+                    help="write the audit CSV (--pda column order) here")
     ap.add_argument("--debug", action="store_true", help="show the full traceback on error")
     args = ap.parse_args(argv)
 
@@ -72,6 +79,19 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  coordinates: {s['with_coords']}/{s['total']} members "
           f"({s['columns_with_coords']}/{s['columns']} columns) "
           f"— frame analysis needs column coordinates")
+
+    if args.report or args.pda_report or args.review_json or args.pda_out:
+        from .review_view import pda_report_csv, render_pda_report, render_problem_report
+
+        review = extraction_review(model, load_default_catalog(), pda=args.pda).to_dict()
+        if args.report:
+            Path(args.report).write_text(render_problem_report(review), encoding="utf-8")
+        if args.pda_report:
+            Path(args.pda_report).write_text(render_pda_report(review), encoding="utf-8")
+        if args.review_json:
+            Path(args.review_json).write_text(json.dumps(review, indent=2), encoding="utf-8")
+        if args.pda_out:
+            Path(args.pda_out).write_text(pda_report_csv(review), encoding="utf-8")
 
     expected = args.expect
     if expected is None and args.schedule:
