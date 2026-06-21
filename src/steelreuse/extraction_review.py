@@ -63,14 +63,14 @@ class MemberReview:
     audited: bool
     admitted: bool
     has_coords: bool
-    issues: list  # list[[code, severity]]
+    issues: list[list[str]]  # each entry is [code, severity]
 
     @property
-    def worst_severity(self):
+    def worst_severity(self) -> str | None:
         sev = [s for _, s in self.issues]
         return max(sev, key=lambda s: SEVERITY_ORDER[s]) if sev else None
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         worst = self.worst_severity
         return {
             "id": self.id, "role": self.role, "raw_section": self.raw_section,
@@ -87,9 +87,9 @@ class MemberReview:
 
 @dataclass
 class ReviewModel:
-    members: list
+    members: list[MemberReview]
     total: int = 0
-    roles: dict = field(default_factory=dict)
+    roles: dict[str, int] = field(default_factory=dict)
     mapped: int = 0
     fuzzy: int = 0
     unknown: int = 0
@@ -100,11 +100,11 @@ class ReviewModel:
     admitted: int = 0
     quarantined: int = 0
     avg_knockdown: float = 1.0
-    verification_counts: dict = field(default_factory=dict)
-    condition_counts: dict = field(default_factory=dict)
-    issue_counts: dict = field(default_factory=dict)
+    verification_counts: dict[str, int] = field(default_factory=dict)
+    condition_counts: dict[str, int] = field(default_factory=dict)
+    issue_counts: dict[str, int] = field(default_factory=dict)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             "schema_version": 1,
             "members": [m.to_dict() for m in self.members],
@@ -122,7 +122,7 @@ class ReviewModel:
         }
 
 
-def _mapping_method(member, catalog, overrides):
+def _mapping_method(member, catalog: dict, overrides: dict) -> str:
     """Reconstruct the per-member mapping method after resolve_members set ``member.section``.
 
     resolve_members reports counts by raw name, not by member; re-running map_section per member
@@ -139,7 +139,7 @@ def _mapping_method(member, catalog, overrides):
     return res.method       # exact / override / normalized
 
 
-def _member_issues(member, method, decision):
+def _member_issues(member, method: str, decision) -> list[list[str]]:
     issues = []
     if method == "unknown":
         issues.append(["UNKNOWN_SECTION", ISSUE_SEVERITY["UNKNOWN_SECTION"]])
@@ -154,15 +154,16 @@ def _member_issues(member, method, decision):
     elif not decision.admitted:
         if decision.condition.upper() == "D":
             issues.append(["QUARANTINED_CONDITION_D", ISSUE_SEVERITY["QUARANTINED_CONDITION_D"]])
-        elif "below floor" in decision.reason:
+        elif decision.reason_code == "below_floor":
             issues.append(["LOW_KNOCKDOWN", ISSUE_SEVERITY["LOW_KNOCKDOWN"]])
         else:
             issues.append(["QUARANTINED_UNVERIFIED", ISSUE_SEVERITY["QUARANTINED_UNVERIFIED"]])
     return issues
 
 
-def extraction_review(model, catalog, pda=None, default_knockdown=1.0,
-                      include_unverified=False, overrides=None):
+def extraction_review(model, catalog: dict, pda: str | None = None,
+                      default_knockdown: float = 1.0, include_unverified: bool = False,
+                      overrides: dict | None = None) -> ReviewModel:
     """Per-member data-quality + audit diagnostics for an extracted model.
 
     Reuses resolve_members (sets member.section in place, gives mapped/fuzzy/unknown counts) and

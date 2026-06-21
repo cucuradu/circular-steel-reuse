@@ -92,7 +92,8 @@ class AuditDecision:
     condition: str          # normalized condition grade ("" if none)
     verification: str       # normalized verification basis ("" if none)
     audited: bool           # did the member carry any audit data at all?
-    reason: str = ""        # why it was quarantined (empty if admitted)
+    reason: str = ""        # why it was quarantined, human-readable (empty if admitted)
+    reason_code: str = ""   # stable machine tag for the quarantine cause (e.g. "below_floor")
 
 
 def assess_member(
@@ -145,7 +146,8 @@ def assess_member(
 
     if kd < MIN_KNOCKDOWN:
         return AuditDecision(mid, False, kd, cond, ver, True,
-                             reason=f"knockdown {kd:.2f} below floor {MIN_KNOCKDOWN:.2f}")
+                             reason=f"knockdown {kd:.2f} below floor {MIN_KNOCKDOWN:.2f}",
+                             reason_code="below_floor")
     return AuditDecision(mid, True, min(kd, 1.0), cond, ver, True)
 
 
