@@ -161,6 +161,93 @@ def build_writeback(result: PipelineResult) -> dict:
     }
 
 
+def status_from_results(results: dict) -> dict:
+    """Reconstruct the apply-matches status map (``build_writeback`` shape) from a ``results.json``.
+
+    For re-applying a *saved* run whose original ``status.json`` was not archived: the assignment-keyed
+    results.json (schema v2, :func:`build_results`) carries enough to recover the elements that get a
+    colour — reused / quarantined donors and filled / partially-filled / unfilled demand. The purely
+    informational states absent from results.json (donor ``available``/``unmapped``, demand
+    ``non_steel`` — grey or no-override) are simply omitted, so those elements are left as-is. Colours
+    and statuses mirror :data:`DONOR_COLORS` / :data:`DEMAND_COLORS` exactly.
+    """
+    assignments = results.get("assignments") or []
+    unfilled = results.get("unfilled") or []
+
+    def _rgb(color):
+        return list(color) if color is not None else None
+
+    # Donor side: group assignments by donor, mark reused; add quarantined donors.
+    donor: dict[str, dict] = {}
+    by_donor: dict[str, list] = {}
+    for a in assignments:
+        by_donor.setdefault(a.get("donor_id", ""), []).append(a)
+    by_donor.pop("", None)
+    for donor_id, assigns in by_donor.items():
+        slot_ids = ", ".join(a.get("slot_id", "") for a in assigns)
+        co2 = sum(a.get("co2_saved_kg") or 0.0 for a in assigns)
+        section = assigns[0].get("donor_section", "")
+        if len(assigns) == 1:
+            note = f"reused -> slot {assigns[0].get('slot_id', '')} ({section}), saved {co2:.0f} kg CO2e"
+        else:
+            note = (f"reused (cut into {len(assigns)}) -> slots {slot_ids} ({section}), "
+                    f"saved {co2:.0f} kg CO2e")
+        donor[donor_id] = ElementStatus("reused", DONOR_COLORS["reused"], note,
+                                        paired_with=slot_ids, co2_saved_kg=co2).to_dict()
+    for q in results.get("quarantined_donors") or []:
+        donor[q.get("donor_id", "")] = ElementStatus(
+            "quarantined", DONOR_COLORS["quarantined"], q.get("reason", "")).to_dict()
+    donor.pop("", None)
+
+    # Demand side: per member, which spans were filled vs left for new steel.
+    filled_by_member: dict[str, list] = {}
+    for a in assignments:
+        filled_by_member.setdefault(a.get("demand_id", ""), []).append(a)
+    unfilled_by_member: dict[str, list] = {}
+    for u in unfilled:
+        unfilled_by_member.setdefault(u.get("demand_id", ""), []).append(u.get("slot_id", ""))
+
+    demand: dict[str, dict] = {}
+    for member_id in set(filled_by_member) | set(unfilled_by_member):
+        if not member_id:
+            continue
+        fa = filled_by_member.get(member_id, [])
+        uf = unfilled_by_member.get(member_id, [])
+        donor_ids = ", ".join(sorted({a.get("donor_id", "") for a in fa}))
+        co2 = sum(a.get("co2_saved_kg") or 0.0 for a in fa) if fa else None
+        n_spans = len(fa) + len(uf)
+        if fa and not uf:
+            note = f"filled by reuse: {donor_ids} ({fa[0].get('donor_section', '')})"
+            demand[member_id] = ElementStatus("filled", DEMAND_COLORS["filled"], note,
+                                              paired_with=donor_ids, co2_saved_kg=co2).to_dict()
+        elif fa and uf:
+            note = f"{len(fa)}/{n_spans} spans filled by reuse, {len(uf)} need new steel"
+            demand[member_id] = ElementStatus(
+                "partially_filled", DEMAND_COLORS["partially_filled"], note,
+                paired_with=donor_ids, co2_saved_kg=co2).to_dict()
+        else:
+            demand[member_id] = ElementStatus(
+                "unfilled", DEMAND_COLORS["unfilled"],
+                "no matching donor found; new steel required").to_dict()
+
+    for v in donor.values():
+        v["color"] = _rgb(v["color"])
+    for v in demand.values():
+        v["color"] = _rgb(v["color"])
+
+    kpis = results.get("kpis") or {}
+    return {
+        "donor": donor,
+        "demand": demand,
+        "summary": {
+            "n_reused": kpis.get("reused"),
+            "slot_count": kpis.get("slots"),
+            "supply_count": kpis.get("supply_count"),
+            "co2_saved_kg": kpis.get("co2_saved_kg"),
+        },
+    }
+
+
 def _mass_reused_kg(result: PipelineResult) -> float:
     """Reclaimed steel mass put back to work = each reused donor's catalog mass over its used length.
 

@@ -9,7 +9,7 @@ from steelreuse.core.sections import ValidationReport
 from steelreuse.match.optimize import Assignment, DemandSlot, MatchResult
 from steelreuse.pipeline import PipelineResult, run_pipeline
 from steelreuse.schema import ExtractedMember, ExtractedModel
-from steelreuse.writeback import build_writeback
+from steelreuse.writeback import build_results, build_writeback, status_from_results
 
 
 def test_writeback_statuses_end_to_end(tmp_path):
@@ -100,3 +100,45 @@ def test_writeback_partially_filled_multi_span():
     assert "1/2 spans filled" in wb["demand"]["N4"]["note"]
     assert wb["demand"]["N4"]["paired_with"] == "D1"
     assert wb["demand"]["N4"]["co2_saved_kg"] == 10.0
+
+
+def test_status_from_results_reconstructs_actionable_statuses(tmp_path):
+    """Re-applying a saved run: status_from_results(results.json) must recover the colour-bearing
+    statuses (reused/quarantined donors, filled/partially/unfilled demand) that build_writeback
+    produces. The purely-informational available/unmapped/non_steel are intentionally omitted."""
+    donor = ExtractedModel(kind="donor", source="pyrevit", members=[
+        ExtractedMember(id="D1", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W18x55", length_mm=7000),
+        ExtractedMember(id="D2", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W18x55", length_mm=7000),
+        ExtractedMember(id="D3", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W18x55", length_mm=7000,
+                        condition_grade="D", verification_status="documented"),
+    ])
+    demand = ExtractedModel(kind="demand", source="pyrevit", members=[
+        ExtractedMember(id="N1", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W16x26", spans_mm=[6000]),
+        ExtractedMember(id="N2", role="beam", category="Structural Framing",
+                        raw_section="W Shapes W16x26", spans_mm=[25000]),
+    ])
+    dp, mp = tmp_path / "donor.json", tmp_path / "demand.json"
+    donor.save(dp)
+    demand.save(mp)
+    res = run_pipeline(str(dp), str(mp), steel_only_demand=True)
+
+    truth = build_writeback(res)
+    rebuilt = status_from_results(build_results(res))
+
+    # demand: filled / unfilled recovered exactly
+    assert rebuilt["demand"]["N1"]["status"] == truth["demand"]["N1"]["status"] == "filled"
+    assert rebuilt["demand"]["N2"]["status"] == truth["demand"]["N2"]["status"] == "unfilled"
+    assert rebuilt["demand"]["N1"]["color"] == [0, 166, 81]            # green, list (JSON-shaped)
+    # the reused donor matches (paired + colour); quarantined D3 recovered
+    reused_id = next(k for k, v in truth["donor"].items() if v["status"] == "reused")
+    assert rebuilt["donor"][reused_id]["status"] == "reused"
+    assert rebuilt["donor"][reused_id]["paired_with"] == "N1#0"
+    assert rebuilt["donor"][reused_id]["co2_saved_kg"] > 0
+    assert rebuilt["donor"]["D3"]["status"] == "quarantined"
+    # available/non_steel intentionally absent (no colour to apply)
+    avail = next(k for k, v in truth["donor"].items() if v["status"] == "available")
+    assert avail not in rebuilt["donor"]
