@@ -28,3 +28,29 @@ def test_template_csv_has_fixed_header_order():
     text = survey_template_csv(_model())
     header = next(csv.reader(io.StringIO(text)))
     assert header == SURVEY_COLUMNS
+
+
+from steelreuse.survey import normalize_survey_value
+
+
+def test_normalize_verification_synonyms():
+    assert normalize_survey_value("verification_status", "Mill Certificate") == "mill_cert"
+    assert normalize_survey_value("verification_status", "coupon test") == "coupon_tested"
+    assert normalize_survey_value("verification_status", "drawings") == "documented"
+    assert normalize_survey_value("verification_status", "visual") == "visual_only"
+    assert normalize_survey_value("verification_status", "") == "unverified"
+
+
+def test_normalize_condition_synonyms():
+    assert normalize_survey_value("condition_grade", "good") == "A"
+    assert normalize_survey_value("condition_grade", "light corrosion") == "B"
+    assert normalize_survey_value("condition_grade", "section loss") == "C"
+    assert normalize_survey_value("condition_grade", "unsuitable") == "D"
+    assert normalize_survey_value("condition_grade", "B") == "B"   # already canonical
+
+
+def test_normalize_connection_and_numbers():
+    assert normalize_survey_value("connection_type", "pinned") == "bolted"
+    assert normalize_survey_value("connection_type", "moment") == "welded"
+    assert normalize_survey_value("knockdown", "0.9") == 0.9
+    assert normalize_survey_value("knockdown", "bad") is None

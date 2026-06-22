@@ -51,3 +51,61 @@ def survey_template_csv(model) -> str:
     for row in survey_template_rows(model):
         w.writerow(row)
     return buf.getvalue()
+
+
+_NUMBER_FIELDS = ("knockdown", "recoverable_length_mm")
+
+_VERIFICATION_SYNONYMS = {
+    "mill_cert": ("mill cert", "mill certificate", "cert", "certificate", "mtc"),
+    "coupon_tested": ("coupon", "coupon test", "coupon tested", "tested", "tensile test"),
+    "documented": ("documented", "drawings", "records", "as-built", "design records"),
+    "visual_only": ("visual", "visual only", "assumed", "estimated", "era"),
+    "unverified": ("unverified", "none", "unknown", "n/a", ""),
+}
+_CONDITION_SYNONYMS = {
+    "A": ("a", "good", "as-new", "new", "excellent", "sound"),
+    "B": ("b", "minor", "light", "light corrosion", "cosmetic"),
+    "C": ("c", "significant", "section loss", "moderate", "deformed"),
+    "D": ("d", "poor", "unsuitable", "bad", "severe", "heavy corrosion"),
+}
+_CONNECTION_SYNONYMS = {
+    "bolted": ("bolted", "pinned", "simple", "shear", "bolt"),
+    "welded": ("welded", "weld", "moment", "fixed"),
+    "riveted": ("riveted", "rivet"),
+}
+
+
+def _match_synonym(text, table, default=None):
+    low = text.strip().lower()
+    for canonical, words in table.items():
+        if low == canonical.lower() or low in words:
+            return canonical
+    return default
+
+
+def normalize_survey_value(field, raw):
+    """Coerce a raw survey cell to the stored form, mapping common synonyms; None when unset.
+
+    Numbers -> float (None if unparseable). condition/verification/connection map through synonym
+    tables, falling back to the canonicalised text (UPPER for condition, lower otherwise) so an
+    unrecognised but plausible value is preserved for the audit layer rather than dropped.
+    """
+    text = (raw or "").strip()
+    if field in _NUMBER_FIELDS:
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
+    if field == "verification_status":
+        return _match_synonym(text, _VERIFICATION_SYNONYMS, default=(text.lower() or "unverified"))
+    if field == "condition_grade":
+        if not text:
+            return None
+        return _match_synonym(text, _CONDITION_SYNONYMS, default=text.upper())
+    if field == "connection_type":
+        if not text:
+            return None
+        return _match_synonym(text, _CONNECTION_SYNONYMS, default="unknown")
+    return text or None
