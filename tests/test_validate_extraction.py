@@ -107,3 +107,15 @@ def test_cli_pda_merge_changes_review(tmp_path):
     data = json.loads(review_json.read_text(encoding="utf-8"))
     a = next(m for m in data["members"] if m["id"] == "A")
     assert any(c == "QUARANTINED_CONDITION_D" for c, _ in a["issues"])
+
+
+def test_cli_writes_survey_template(tmp_path):
+    donor = tmp_path / "d.json"
+    donor.write_text(json.dumps({"kind": "donor", "members": [
+        {"id": "1", "unique_id": "g1", "mark": "B-1", "role": "beam",
+         "raw_section": "IPE300", "length_mm": 6000.0}]}), encoding="utf-8")
+    out = tmp_path / "survey.csv"
+    rc = main([str(donor), "--survey-template", str(out)])
+    assert rc == 0
+    text = out.read_text(encoding="utf-8")
+    assert "unique_id" in text and "condition_grade" in text and "g1" in text

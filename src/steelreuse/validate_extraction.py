@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--review-json", default=None, help="write the ReviewModel JSON here")
     ap.add_argument("--pda-out", default=None,
                     help="write the audit CSV (--pda column order) here")
+    ap.add_argument("--survey-template", default=None,
+                    help="write a PDA survey template CSV (one row per member, audit columns blank)")
     ap.add_argument("--debug", action="store_true", help="show the full traceback on error")
     args = ap.parse_args(argv)
 
@@ -92,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.review_json).write_text(json.dumps(review, indent=2), encoding="utf-8")
         if args.pda_out:
             Path(args.pda_out).write_text(pda_report_csv(review), encoding="utf-8")
+
+    if args.survey_template:
+        from .survey import survey_template_csv
+        Path(args.survey_template).write_text(survey_template_csv(model), encoding="utf-8")
 
     expected = args.expect
     if expected is None and args.schedule:
