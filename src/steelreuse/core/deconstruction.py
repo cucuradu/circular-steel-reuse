@@ -74,3 +74,22 @@ def effective_recoverable_length(member, policy: DeconstructionPolicy | None = N
         base = float(getattr(member, "length_mm", 0.0) or 0.0)
     t = deconstruction_treatment(member, p)
     return max(p.min_stock_mm, base - t.cut_total_mm)
+
+
+def member_degrees(model, snap_tol_mm: float = 50.0) -> dict[str, int]:
+    """Connections-per-member from shared-node snapping: how many other members meet a member's ends.
+
+    Reuses the frame solver's :func:`steelreuse.core.frame.snap_nodes` (pure, no solver). A member's
+    degree = the number of distinct *other* members that share either of its two end nodes. Members
+    without usable coordinates are absent from the result (no opinion), mirroring the frame path.
+    """
+    topo = snap_nodes(model.members, snap_tol_mm=snap_tol_mm)
+    members_at_node: dict[str, set[str]] = {}
+    for mid, (i, j) in topo.member_nodes.items():
+        members_at_node.setdefault(i, set()).add(mid)
+        members_at_node.setdefault(j, set()).add(mid)
+    degrees: dict[str, int] = {}
+    for mid, (i, j) in topo.member_nodes.items():
+        neighbours = (members_at_node.get(i, set()) | members_at_node.get(j, set())) - {mid}
+        degrees[mid] = len(neighbours)
+    return degrees

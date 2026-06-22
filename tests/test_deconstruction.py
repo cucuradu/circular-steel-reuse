@@ -1,8 +1,8 @@
 """Tests for the deconstruction recovery model (connection type -> recovery treatment + degree)."""
 
 from steelreuse.core.deconstruction import (DeconstructionPolicy, deconstruction_treatment,
-                                            effective_recoverable_length)
-from steelreuse.schema import ExtractedMember
+                                            effective_recoverable_length, member_degrees)
+from steelreuse.schema import ExtractedMember, ExtractedModel
 
 
 def _m(**kw):
@@ -42,3 +42,22 @@ def test_effective_recoverable_length_composes_with_pda_and_floors():
     # floor: a tiny member can't go below min_stock
     short = _m(connection_type="welded", length_mm=1000.0, recoverable_length_mm=1000.0)
     assert effective_recoverable_length(short, p) == 1000.0
+
+
+def test_member_degrees_on_a_small_frame():
+    # two beams sharing one end node at (6000,0,0): each connects to the other -> degree 1 each.
+    members = [
+        ExtractedMember(id="b1", role="beam", raw_section="IPE300",
+                        start_xyz=[0, 0, 0], end_xyz=[6000, 0, 0]),
+        ExtractedMember(id="b2", role="beam", raw_section="IPE300",
+                        start_xyz=[6000, 0, 0], end_xyz=[12000, 0, 0]),
+    ]
+    deg = member_degrees(ExtractedModel(kind="donor", members=members))
+    assert deg["b1"] == 1
+    assert deg["b2"] == 1
+
+
+def test_member_without_coords_has_no_degree():
+    m = ExtractedMember(id="x", role="beam", raw_section="IPE300")  # no coords
+    deg = member_degrees(ExtractedModel(kind="donor", members=[m]))
+    assert "x" not in deg
