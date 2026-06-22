@@ -75,7 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="imposed area load q_k (kN/m^2) for the FLOOR zone; overrides --occupancy")
     ap.add_argument("--national-annex", choices=sorted(NATIONAL_ANNEXES), default="en",
                     help="National Annex q_k override set applied to the occupancy presets "
-                         "(en = EN base, default; dk/fi/cy/es from official free sources; it/uk "
+                         "(en = EN base, default; dk/fi/cy/es/be from official free sources; it/uk "
                          "partial; de/fr/nl/ie inherit EN until verified values are added). q_k is a "
                          "Nationally Determined Parameter — confirm against the official NA before "
                          "certified use")

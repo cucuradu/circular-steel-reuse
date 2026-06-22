@@ -87,9 +87,9 @@ OCCUPANCY_PRESETS: dict[str, ZoneSpec] = {
 # Nationally Determined Parameter, so each country's NA sets its own value; only the
 # categories that DIFFER from the EN base are listed (the rest inherit EN). Adding or
 # correcting a value is a single dict entry.
-#   dk, fi, cy, es  — read from the official, free national documents (parsed 2026-06-20).
-#   it, uk          — PARTIAL: a few values from secondary/known sources; verify.
-#   de, fr, nl, ie  — NA is paywalled; not entered, inherit EN until verified values added.
+#   dk, fi, cy, es, be  — read from the official, free national documents (parsed 2026-06-20/21).
+#   it, uk              — PARTIAL: a few values from secondary/known sources; verify.
+#   de, fr, nl, ie      — NA paywalled (only paid/pirate copies found); inherit EN until entered.
 # For certified use, confirm against the governing National Annex.
 NATIONAL_ANNEXES: dict[str, dict[str, float]] = {
     "en": {},  # EN 1991-1-1 base recommended values (default)
@@ -117,6 +117,12 @@ NATIONAL_ANNEXES: dict[str, dict[str, float]] = {
     "es": {    # Spain — CTE DB-SE-AE Tabla 3.1 (official, free)
         "office-B": 2.0,        # B zonas administrativas
         "retail-D1": 5.0,       # D1 locales comerciales
+    },
+    "be": {    # Belgium — NBN EN 1991-1-1 ANB (Buildwise fiche, official, free)
+        "stairs-A": 3.0,        # A trappen
+        "balcony-A": 4.0,       # A balkons
+        "retail-D1": 5.0,       # D1 kleinhandel
+        "traffic-F": 2.5,       # cat F
     },
     "it": {    # Italy — NTC 2018 Tab. 3.1.II  (PARTIAL)
         "storage-E1": 6.0,      # cat E magazzini/depositi (ground)
@@ -187,7 +193,8 @@ class AreaLoadModel:
     column_floors: float = 1.0             # default floors a column accumulates
     column_eccentricity_mm: float = 0.0    # notional moment lever for columns (0 = pure axial)
     notional_phi: float = 0.0              # EN 5.3.2 global sway imperfection (0 = off; EN value 1/200)
-    flange_restrained: bool = True         # a floor slab restrains the beam's compression flange
+    flange_restrained: bool = False        # conservative default: LTB evaluated as unrestrained (EN
+                                           # k=1.0) unless a slab/bracing restraint is asserted
     construction_stage: bool = False       # add the bare-steel erection-stage case for beams (opt-in)
     construction_live_kpa: float = 0.75    # EN 1991-1-6 q_ca, working personnel (kN/m^2)
     uplift_kpa: float = 0.0                # net upward roof wind pressure (kN/m^2, EN 1991-1-4; 0 = off)

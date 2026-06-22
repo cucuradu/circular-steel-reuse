@@ -63,6 +63,9 @@ def test_national_annex_overrides_qk_only():
     assert presets_for_na("cy")["retail-D1"].q_k == pytest.approx(5.0)
     # Spain (official): office 2.0
     assert presets_for_na("es")["office-B"].q_k == pytest.approx(2.0)
+    # Belgium (official): balcony 4.0, retail-D1 5.0
+    assert presets_for_na("be")["balcony-A"].q_k == pytest.approx(4.0)
+    assert presets_for_na("be")["retail-D1"].q_k == pytest.approx(5.0)
     # Italy (partial): roof + storage
     it = presets_for_na("it")
     assert it["roof-H"].q_k == pytest.approx(0.5)
@@ -73,7 +76,7 @@ def test_national_annex_overrides_qk_only():
     assert presets_for_na("en")["office-B"] == base["office-B"]
     assert presets_for_na("de")["office-B"] == base["office-B"]
     # every advertised NA key is selectable
-    assert {"en", "dk", "fi", "cy", "es", "it", "uk", "de", "fr", "nl", "ie"} <= set(NATIONAL_ANNEXES)
+    assert {"en", "dk", "fi", "cy", "es", "be", "it", "uk", "de", "fr", "nl", "ie"} <= set(NATIONAL_ANNEXES)
 
 
 def test_alpha_n_storey_reduction():
