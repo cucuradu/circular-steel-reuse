@@ -249,34 +249,76 @@ def save_settings(ext_dir, settings):
         json.dump(settings, handle, indent=2)
 
 
-def run_match(interpreter, opts, out_dir):
-    """Run one match synchronously via subprocess; return a result dict.
+# Windows NTSTATUS-style exit codes that mean "the OS killed the process", not a clean Python error
+# (a Python exception exits 1 with a traceback). These appear as large-magnitude negative returncodes.
+_CRASH_CODES = {
+    -1073741510: "terminated (Ctrl-C / console-close, 0xC000013A)",
+    -1073741819: "access violation / native crash (0xC0000005)",
+    -1073741795: "illegal instruction (0xC000001D)",
+    -1073740791: "stack buffer overrun (0xC0000409)",
+    -1073741515: "a required DLL was not found (0xC0000135)",
+}
 
-    ``{"ok": bool, "returncode": int, "stdout": str, "stderr": str, "paths": {...}}``. The caller
-    (Run Match button) runs this on a background thread and, on success, hands ``paths["results"]``
-    to the dockable panel. This function touches no Revit API, so it is safe off the UI thread.
+
+def describe_returncode(rc):
+    """A human hint for an abnormal subprocess exit code, or '' for a normal (0..255) exit.
+
+    Large negative codes are Windows process-kills: the engine was terminated by the OS (antivirus /
+    Application Control / a blocked native binary such as the bundled CBC solver), not a Python error.
+    Such a kill usually leaves no log, so the button should explain the number instead of just showing
+    it. The same command run from a terminal succeeding confirms it is the in-Revit launch context.
+    """
+    if 0 <= rc <= 255:
+        return ""
+    what = _CRASH_CODES.get(rc, "abnormal termination (0x%08X)" % (rc & 0xFFFFFFFF))
+    return ("The engine process was killed by Windows: " + what + ". This is not a Python error and "
+            "usually leaves no log. Most likely antivirus or Application Control killed python.exe or "
+            "the bundled CBC solver. If the same 'python -m steelreuse.cli ...' runs fine in a "
+            "terminal, the problem is the in-Revit launch context (an AV/policy exclusion is needed).")
+
+
+def _run_logged(cmd, out_dir, paths, log_name):
+    """Shell the engine out, streaming stdout+stderr to ``out_dir/log_name`` so the output survives
+    even a hard OS kill (a pipe + communicate() would return empty when the child is terminated).
+
+    Runs the interpreter unbuffered (``-u``) so the log flushes in real time, suppresses the console
+    window (Revit is a GUI app), and puts the child in its own process group so it does not inherit
+    Revit's console-control events (the 0xC000013A kill). Returns the run_match/run_review result dict.
     """
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
-    cmd = build_command(interpreter, opts, out_dir)
-    # Revit is a GUI app, so a plain Popen would flash a console window for the child python; suppress
-    # it on Windows (no-op elsewhere). Output is captured via the pipes regardless.
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            universal_newlines=True, creationflags=creationflags)
-    out, err = proc.communicate()
+    cmd = [cmd[0], "-u"] + cmd[1:]
+    log_path = os.path.join(out_dir, log_name)
+    creationflags = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    with open(log_path, "w") as logfh:
+        proc = subprocess.Popen(cmd, stdout=logfh, stderr=subprocess.STDOUT,
+                                creationflags=creationflags)
+        proc.wait()
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            combined = fh.read()
+    except Exception:  # noqa: BLE001 -- a missing log must never mask the returncode
+        combined = ""
+    paths = dict(paths)
+    paths["log"] = log_path
     return {"ok": proc.returncode == 0, "returncode": proc.returncode,
-            "stdout": out, "stderr": err, "paths": output_paths(out_dir)}
+            "stdout": combined, "stderr": "", "paths": paths}
+
+
+def run_match(interpreter, opts, out_dir):
+    """Run one match synchronously via subprocess; return a result dict.
+
+    ``{"ok": bool, "returncode": int, "stdout": str, "stderr": str, "paths": {...}}`` (``stdout`` is
+    the combined child log; ``paths['log']`` is its file). The caller (Run Match button) runs this on a
+    background thread and, on success, hands ``paths['results']`` to the dockable panel. This function
+    touches no Revit API, so it is safe off the UI thread.
+    """
+    return _run_logged(build_command(interpreter, opts, out_dir), out_dir,
+                       output_paths(out_dir), "run.log")
 
 
 def run_review(interpreter, opts, out_dir):
     """Run a review synchronously via subprocess; return the same dict shape as run_match."""
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-    cmd = build_review_command(interpreter, opts, out_dir)
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            universal_newlines=True, creationflags=creationflags)
-    out, err = proc.communicate()
-    return {"ok": proc.returncode == 0, "returncode": proc.returncode,
-            "stdout": out, "stderr": err, "paths": review_paths(out_dir)}
+    return _run_logged(build_review_command(interpreter, opts, out_dir), out_dir,
+                       review_paths(out_dir), "review.log")

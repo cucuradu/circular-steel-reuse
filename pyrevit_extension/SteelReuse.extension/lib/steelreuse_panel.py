@@ -278,9 +278,13 @@ class SteelReusePanel(forms.WPFWindow):
             self._ui(lambda: self._failed(message))
             return
         if not res["ok"]:
-            detail = (res["stderr"] or res["stdout"] or "").strip()
-            self._ui(lambda: self._failed(
-                "Match failed (exit %s):\n%s" % (res["returncode"], detail[-2000:])))
+            detail = (res["stdout"] or res["stderr"] or "").strip()
+            hint = runner.describe_returncode(res["returncode"])
+            if hint:
+                log = res["paths"].get("log")
+                detail = hint + (("\n\nLog: " + log) if log else "") + (("\n\n" + detail) if detail else "")
+            message = "Match failed (exit %s):\n%s" % (res["returncode"], detail[-2000:])
+            self._ui(lambda m=message: self._failed(m))
             return
         self._ui(lambda: self._loaded(res["paths"]["results"], res.get("stdout", ""), opts))
 

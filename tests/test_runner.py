@@ -210,6 +210,24 @@ def test_run_match_end_to_end_is_terminal_free(tmp_path):
     assert "assignments" in data
 
 
+def test_run_match_writes_a_durable_log(tmp_path):
+    from steelreuse.resources import sample_path
+
+    out = tmp_path / "run"
+    opts = {"donor": str(sample_path("donor.json")), "demand": str(sample_path("demand.json"))}
+    res = runner.run_match(sys.executable, opts, str(out))
+    assert res["ok"], res["stdout"]
+    assert os.path.exists(res["paths"]["log"])          # log survives even a kill
+    assert res["stdout"]                                 # combined child output is captured from it
+
+
+def test_describe_returncode_flags_os_kills_only():
+    assert runner.describe_returncode(0) == ""           # clean exit -> no hint
+    assert runner.describe_returncode(1) == ""           # ordinary Python error -> no hint
+    assert "0xC000013A" in runner.describe_returncode(-1073741510)
+    assert "killed by Windows" in runner.describe_returncode(-1073741819)
+
+
 def test_build_review_command_has_all_artifacts():
     cmd = runner.build_review_command("py.exe", {"donor": "d.json"}, "/out")
     assert cmd[:3] == ["py.exe", "-m", "steelreuse.validate_extraction"]
