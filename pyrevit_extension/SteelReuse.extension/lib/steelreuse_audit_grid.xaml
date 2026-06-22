@@ -1,0 +1,22 @@
+<!-- .../lib/steelreuse_audit_grid.xaml -->
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SteelReuse — Audit Grid" Height="600" Width="900" WindowStartupLocation="CenterScreen">
+  <Grid Margin="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,6">
+      <TextBlock Text="Bulk set:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <ComboBox x:Name="bulkField" Width="160" Margin="0,0,6,0"/>
+      <TextBox x:Name="bulkValue" Width="160" Margin="0,0,6,0"/>
+      <Button x:Name="bulkApply" Content="Apply to selected" Width="130"/>
+    </StackPanel>
+    <DataGrid x:Name="dg" Grid.Row="1" AutoGenerateColumns="True" CanUserAddRows="False"
+              SelectionMode="Extended"/>
+    <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Right" Margin="0,6,0,0">
+      <TextBlock x:Name="status" VerticalAlignment="Center" Margin="0,0,12,0"/>
+      <Button x:Name="saveBtn" Content="Save to model" Width="120"/>
+    </StackPanel>
+  </Grid>
+</Window>

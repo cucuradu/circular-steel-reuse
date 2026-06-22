@@ -1,0 +1,7 @@
+title: |-
+  Audit
+  Grid
+tooltip: >-
+  Open an editable table of all donor members and enter pre-demolition-audit data (condition,
+  verification, knockdown, recoverable length, defects, connection) inline. Multi-select rows to
+  bulk-set a value; Save writes everything to SteelReuse shared parameters in one step.
