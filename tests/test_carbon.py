@@ -68,6 +68,22 @@ def test_old_factor_csv_without_credit_columns_still_loads(tmp_path):
     assert f.recycle_credit == 0.0 and f.reroll_credit == 0.0
 
 
+def test_welded_member_has_higher_reuse_process_carbon():
+    from steelreuse.core.sections import load_default_catalog
+    from steelreuse.schema import ExtractedMember
+    cat = load_default_catalog()
+    clean = ExtractedMember(id="1", section="IPE300", raw_section="IPE300", length_mm=6000.0,
+                            connection_type="bolted")
+    welded = ExtractedMember(id="2", section="IPE300", raw_section="IPE300", length_mm=6000.0,
+                             connection_type="welded")
+    p = build_passport([clean, welded], cat)
+    e_clean = next(e for e in p.entries if e.id == "1")
+    e_welded = next(e for e in p.entries if e.id == "2")
+    assert e_welded.ec_reuse_kgco2e > e_clean.ec_reuse_kgco2e
+    # net saving correspondingly lower for the welded member
+    assert e_welded.ec_saved_kgco2e < e_clean.ec_saved_kgco2e
+
+
 def test_passport_skips_unknown_sections(cat):
     model = ExtractedModel.load(DATA / "samples" / "donor.json")
     resolve_members(model.members, cat)

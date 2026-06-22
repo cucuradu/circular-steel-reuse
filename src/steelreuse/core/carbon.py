@@ -131,12 +131,15 @@ def build_passport(
             continue  # unmapped -> excluded from the passport (reported separately by the mapping layer)
         sec = catalog[m.section]
         mass = member_mass_kg(sec, m.length_mm)
+        from .deconstruction import deconstruction_treatment
+        mult = deconstruction_treatment(m).process_multiplier
+        reuse_per_kg = f.reuse_process * mult
         entries.append(PassportEntry(
             id=m.id, section=m.section, grade=m.material_grade,
             length_mm=m.length_mm, mass_kg=mass, volume_m3=member_volume_m3(sec, m.length_mm),
             ec_new_kgco2e=mass * f.a1a3,
-            ec_reuse_kgco2e=mass * f.reuse_process,
-            ec_saved_kgco2e=mass * f.saved_per_kg,
+            ec_reuse_kgco2e=mass * reuse_per_kg,
+            ec_saved_kgco2e=mass * (f.a1a3 - reuse_per_kg),
             verification_status=getattr(m, "verification_status", None),
             condition_grade=getattr(m, "condition_grade", None),
         ))
