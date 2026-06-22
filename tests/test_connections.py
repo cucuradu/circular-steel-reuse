@@ -138,3 +138,26 @@ def test_v_ed_above_standard_capacity_flags_review(catalog):
     # capacity opinion stands even with no design section to compare against
     no_design = screen_pair(sec, None, v_ed_n=200e3)
     assert no_design.status == "review"
+
+
+# --- surveyed connection data ------------------------------------------------
+
+CAT = load_default_catalog()
+IPE300 = CAT["IPE300"]
+
+
+def test_surveyed_welded_joint_adds_review_note():
+    chk = screen_pair(IPE300, IPE300, donor_connection_type="welded")
+    assert chk.status == "review"
+    assert any("welded" in n.lower() for n in chk.notes)
+
+
+def test_surveyed_poor_joint_condition_adds_review():
+    chk = screen_pair(IPE300, IPE300, donor_connection_condition="D")
+    assert chk.status == "review"
+
+
+def test_absent_survey_is_unchanged_regression():
+    # no surveyed args -> identical to the geometric-only result (here: a clean ok)
+    assert screen_pair(IPE300, IPE300).status == "ok"
+    assert screen_pair(IPE300, IPE300, donor_connection_type="bolted").status == "ok"

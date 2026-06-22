@@ -104,6 +104,8 @@ def screen_pair(
     design: SectionProps | None,
     policy: ConnectionPolicy | None = None,
     v_ed_n: float = 0.0,
+    donor_connection_type: str | None = None,
+    donor_connection_condition: str | None = None,
 ) -> ConnectionCheck:
     """Geometric connection-compatibility of ``donor`` standing in for ``design``.
 
@@ -116,7 +118,15 @@ def screen_pair(
     ``incompatible`` (a bespoke connection may well work; that is the engineer's call).
     """
     p = policy or ConnectionPolicy()
-    cap_notes: list[str] = []
+    survey_notes: list[str] = []
+    ctype = (donor_connection_type or "").strip().lower()
+    if ctype in ("welded", "riveted"):
+        survey_notes.append(
+            "surveyed joint: " + ctype + " — verify the member can be recovered intact (cutting needed)")
+    ccond = (donor_connection_condition or "").strip().upper()
+    if ccond in ("C", "D"):
+        survey_notes.append("surveyed joint condition " + ccond + ": inspect the connection")
+    cap_notes: list[str] = list(survey_notes)
     if v_ed_n > 0:
         cap = standard_shear_capacity(donor, p)
         if cap is not None and v_ed_n > cap[0]:
