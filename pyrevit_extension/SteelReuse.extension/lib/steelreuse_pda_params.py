@@ -15,6 +15,9 @@ PDA_SHARED_PARAMS = (
     ("Reuse Knockdown", "number"),
     ("Reuse Recoverable Length (mm)", "number"),
     ("Reuse Defects", "text"),
+    ("Reuse Connection Type", "text"),
+    ("Reuse Connection Condition", "text"),
+    ("Reuse Deconstructability", "text"),
 )
 
 # Revit param name -> ExtractedMember field name.
@@ -24,6 +27,9 @@ FIELD_BY_PARAM = {
     "Reuse Knockdown": "knockdown",
     "Reuse Recoverable Length (mm)": "recoverable_length_mm",
     "Reuse Defects": "defects",
+    "Reuse Connection Type": "connection_type",
+    "Reuse Connection Condition": "connection_condition",
+    "Reuse Deconstructability": "deconstructability",
 }
 
 _NUMBER_FIELDS = ("knockdown", "recoverable_length_mm")
@@ -43,8 +49,8 @@ def coerce_field(field, value):
             return float(text)
         except ValueError:
             return None
-    if field == "condition_grade":
+    if field in ("condition_grade", "connection_condition"):
         return text.upper()
-    if field == "verification_status":
+    if field in ("verification_status", "connection_type", "deconstructability"):
         return text.lower()
     return text
