@@ -25,7 +25,7 @@ def _txt(value):
     return "" if value is None else str(value)
 
 
-class GridRow(object):
+class GridRow:
     """One editable row as plain attributes so the WPF DataGrid can bind/edit it (dicts can't bind).
 
     Seeded from a steelreuse_audit_grid.build_rows dict; ``_orig`` keeps the seeded display strings so
@@ -82,7 +82,8 @@ class AuditGridWindow(forms.WPFWindow):
     def _payload(self):
         """Replay each row's CHANGED cells through the tested pure model -> {element_id: {field: val}}."""
         model_rows = gridmodel.build_rows(self._review)
-        for gr, mr in zip(self.rows, model_rows):
+        for i in range(len(self.rows)):     # index loop: IronPython 3 has no zip(strict=...)
+            gr, mr = self.rows[i], model_rows[i]
             for field in gridmodel.EDITABLE_FIELDS:
                 value = getattr(gr, field)
                 if value != gr._orig.get(field):
