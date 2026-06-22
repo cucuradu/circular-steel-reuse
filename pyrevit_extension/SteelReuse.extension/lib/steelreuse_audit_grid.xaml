@@ -1,7 +1,7 @@
 <!-- .../lib/steelreuse_audit_grid.xaml -->
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SteelReuse — Audit Grid" Height="600" Width="900" WindowStartupLocation="CenterScreen">
+        Title="SteelReuse — Audit Grid" Height="600" Width="1080" WindowStartupLocation="CenterScreen">
   <Grid Margin="8">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
@@ -11,9 +11,29 @@
       <ComboBox x:Name="bulkField" Width="160" Margin="0,0,6,0"/>
       <TextBox x:Name="bulkValue" Width="160" Margin="0,0,6,0"/>
       <Button x:Name="bulkApply" Content="Apply to selected" Width="130"/>
+      <TextBlock Text="  Tip: edit cells inline, or select rows + bulk-set. Save writes to the model."
+                 VerticalAlignment="Center" Foreground="#666" Margin="10,0,0,0"/>
     </StackPanel>
-    <DataGrid x:Name="dg" Grid.Row="1" AutoGenerateColumns="True" CanUserAddRows="False"
-              SelectionMode="Extended"/>
+    <!-- AutoGenerateColumns=False: WPF cannot bind Python dict keys; bind explicit columns to the
+         GridRow object's attributes (mirrors lib/steelreuse_panel.xaml). -->
+    <DataGrid x:Name="dg" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False"
+              SelectionMode="Extended" SelectionUnit="FullRow" HeadersVisibility="Column"
+              GridLinesVisibility="All">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Element id" Binding="{Binding id}" IsReadOnly="True" Width="80"/>
+        <DataGridTextColumn Header="Mark" Binding="{Binding mark}" IsReadOnly="True" Width="60"/>
+        <DataGridTextColumn Header="Section" Binding="{Binding section}" IsReadOnly="True" Width="90"/>
+        <DataGridTextColumn Header="Role" Binding="{Binding role}" IsReadOnly="True" Width="70"/>
+        <DataGridTextColumn Header="Condition" Binding="{Binding condition_grade}" Width="80"/>
+        <DataGridTextColumn Header="Verification" Binding="{Binding verification_status}" Width="110"/>
+        <DataGridTextColumn Header="Knockdown" Binding="{Binding knockdown}" Width="80"/>
+        <DataGridTextColumn Header="Recov. len (mm)" Binding="{Binding recoverable_length_mm}" Width="105"/>
+        <DataGridTextColumn Header="Defects" Binding="{Binding defects}" Width="150"/>
+        <DataGridTextColumn Header="Connection" Binding="{Binding connection_type}" Width="95"/>
+        <DataGridTextColumn Header="Conn. cond." Binding="{Binding connection_condition}" Width="85"/>
+        <DataGridTextColumn Header="Deconstruct." Binding="{Binding deconstructability}" Width="100"/>
+      </DataGrid.Columns>
+    </DataGrid>
     <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Right" Margin="0,6,0,0">
       <TextBlock x:Name="status" VerticalAlignment="Center" Margin="0,0,12,0"/>
       <Button x:Name="saveBtn" Content="Save to model" Width="120"/>
