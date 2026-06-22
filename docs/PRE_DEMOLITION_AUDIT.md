@@ -62,13 +62,30 @@ quarantines the member rather than silently zeroing its capacity.
 it defaults to the member's physical length when not surveyed and feeds the matcher's length/cutting
 constraints.
 
+### Connection survey (optional)
+
+Three further optional fields record *how* the member is joined, so its recovery effort is honest
+rather than assumed. The reuse question is per member — "can I extract *this* member intact?" — so a
+connection is modelled as the member's own attribute (its **hardest** end), not as a shared object.
+
+| field | values | effect |
+|---|---|---|
+| `connection_type` | `bolted` / `welded` / `riveted` / `unknown` | `welded`/`riveted` ends cannot be deconstructed intact → the connection screen flags `review`, and the material passport adds a cutting allowance (lost length per cut end) + a reuse-process carbon uplift |
+| `connection_condition` | `A`–`D` | surveyed joint condition; `C`/`D` flags `review` |
+| `deconstructability` | `easy` / `moderate` / `hard` / `unknown` | explicit override of the type-derived treatment (`easy` → treat as clean even if welded; `hard` → force cutting) |
+
+Like every PDA field these are honest-by-default: absent or `unknown` → no effect, results unchanged.
+A geometric connections-per-member **degree** (how many other members meet a member's ends) is derived
+from the model geometry and surfaced in the review/PDA reports — no survey input needed.
+
 ## How to supply audit data
 
 Two interchangeable routes — the fields live on each donor member either way:
 
 1. **In the model JSON.** The extractor (or a later edit) sets the PDA fields directly on each
    `ExtractedMember`: `condition_grade`, `verification_status`, `knockdown`, `defects`,
-   `recoverable_length_mm`.
+   `recoverable_length_mm`, and the optional connection fields `connection_type`,
+   `connection_condition`, `deconstructability`.
 2. **As a separate CSV** merged at run time with `--pda audit.csv`. This lets the audit live alongside
    the BIM export rather than inside it. Columns (only `id` is required; blanks are ignored):
 
@@ -88,7 +105,8 @@ Two interchangeable routes — the fields live on each donor member either way:
    **SteelReuse tab → Review panel → Set Audit**, and enter the condition grade, verification basis,
    knockdown, recoverable length and defects. The values are written to schedulable **SteelReuse**
    shared parameters (`Reuse Condition Grade`, `Reuse Verification`, `Reuse Knockdown`,
-   `Reuse Recoverable Length (mm)`, `Reuse Defects`) on each element, alongside the reuse passport.
+   `Reuse Recoverable Length (mm)`, `Reuse Defects`, `Reuse Connection Type`,
+   `Reuse Connection Condition`, `Reuse Deconstructability`) on each element, alongside the reuse passport.
    The next **Extract Steel** reads them straight back onto each member, so the audit flows into the
    match exactly like route 1 — no separate CSV needed. The same **Review** panel also has
    **Review Extraction** / **PDA Report** (read the data-quality and audit-coverage reports without
@@ -115,6 +133,8 @@ The material passport (`core/carbon.py`) records each member's verification basi
 ## Scope
 
 The PDA layer models *how audit findings flow into the structural and carbon results*. It does not
-perform the survey, design coupon-test programmes, or assess weldability of old steel or connection
-condition — those remain the engineer's responsibility (see `docs/METHODOLOGY.md` §12, out of scope).
-The value here is making the audit an explicit, auditable input rather than a silent assumption.
+perform the survey or design coupon-test programmes, and it does not *assess* weldability of old steel
+or connection capacity — those remain the engineer's responsibility (see `docs/METHODOLOGY.md` §12, out
+of scope). It does now *record* a surveyed connection type/condition and let it flag review and adjust
+the recovery/carbon figures, but recording a survey finding is not the same as designing the joint. The
+value here is making the audit an explicit, auditable input rather than a silent assumption.

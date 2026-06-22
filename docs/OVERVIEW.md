@@ -33,12 +33,36 @@ realistic action effects (gravity load path, sway imperfection, wind, seismic, a
 the solver is interchangeable, an experimental SAP2000 backend cross‑validating the open‑source one.
 A language model generates the report prose under a strict constraint that it performs no arithmetic; all
 quantities are computed deterministically and validated. The deterministic core is hand‑verified against
-published section data and protected by 312 automated tests. The tool is scoped as member‑level
+published section data and protected by 443 automated tests. The tool is scoped as member‑level
 pre‑feasibility decision support: it does not design connections, and reclaimed material requires physical
 verification before reliance.
 
 **Keywords:** circular economy; steel reuse; embodied carbon; Eurocode EN 1993‑1‑1; BIM; Mixed‑Integer
 Linear Programming; design for deconstruction.
+
+---
+
+## Statement of contribution
+
+Three ideas distinguish this work from standard member‑level reuse screening.
+
+The first is the avoided‑new baseline. Carbon saved is credited against the lightest catalogue section
+that would otherwise have been bought for a position, not against the reclaimed member's own mass. A
+heavy donor dropped into a light slot therefore cannot over‑book its saving, and the optimiser cannot be
+rewarded for spending heavy stock on light demand (`src/steelreuse/match/optimize.py:288‑331`; §8.2).
+
+The second is treating scope honesty as part of the method rather than as a disclaimer. Connection design
+and material certification are placed outside the tool on purpose and stated as boundaries of the
+contribution, not excused after the fact (§1.4).
+
+The third is a conservative‑default‑and‑flag invariant. Where a restraint or action effect is unknown the
+tool assumes the unfavourable case and records the flag, so a favourable structural assumption is never
+made silently (see [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md), principle 4).
+
+These support one methodological claim. Member‑level reuse pre‑feasibility can be made trustworthy enough
+to act on when a deterministic EN 1993‑1‑1 source of truth is paired with an avoided‑new carbon baseline
+and run under a conservative‑default‑and‑flag discipline, so that every result is bounded by its stated
+scope.
 
 ---
 
@@ -509,6 +533,17 @@ bespoke design needed" — never excluded, because a bespoke connection may well
 screen yields a 3‑row plate at ≈ 183 kN, hand‑verified in the tests. Designing the connections
 themselves — bolts, welds, plates, block tearing, the bespoke cases — remains out of scope.
 
+The screen also reads the donor's **surveyed connection data** when the pre‑demolition audit recorded
+it (§ PDA): a member whose hardest end is `welded` or `riveted`, or whose joint condition is surveyed
+`C`/`D`, is flagged `review` — the member may not come out intact, so its recovery needs verifying.
+The same survey feeds the **material passport**: a member that cannot be deconstructed intact carries
+a cutting allowance (lost length at each cut end) and a reuse‑process carbon uplift, so the passport's
+reuse figure reflects the real deconstruction effort instead of assuming every joint unbolts cleanly.
+A geometric connections‑per‑member **degree** — how many other members meet a member's ends, from the
+shared‑node topology — is reported alongside as a first proxy for how entangled a member is. All of it
+is honest‑by‑default: absent or `unknown` survey data changes nothing, so un‑surveyed runs are
+byte‑identical to before.
+
 ## 9.1.2 Selectable objectives
 
 Net carbon saving is the default objective, but it is not the only sensible one, and the matcher exposes
@@ -617,7 +652,7 @@ hand‑verified against EN 1993‑1‑1 Annex B / NCCI SN003 / AISC `C_b` (`C₁
 UDL span; `C_m = 0.6 + 0.4ψ` for end‑moment members), and the shear–moment interaction against an IPE300
 (`V_Ed = 300 kN → ρ = 0.223`, `M_y,V,Rd = 164.2 kNm`).
 
-**Automated suite.** 312 tests (across twenty‑nine files) pass under a clean linter, covering the member
+**Automated suite.** 443 tests (across forty files) pass under a clean linter, covering the member
 checks, the matcher (known‑answer feasibility, use constraints, the avoided‑new and standard‑restricted
 baselines, the selectable objectives and stewardship terms, degenerate‑geometry safety, the greedy guard,
 the independent match verifier, the combination envelope, cutting‑stock), the frame analysis (topology,
