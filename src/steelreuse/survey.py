@@ -109,3 +109,106 @@ def normalize_survey_value(field, raw):
             return None
         return _match_synonym(text, _CONNECTION_SYNONYMS, default="unknown")
     return text or None
+
+
+# Source header (lowercased, separators stripped) -> our field name.
+_HEADER_ALIASES = {
+    # key
+    "uniqueid": "unique_id", "unique_id": "unique_id", "guid": "unique_id",
+    "globalid": "unique_id", "ifcguid": "unique_id",
+    "id": "id", "elementid": "id",
+    "mark": "mark",
+    # audit
+    "condition": "condition_grade", "conditiongrade": "condition_grade", "grade": "condition_grade",
+    "state": "condition_grade",
+    "verification": "verification_status", "verificationstatus": "verification_status",
+    "basis": "verification_status", "gradebasis": "verification_status", "cert": "verification_status",
+    "certification": "verification_status",
+    "knockdown": "knockdown",
+    "recoverablelength": "recoverable_length_mm", "recoverablelengthmm": "recoverable_length_mm",
+    "defects": "defects", "notes": "defects",
+    "connection": "connection_type", "connectiontype": "connection_type", "joint": "connection_type",
+    "fixity": "connection_type",
+    "connectioncondition": "connection_condition", "jointcondition": "connection_condition",
+    "deconstructability": "deconstructability", "deconstruction": "deconstructability",
+}
+
+_IMPORTABLE_FIELDS = ("unique_id", "id", "mark", "condition_grade", "verification_status",
+                      "knockdown", "recoverable_length_mm", "defects",
+                      "connection_type", "connection_condition", "deconstructability")
+
+
+def _canon_header(name):
+    return "".join(ch for ch in (name or "").strip().lower() if ch.isalnum())
+
+
+def _map_header(name, col_map):
+    if col_map and name in col_map:
+        return col_map[name]
+    return _HEADER_ALIASES.get(_canon_header(name))
+
+
+def _read_rows(path):
+    """Read a survey file into a list of {source_header: cell_string} dicts (CSV / JSON / .xlsx)."""
+    suffix = Path(path).suffix.lower()
+    if suffix == ".json":
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        rows = data if isinstance(data, list) else data.get("members", data.get("rows", []))
+        return [{k: ("" if v is None else str(v)) for k, v in row.items()} for row in rows]
+    if suffix in (".xlsx", ".xlsm"):
+        try:
+            import openpyxl
+        except ImportError as e:  # noqa: BLE001
+            raise RuntimeError("reading .xlsx needs the optional 'xlsx' extra: "
+                               "pip install steelreuse[xlsx]") from e
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        it = ws.iter_rows(values_only=True)
+        headers = [str(h) if h is not None else "" for h in next(it, [])]
+        out = []
+        for vals in it:
+            out.append({headers[i]: ("" if v is None else str(v))
+                        for i, v in enumerate(vals) if i < len(headers)})
+        return out
+    # default: CSV (also handles .tsv via the sniffer-free DictReader on commas)
+    with Path(path).open(newline="", encoding="utf-8-sig") as fh:
+        return [dict(row) for row in csv.DictReader(fh)]
+
+
+def resolve_key(record):
+    """The element key for a parsed record: unique_id -> id -> mark, first non-empty."""
+    for field in ("unique_id", "id", "mark"):
+        val = (record.get(field) or "").strip()
+        if val:
+            return val
+    return None
+
+
+def load_survey(path, col_map=None):
+    """Read a survey file (CSV/Excel/JSON) into ``{element_key: {field: coerced_value}}``.
+
+    Columns are mapped to our fields by ``col_map`` (override) then the alias table; cell values are
+    normalised via :func:`normalize_survey_value`. Rows without a resolvable key are skipped.
+    """
+    out = {}
+    for raw_row in _read_rows(path):
+        record = {}
+        for src_header, cell in raw_row.items():
+            field = _map_header(src_header, col_map)
+            if field is None or field not in _IMPORTABLE_FIELDS:
+                continue
+            if field in ("unique_id", "id", "mark"):
+                record[field] = (cell or "").strip()
+            else:
+                value = normalize_survey_value(field, cell)
+                if value is not None:
+                    record[field] = value
+        key = resolve_key(record)
+        if not key:
+            continue
+        # Don't store the key columns themselves as audit fields.
+        record.pop("unique_id", None)
+        record.pop("id", None)
+        record.pop("mark", None)
+        out[key] = record
+    return out
