@@ -39,6 +39,8 @@ class ExtractedMember:
     """
 
     id: str
+    unique_id: str | None = None   # stable Revit UniqueId / IFC GlobalId (survives worksharing)
+    mark: str | None = None        # human Mark parameter (e.g. "B-12"); blank when unset
     role: str = "unknown"          # one of ROLES
     category: str = ""             # raw Revit category, e.g. "Structural Framing"
     raw_section: str = ""          # original Revit family/type name, e.g. "IPE 300" / "HE 300 A"
