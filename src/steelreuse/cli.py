@@ -237,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
-def _loads_from_args(args: argparse.Namespace) -> "LoadModel | AreaLoadModel":
+def _loads_from_args(args: argparse.Namespace) -> LoadModel | AreaLoadModel:
     """Build the load model from parsed CLI args (legacy flat model, or zone-based area model)."""
     if args.beam_udl is not None or args.column_axial is not None:
         return LoadModel(

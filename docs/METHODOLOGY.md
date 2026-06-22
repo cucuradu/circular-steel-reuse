@@ -631,7 +631,7 @@ its own `wL²/8`; `run_pipeline` then yields one slot per span. **Seismic:** `se
 2-storey box gives a base shear `Cs·ΣW` distributed inverted-triangular (roof force = 2× the floor force),
 and `seismic_cs > 0` adds the `seismic X/Y` design situations.
 
-**Whole suite:** 328 tests, ruff clean.
+**Whole suite:** 475 tests, ruff clean.
 
 ### 10.1 Sensitivity & uncertainty of the CO₂ figure  (`sensitivity.py`, `--demo` via `steelreuse-sensitivity`)
 

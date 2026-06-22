@@ -27,7 +27,7 @@ from steelreuse.core.sections import FY_BY_GRADE, SectionProps, load_catalog
 def _round(name="CHS200X10", D=200.0, t=10.0):
     r_out, r_in = D / 2.0, D / 2.0 - t
     A = math.pi * (r_out**2 - r_in**2)
-    I = math.pi / 4.0 * (r_out**4 - r_in**4)
+    I = math.pi / 4.0 * (r_out**4 - r_in**4)  # noqa: E741 — second moment of area
     Wel = I / r_out
     Wpl = 4.0 / 3.0 * (r_out**3 - r_in**3)
     i = math.sqrt(I / A)

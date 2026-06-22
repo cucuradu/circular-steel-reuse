@@ -17,7 +17,6 @@ ifcopenshell = pytest.importorskip("ifcopenshell")
 
 from steelreuse.ifc_extract import extract_ifc  # noqa: E402
 
-
 # --- tiny IFC builder -----------------------------------------------------------------------------
 # Built with raw create_entity so each placement/curve is explicit and hand-checkable.
 

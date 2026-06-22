@@ -33,7 +33,7 @@ realistic action effects (gravity load path, sway imperfection, wind, seismic, a
 the solver is interchangeable, an experimental SAP2000 backend cross‑validating the open‑source one.
 A language model generates the report prose under a strict constraint that it performs no arithmetic; all
 quantities are computed deterministically and validated. The deterministic core is hand‑verified against
-published section data and protected by 443 automated tests. The tool is scoped as member‑level
+published section data and protected by 475 automated tests. The tool is scoped as member‑level
 pre‑feasibility decision support: it does not design connections, and reclaimed material requires physical
 verification before reliance.
 
@@ -652,7 +652,7 @@ hand‑verified against EN 1993‑1‑1 Annex B / NCCI SN003 / AISC `C_b` (`C₁
 UDL span; `C_m = 0.6 + 0.4ψ` for end‑moment members), and the shear–moment interaction against an IPE300
 (`V_Ed = 300 kN → ρ = 0.223`, `M_y,V,Rd = 164.2 kNm`).
 
-**Automated suite.** 443 tests (across forty files) pass under a clean linter, covering the member
+**Automated suite.** 475 tests (across forty files) pass under a clean linter, covering the member
 checks, the matcher (known‑answer feasibility, use constraints, the avoided‑new and standard‑restricted
 baselines, the selectable objectives and stewardship terms, degenerate‑geometry safety, the greedy guard,
 the independent match verifier, the combination envelope, cutting‑stock), the frame analysis (topology,
