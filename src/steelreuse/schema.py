@@ -80,6 +80,14 @@ class ExtractedMember:
     defects: str = ""                       # free-text survey notes (corrosion, deformation, holes, ...)
     recoverable_length_mm: float | None = None  # usable length after de-construction (defaults to length)
 
+    # --- Connection survey (D) -------------------------------------------------------------------
+    # The member's own ends, as surveyed. connection_type is the member's HARDEST end to deconstruct
+    # (one welded end forces a cut); a connection is not modelled as a shared object. All optional:
+    # absent -> not surveyed -> no effect (honest-by-default, like the PDA condition/verification).
+    connection_type: str | None = None       # bolted | welded | riveted | unknown
+    connection_condition: str | None = None  # A-D, the joint's surveyed condition
+    deconstructability: str | None = None    # easy | moderate | hard | unknown (override of derived)
+
     def __post_init__(self) -> None:
         if self.role not in ROLES:
             self.role = "unknown"

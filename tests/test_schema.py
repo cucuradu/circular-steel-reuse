@@ -21,3 +21,19 @@ def test_unique_id_and_mark_roundtrip_through_json(tmp_path):
 def test_old_extraction_without_new_fields_still_loads():
     m = ExtractedMember.from_dict({"id": "1", "raw_section": "IPE300"})
     assert m.unique_id is None and m.mark is None
+
+
+def test_member_carries_connection_fields():
+    m = ExtractedMember(id="1", raw_section="IPE300",
+                        connection_type="welded", connection_condition="C",
+                        deconstructability="hard")
+    assert m.connection_type == "welded"
+    assert m.connection_condition == "C"
+    assert m.deconstructability == "hard"
+
+
+def test_connection_fields_default_none():
+    m = ExtractedMember(id="1", raw_section="IPE300")
+    assert m.connection_type is None
+    assert m.connection_condition is None
+    assert m.deconstructability is None
