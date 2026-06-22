@@ -1,0 +1,7 @@
+title: |-
+  Import
+  Survey
+tooltip: >-
+  Import a filled pre-demolition-audit survey (CSV / Excel / JSON, from any tool) and write the
+  condition, verification basis, knockdown, recoverable length and defects onto the matching elements
+  as schedulable SteelReuse shared parameters. Rows are matched by UniqueId, then id, then Mark.
