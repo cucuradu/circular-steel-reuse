@@ -125,6 +125,27 @@ parameters. Other overrides, parameters and comments are untouched; the paramete
 so the schedule columns survive (they just go blank). Overrides are per-view — run it in the same
 view you applied them in.
 
+## Use: the Review panel
+
+A one-pass review of an extraction — **before** matching — surfaces data-quality problems and the
+pre-demolition-audit status, and lets you author audit data in-Revit. All five buttons live on the
+**Review** panel and (except Set Audit) shell out to the same CPython engine as Run Match, so the
+heavy work never runs in Revit.
+
+- **Review Extraction** — runs a headless review of the active model's last extraction and shows the
+  **problem report** (unknown / fuzzy sections, missing grades, missing coordinates, audit
+  quarantines) in the output window, plus a clickable element-id list grouped by severity — click an
+  id to select and zoom to it.
+- **PDA Report** — the pre-demolition-audit QA report: coverage (audited / admitted / quarantined /
+  average knockdown) and each member's condition, verification basis and knockdown. No match needed.
+- **Highlight Problems** / **Clear Highlight** — colour the active view by review severity
+  (red = unknown section, amber = fuzzy / audit quarantine, grey = info), then remove the overrides.
+  Per-view, like Apply / Clear Matches.
+- **Set Audit** — select framing/columns and enter condition grade, verification basis, knockdown,
+  recoverable length and defects; they are written to schedulable **SteelReuse** shared parameters
+  and read back by the next **Extract Steel**, so the audit flows into the match. See
+  [`docs/PRE_DEMOLITION_AUDIT.md`](../docs/PRE_DEMOLITION_AUDIT.md#how-to-supply-audit-data).
+
 ## Folder layout (pyRevit's required nesting)
 
 ```
@@ -137,16 +158,24 @@ pyrevit_extension/                         <- register THIS as a custom extensio
    │  ├─ steelreuse_panel.py               # the Run Match WPFWindow (+ ExternalEvent zoom/apply)
    │  ├─ steelreuse_panel.xaml             # the window layout
    │  ├─ steelreuse_panel_model.py         # parse results.json v2 into grid rows + filters
-   │  ├─ steelreuse_apply.py               # shared Apply-Matches (overrides + reuse params)
-   │  └─ steelreuse_results_view.py        # HTML results view (fallback / Results button)
+   │  ├─ steelreuse_apply.py               # shared Apply-Matches + Highlight/Set-Audit (overrides + params)
+   │  ├─ steelreuse_results_view.py        # HTML results view (fallback / Results button)
+   │  ├─ steelreuse_review_view.py         # HTML problem + PDA reports for the Review panel
+   │  └─ steelreuse_pda_params.py          # PDA shared-param map + value coercion
    └─ SteelReuse.tab/
       ├─ Extract.panel/
-      │  └─ Extract.pushbutton/            # runs extractor/pyrevit_extract.py:main()
-      └─ Match.panel/
-         ├─ RunMatch.pushbutton/           # opens the SteelReuse window (run + review, no terminal)
-         ├─ Results.pushbutton/            # re-open the last results.json in an HTML view
-         ├─ ApplyMatches.pushbutton/       # reads status.json: overrides + reuse parameters
-         ├─ ReuseSchedule.pushbutton/      # creates/opens the "SteelReuse Passport" schedule
-         ├─ TraceMatch.pushbutton/         # jump from a matched element to its partner(s)
-         └─ ClearMatches.pushbutton/       # undoes Apply Matches (reset overrides, empty params)
+      │  └─ Extract.pushbutton/            # runs extractor/pyrevit_extract.py:main() (reads PDA params back)
+      ├─ Match.panel/
+      │  ├─ RunMatch.pushbutton/           # opens the SteelReuse window (run + review, no terminal)
+      │  ├─ Results.pushbutton/            # re-open the last results.json in an HTML view
+      │  ├─ ApplyMatches.pushbutton/       # reads status.json: overrides + reuse parameters
+      │  ├─ ReuseSchedule.pushbutton/      # creates/opens the "SteelReuse Passport" schedule
+      │  ├─ TraceMatch.pushbutton/         # jump from a matched element to its partner(s)
+      │  └─ ClearMatches.pushbutton/       # undoes Apply Matches (reset overrides, empty params)
+      └─ Review.panel/
+         ├─ ReviewExtraction.pushbutton/   # headless review -> problem report + clickable ids
+         ├─ PdaReport.pushbutton/          # pre-demolition-audit QA report
+         ├─ HighlightProblems.pushbutton/  # colour the active view by review severity
+         ├─ ClearHighlight.pushbutton/     # remove the highlight overrides
+         └─ SetAudit.pushbutton/           # write PDA shared params on the selection
 ```

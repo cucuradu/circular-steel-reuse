@@ -84,6 +84,17 @@ Two interchangeable routes — the fields live on each donor member either way:
 
    A blank template ships at [`docs/pda_template.csv`](pda_template.csv).
 
+3. **In Revit, via the Set Audit button.** Select the framing/columns you surveyed, then
+   **SteelReuse tab → Review panel → Set Audit**, and enter the condition grade, verification basis,
+   knockdown, recoverable length and defects. The values are written to schedulable **SteelReuse**
+   shared parameters (`Reuse Condition Grade`, `Reuse Verification`, `Reuse Knockdown`,
+   `Reuse Recoverable Length (mm)`, `Reuse Defects`) on each element, alongside the reuse passport.
+   The next **Extract Steel** reads them straight back onto each member, so the audit flows into the
+   match exactly like route 1 — no separate CSV needed. The same **Review** panel also has
+   **Review Extraction** / **PDA Report** (read the data-quality and audit-coverage reports without
+   running a match) and **Highlight Problems** / **Clear Highlight** (colour the model by review
+   severity). See [`pyrevit_extension/README.md`](../pyrevit_extension/README.md#use-the-review-panel).
+
 ## CLI
 
 ```bash
