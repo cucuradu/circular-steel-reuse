@@ -64,6 +64,10 @@ class MemberReview:
     admitted: bool
     has_coords: bool
     issues: list[list[str]]  # each entry is [code, severity]
+    connection_type: str | None = None
+    connection_condition: str | None = None
+    deconstructability: str | None = None
+    degree: int | None = None
 
     @property
     def worst_severity(self) -> str | None:
@@ -80,6 +84,10 @@ class MemberReview:
             "recoverable_length_mm": self.recoverable_length_mm,
             "audited": self.audited, "admitted": self.admitted, "has_coords": self.has_coords,
             "issues": [list(i) for i in self.issues],
+            "connection_type": self.connection_type,
+            "connection_condition": self.connection_condition,
+            "deconstructability": self.deconstructability,
+            "degree": self.degree,
             "worst_severity": worst,
             "color": SEVERITY_COLOR.get(worst),  # None when clean
         }
@@ -178,6 +186,8 @@ def extraction_review(model, catalog: dict, pda: str | None = None,
     overrides = overrides or {}
     vr = resolve_members(members, catalog, overrides)   # sets m.section in place
     audit = assess_supply(members, default_knockdown, include_unverified)
+    from .core.deconstruction import member_degrees
+    degrees = member_degrees(model)
 
     reviews = []
     issue_counts = {}
@@ -194,6 +204,10 @@ def extraction_review(model, catalog: dict, pda: str | None = None,
             recoverable_length_mm=getattr(m, "recoverable_length_mm", None),
             audited=d.audited, admitted=d.admitted,
             has_coords=bool(m.start_xyz and m.end_xyz), issues=issues,
+            connection_type=getattr(m, "connection_type", None),
+            connection_condition=getattr(m, "connection_condition", None),
+            deconstructability=getattr(m, "deconstructability", None),
+            degree=degrees.get(m.id),
         ))
 
     roles = {}

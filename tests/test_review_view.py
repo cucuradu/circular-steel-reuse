@@ -62,6 +62,13 @@ def test_pda_report_shows_coverage_and_member_audit():
     assert "D1" in html and "light corrosion" in html
 
 
+def test_pda_report_shows_connection_columns():
+    review = {**REVIEW}
+    review["members"] = [{**REVIEW["members"][0], "connection_type": "welded", "degree": 3}]
+    html = render_pda_report(review)
+    assert "welded" in html and ">3<" in html
+
+
 def test_pda_report_needs_attention_lists_unaudited_member():
     html = render_pda_report(REVIEW)
     needs = html.split("Needs attention", 1)

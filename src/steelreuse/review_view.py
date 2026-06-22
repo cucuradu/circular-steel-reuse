@@ -109,16 +109,20 @@ def render_pda_report(review):
 
     head = ('<table><thead><tr><th>Element id</th><th>Role</th><th>Condition</th>'
             '<th>Verification</th><th>Knockdown</th><th>Admitted</th>'
-            '<th>Recoverable (mm)</th><th>Defects</th></tr></thead><tbody>')
+            '<th>Recoverable (mm)</th><th>Defects</th><th>Connection</th><th>Degree</th>'
+            '</tr></thead><tbody>')
     body = []
     for m in review["members"]:
         rl = m["recoverable_length_mm"]
         recoverable = _esc(f"{rl:.0f}" if rl is not None else "—")
+        conn = m.get("connection_type") or "—"
+        deg = m.get("degree")
         body.append(
             f'<tr><td>{_esc(m["id"])}</td><td>{_esc(m["role"])}</td>'
             f'<td>{_esc(m["condition"] or "—")}</td><td>{_esc(m["verification"] or "—")}</td>'
             f'<td>{m["knockdown"]:.3f}</td><td>{"yes" if m["admitted"] else "no"}</td>'
-            f'<td>{recoverable}</td><td>{_esc(m["defects"] or "")}</td></tr>')
+            f'<td>{recoverable}</td><td>{_esc(m["defects"] or "")}</td>'
+            f'<td>{_esc(conn)}</td><td>{_esc("—" if deg is None else deg)}</td></tr>')
     table = head + "".join(body) + "</tbody></table>"
 
     needs = [m for m in review["members"]

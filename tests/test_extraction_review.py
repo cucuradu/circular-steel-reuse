@@ -110,6 +110,19 @@ def test_pda_csv_merge_changes_review(tmp_path):
     assert rv.audited == 1 and rv.quarantined == 1
 
 
+def test_review_carries_connection_and_degree():
+    members = [
+        ExtractedMember(id="b1", role="beam", raw_section="IPE300", material_grade="S275",
+                        start_xyz=[0, 0, 0], end_xyz=[6000, 0, 0], connection_type="welded"),
+        ExtractedMember(id="b2", role="beam", raw_section="IPE300", material_grade="S275",
+                        start_xyz=[6000, 0, 0], end_xyz=[12000, 0, 0], connection_type="bolted"),
+    ]
+    d = extraction_review(ExtractedModel(kind="donor", members=members), CAT).to_dict()
+    b1 = next(m for m in d["members"] if m["id"] == "b1")
+    assert b1["connection_type"] == "welded"
+    assert b1["degree"] == 1
+
+
 def test_geometry_confirmed_section_reports_geometry_method():
     # An unrecognised name whose measured dimensions match exactly one catalog row is identified by
     # geometry (method "geometry"), not left UNKNOWN -- IPE300's real dims, under a mystery name.
