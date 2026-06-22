@@ -20,6 +20,40 @@ def _results(tmp_path, tag):
     return str(p)
 
 
+def _status(tmp_path, tag):
+    p = tmp_path / f"status_{tag}.json"
+    p.write_text(json.dumps({"donor": {"42": {"status": "reused"}}, "demand": {}, "summary": {}}),
+                 encoding="utf-8")
+    return str(p)
+
+
+def test_record_archives_status_and_load_run_status_round_trips(tmp_path):
+    hist = str(tmp_path / "h")
+    runs.record_run(hist, "a", "", _results(tmp_path, "a"),
+                    run_id="r1", status_path=_status(tmp_path, "a"))
+    data = runs.load_run_status(hist, "r1")
+    assert data is not None
+    assert data["donor"]["42"]["status"] == "reused"
+    # the archived status survives even after the original is gone (it was copied into the history)
+    assert os.path.isfile(os.path.join(hist, runs.load_runs(hist)[0]["status_file"]))
+
+
+def test_load_run_status_none_for_legacy_run_without_status(tmp_path):
+    hist = str(tmp_path / "h")
+    runs.record_run(hist, "a", "", _results(tmp_path, "a"), run_id="r1")  # no status_path
+    assert runs.load_run_status(hist, "r1") is None
+
+
+def test_delete_also_removes_archived_status(tmp_path):
+    hist = str(tmp_path / "h")
+    runs.record_run(hist, "a", "", _results(tmp_path, "a"),
+                    run_id="r1", status_path=_status(tmp_path, "a"))
+    status_file = os.path.join(hist, "status_r1.json")
+    assert os.path.isfile(status_file)
+    runs.delete_run(hist, "r1")
+    assert not os.path.isfile(status_file)
+
+
 def test_record_then_load_newest_first(tmp_path):
     hist = str(tmp_path / "steelreuse_runs")
     runs.record_run(hist, "baseline", "co2, cut", _results(tmp_path, "a"), run_id="20260616-100000")

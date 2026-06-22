@@ -15,22 +15,64 @@ JSON, choose which side the open model is, then print the run summary + clickabl
 """
 
 import json
+import os
 
 import steelreuse_apply as apply_mod  # noqa: E402 -- extension lib/ is on the path
+import steelreuse_runner as runner  # noqa: E402
+import steelreuse_runs as runhist  # noqa: E402
 from pyrevit import forms, revit, script
 
 output = script.get_output()
 doc = revit.doc
 
 MAX_LINKS = 25  # cap the clickable list per status so huge models stay readable
+_PICK_FILE = "Pick a JSON file..."  # sentinel for the file-picker fallback in the run list
+
+
+def _pick_status_data():
+    """Get the apply-matches status dict, either from a saved run (by name) or a picked JSON file.
+
+    Saved runs (steelreuse_runs/) are listed by name so an *old* run can be re-applied, not just the
+    last one. A run saved before apply-data archiving has no status to apply -- we say so and fall
+    back to the file picker.
+    """
+    ext_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    history_dir = runner.load_settings(ext_root).get("history_dir")
+    saved = runhist.load_runs(history_dir) if history_dir else []
+
+    if saved:
+        labels = {}
+        for r in saved:
+            label = "%s  --  %s  (%s)" % (r.get("name", "run"), r.get("params_label", ""),
+                                          r.get("timestamp", ""))
+            labels[label] = r
+        choice = forms.SelectFromList.show(
+            [_PICK_FILE] + list(labels.keys()),
+            title="Apply which run? (saved runs by name, or pick a file)", button_name="Apply")
+        if not choice:
+            return None
+        if choice != _PICK_FILE:
+            run = labels[choice]
+            data = runhist.load_run_status(history_dir, run.get("id"))
+            if data is None:
+                forms.alert("'%s' was saved before apply-data archiving, so it can't be applied. "
+                            "Re-run it, or pick a status.json file." % run.get("name", "run"),
+                            title="SteelReuse")
+                # fall through to the file picker
+            else:
+                return data
+
+    json_path = forms.pick_file(file_ext="json", title="Pick the SteelReuse apply-matches JSON")
+    if not json_path:
+        return None
+    with open(json_path) as fh:
+        return json.load(fh)
 
 
 def main():
-    json_path = forms.pick_file(file_ext="json", title="Pick the SteelReuse apply-matches JSON")
-    if not json_path:
+    data = _pick_status_data()
+    if data is None:
         return
-    with open(json_path) as fh:
-        data = json.load(fh)
 
     side = forms.CommandSwitchWindow.show(
         ["donor", "demand"],

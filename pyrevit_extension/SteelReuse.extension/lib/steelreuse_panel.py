@@ -526,10 +526,16 @@ class SteelReusePanel(forms.WPFWindow):
         return ", ".join(parts)
 
     def _save_to_history(self, results_path, opts):
-        """Auto-save this run to the run history (steelreuse_runs/ beside the demand model)."""
+        """Auto-save this run to the run history (steelreuse_runs/ beside the demand model).
+
+        The run's apply-matches status.json (written next to results.json) is archived too, so the
+        run can be re-applied to the model from the Apply Matches button later, not just the last run.
+        """
         history_dir = os.path.join(
             os.path.dirname(os.path.dirname(results_path)), "steelreuse_runs")
         name = self.run_name_box.Text.strip()
-        runhist.record_run(history_dir, name, self._params_label(opts), results_path)
+        status_path = os.path.join(os.path.dirname(results_path), "status.json")
+        runhist.record_run(history_dir, name, self._params_label(opts), results_path,
+                           status_path=status_path)
         self._settings["history_dir"] = history_dir
         runner.save_settings(self._ext_root, self._settings)

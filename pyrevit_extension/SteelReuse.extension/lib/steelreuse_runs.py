@@ -39,8 +39,14 @@ def load_runs(history_dir):
     return list(reversed(out))
 
 
-def record_run(history_dir, name, params_label, results_path, run_id=None):
-    """Copy ``results_path`` into the history under a fresh id, append to the manifest, return entry."""
+def record_run(history_dir, name, params_label, results_path, run_id=None, status_path=None):
+    """Copy ``results_path`` into the history under a fresh id, append to the manifest, return entry.
+
+    When ``status_path`` (the run's apply-matches JSON, donor/demand per-element status) is given and
+    exists, it is archived too as ``status_<id>.json`` and recorded under ``status_file`` so the run
+    can be re-applied to the model later (see :func:`load_run_status`). Runs recorded before this was
+    added simply have no ``status_file`` and are not re-applicable.
+    """
     if not os.path.isdir(history_dir):
         os.makedirs(history_dir)
     rid = run_id or time.strftime("%Y%m%d-%H%M%S")
@@ -53,6 +59,10 @@ def record_run(history_dir, name, params_label, results_path, run_id=None):
     shutil.copyfile(results_path, os.path.join(history_dir, fname))
     entry = {"id": rid, "name": name or "run", "params_label": params_label or "",
              "timestamp": rid, "file": fname}
+    if status_path and os.path.isfile(status_path):
+        status_fname = "status_" + rid + ".json"
+        shutil.copyfile(status_path, os.path.join(history_dir, status_fname))
+        entry["status_file"] = status_fname
     manifest = _read_raw(history_dir)
     manifest.append(entry)
     _save_manifest(history_dir, manifest)
@@ -68,10 +78,12 @@ def delete_run(history_dir, run_id):
     _save_manifest(history_dir, kept)
     for r in manifest:
         if r.get("id") == run_id:
-            try:
-                os.remove(os.path.join(history_dir, r.get("file", "")))
-            except OSError:
-                pass
+            for key in ("file", "status_file"):
+                if r.get(key):
+                    try:
+                        os.remove(os.path.join(history_dir, r[key]))
+                    except OSError:
+                        pass
     return True
 
 
@@ -80,5 +92,24 @@ def load_run_data(history_dir, run_id):
     for r in _read_raw(history_dir):
         if r.get("id") == run_id:
             with open(os.path.join(history_dir, r["file"])) as handle:
+                return json.load(handle)
+    return None
+
+
+def load_run_status(history_dir, run_id):
+    """The archived apply-matches status dict (donor/demand) for a run id, or None.
+
+    None when the run predates status archiving or its file is missing -- the caller should tell the
+    user that run can't be applied and offer to re-run it.
+    """
+    for r in _read_raw(history_dir):
+        if r.get("id") == run_id:
+            status_file = r.get("status_file")
+            if not status_file:
+                return None
+            path = os.path.join(history_dir, status_file)
+            if not os.path.isfile(path):
+                return None
+            with open(path) as handle:
                 return json.load(handle)
     return None
