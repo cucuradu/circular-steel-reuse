@@ -54,6 +54,15 @@ def _id_str(element_id):
     return str(val)
 
 
+def _mark(element):
+    """The element's Mark parameter value, or "" when unset (IronPython-safe)."""
+    try:
+        p = element.LookupParameter("Mark")
+        return p.AsString() or "" if p is not None else ""
+    except Exception:
+        return ""
+
+
 def _type_name(elem):
     """Best raw section name: '<Family> <Type>' (the mapping layer normalizes this later)."""
     try:
@@ -302,7 +311,8 @@ def extract(kind):
         if s is None and e is None:
             s, e = _column_point_xyz(col, length)   # recover plan x,y for point-placed columns
         member = {
-            "id": _id_str(col.Id), "role": "column",
+            "id": _id_str(col.Id), "unique_id": col.UniqueId, "mark": _mark(col),
+            "role": "column",
             "category": "Structural Columns", "raw_section": _type_name(col),
             "section": None, "material_grade": _grade(col), "level": _level_name(col),
             "length_mm": length, "spans_mm": [length] if length else [],
@@ -322,7 +332,8 @@ def extract(kind):
             spans = [length] if length else []
             note = "donor: physical stock length" if kind == "donor" else ""
         member = {
-            "id": _id_str(bm.Id), "role": "beam",
+            "id": _id_str(bm.Id), "unique_id": bm.UniqueId, "mark": _mark(bm),
+            "role": "beam",
             "category": "Structural Framing", "raw_section": _type_name(bm),
             "section": None, "material_grade": _grade(bm), "level": _level_name(bm),
             "length_mm": length, "spans_mm": spans,
