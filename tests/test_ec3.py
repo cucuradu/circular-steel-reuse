@@ -243,11 +243,13 @@ def test_interaction_nm_is_ltb_aware(cat):
 
 def test_nominal_fy_thickness_bands():
     from steelreuse.core.sections import nominal_fy
-    # EN 10025 grades band with thickness (Table 3.1): t<=40 nominal, 40<t<=80 reduced.
-    assert nominal_fy("S355", 30) == 355.0
-    assert nominal_fy("S355", 60) == 335.0
-    assert nominal_fy("S275", 50) == 255.0
-    assert nominal_fy("S235", 41) == 215.0
+    # EN 10025-2/-3 product banding (finer than EN 1993-1-1 Table 3.1): 16/40/63/80 mm steps.
+    assert nominal_fy("S355", 16) == 355.0      # <= 16 mm: full value
+    assert nominal_fy("S355", 30) == 345.0      # 16 < t <= 40 mm: product reduction (was 355 on Table 3.1)
+    assert nominal_fy("S355", 60) == 335.0      # 40 < t <= 63 mm
+    assert nominal_fy("S275", 30) == 265.0      # 16 < t <= 40 mm
+    assert nominal_fy("S275", 50) == 255.0      # 40 < t <= 63 mm
+    assert nominal_fy("S235", 41) == 215.0      # 40 < t <= 63 mm
     # ASTM grades carry a single specified minimum F_y — no EN thickness banding.
     assert nominal_fy("A992", 10) == pytest.approx(345.0)
     assert nominal_fy("A992", 60) == pytest.approx(345.0)

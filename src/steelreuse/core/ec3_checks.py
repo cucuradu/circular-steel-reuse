@@ -206,18 +206,30 @@ def warping_constant(sec: SectionProps) -> float:
     return sec.Iz * hs**2 / 4.0
 
 
-def M_cr(sec: SectionProps, L: float, C1: float = 1.0) -> float:
-    """Elastic critical moment for LTB, doubly-symmetric section, uniform moment (mm units)."""
+def M_cr(sec: SectionProps, L: float, C1: float = 1.0, C2: float = 0.0, zg: float = 0.0) -> float:
+    """Elastic critical moment for LTB, doubly-symmetric section (NCCI SN003a, k = k_w = 1; mm units).
+
+    ``C2``/``zg`` model the **load height**: ``zg`` is the load-application point relative to the shear
+    centre (positive = above it, i.e. a transverse load on the top flange, which is destabilising and
+    *lowers* M_cr); ``C2`` is the corresponding load-shape factor. The default ``C2 = zg = 0`` recovers
+    the shear-centre form (no load-height effect). With load height the closed form is
+
+        M_cr = C1 · (π²E I_z / L²) · { √[ I_w/I_z + L²G I_t/(π²E I_z) + (C2·z_g)² ] − C2·z_g }.
+    """
     It, Iw = torsion_constant(sec), warping_constant(sec)
     base = math.pi**2 * E_STEEL * sec.Iz / L**2
-    root = math.sqrt(Iw / sec.Iz + L**2 * G_STEEL * It / (math.pi**2 * E_STEEL * sec.Iz))
-    return C1 * base * root
+    root_arg = (Iw / sec.Iz + L**2 * G_STEEL * It / (math.pi**2 * E_STEEL * sec.Iz)
+                + (C2 * zg) ** 2)
+    return C1 * base * (math.sqrt(root_arg) - C2 * zg)
 
 
-def chi_LT(sec: SectionProps, fy: float, L: float, section_class: int, C1: float = 1.0) -> float:
-    """LTB reduction factor, EN 1993-1-1 cl. 6.3.2.3 (rolled sections), returns chi_LT in (0, 1]."""
+def chi_LT(sec: SectionProps, fy: float, L: float, section_class: int, C1: float = 1.0,
+           C2: float = 0.0, zg: float = 0.0) -> float:
+    """LTB reduction factor, EN 1993-1-1 cl. 6.3.2.3 (rolled sections), returns chi_LT in (0, 1].
+
+    ``C2``/``zg`` pass through to :func:`M_cr` to account for load height (see there)."""
     Wy = sec.Wpl_y if section_class <= 2 else sec.Wel_y
-    Mcr = M_cr(sec, L, C1)
+    Mcr = M_cr(sec, L, C1, C2, zg)
     lam = math.sqrt(Wy * fy / Mcr)
     lam0, beta = 0.4, 0.75
     if lam <= lam0:
@@ -226,6 +238,22 @@ def chi_LT(sec: SectionProps, fy: float, L: float, section_class: int, C1: float
     phi = 0.5 * (1 + alpha * (lam - lam0) + beta * lam**2)
     chi = 1.0 / (phi + math.sqrt(phi**2 - beta * lam**2))
     return min(chi, 1.0, 1.0 / lam**2)
+
+
+# Conservative load-height default for the member LTB check. The tool can't know where the transverse
+# load acts, so it assumes the destabilising case — load on the top flange, z_g = +h/2 — which lowers
+# M_cr (a shear-centre/z_g=0 assumption is non-conservative for the usual floor/roof beam loaded on its
+# top flange). C2 ~ 0.5 spans common transverse shapes (UDL 0.454, central point load ~0.55).
+_LTB_DESTAB_C2 = 0.5
+
+
+def chi_LT_member(sec: SectionProps, fy: float, L: float, section_class: int, C1: float = 1.0) -> float:
+    """``chi_LT`` for a member whose load height is unknown: assume top-flange (destabilising) loading.
+
+    Wraps :func:`chi_LT` with the conservative ``z_g = +h/2`` / ``C2`` default (see ``_LTB_DESTAB_C2``).
+    Hollow sections never reach this path. Pass ``z_g`` directly to :func:`chi_LT` if the load height is
+    actually known (e.g. shear-centre / below-flange loading, which is less onerous)."""
+    return chi_LT(sec, fy, L, section_class, C1, C2=_LTB_DESTAB_C2, zg=sec.h / 2.0)
 
 
 def c1_moment_gradient(m_max: float, m_quarter: float, m_mid: float, m_three_quarter: float) -> float:
@@ -510,7 +538,7 @@ def check_member(
             mrd = mc
             # Surface what LTB *would* do without the slab restraint, so the chi_LT computation is
             # visible even on the (default) restrained path and restraint-critical beams are flagged.
-            x_lt_free = chi_LT(sec, fy, demand.L, section_class, demand.C1) if demand.L > 0 else 1.0
+            x_lt_free = chi_LT_member(sec, fy, demand.L, section_class, demand.C1) if demand.L > 0 else 1.0
             detail = {"M_c_Rd": mc, "chi_LT": 1.0, "restrained": True,
                       "chi_LT_if_unrestrained": round(x_lt_free, 4)}
             if x_lt_free < 0.85:
@@ -519,7 +547,7 @@ def check_member(
                     "unrestrained (verify the slab/bracing, especially at the construction stage)"
                 )
         else:
-            x_lt = chi_LT(sec, fy, demand.L, section_class, demand.C1)
+            x_lt = chi_LT_member(sec, fy, demand.L, section_class, demand.C1)
             mrd = x_lt * mc
             detail = {"M_b_Rd": mrd, "chi_LT": round(x_lt, 4), "restrained": False}
             if x_lt < 1.0:
@@ -587,7 +615,7 @@ def check_member(
         n_y = demand.N_Ed / (x_y * N_Rk / GAMMA_M1)
         n_z = demand.N_Ed / (x_z * N_Rk / GAMMA_M1)
         susceptible = not (sec.is_hollow or demand.compression_flange_restrained)
-        ltb = (chi_LT(sec, fy, demand.L, section_class, demand.C1)
+        ltb = (chi_LT_member(sec, fy, demand.L, section_class, demand.C1)
                if susceptible and abs(demand.My_Ed) > 0 and demand.L > 0 else 1.0)
         k = annex_b_k_factors(section_class, lam_y, lam_z, n_y, n_z,
                               hollow=sec.is_hollow, susceptible=susceptible,

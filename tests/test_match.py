@@ -503,8 +503,9 @@ def test_wind_uplift_governs_and_can_reject_a_slender_roof_beam(cat):
     assert len(ok.assignments) == 1
     assert ok.assignments[0].governing_combination == "ULS wind uplift"
 
-    # without uplift the same IPE300 donor is accepted
-    slots_off = build_slots(demand, AreaLoadModel(dead_kpa=0.5))
+    # without uplift, under restrained gravity (deck restrains the top flange) the IPE300 is accepted —
+    # isolating the uplift reversal as the cause of rejection above.
+    slots_off = build_slots(demand, AreaLoadModel(dead_kpa=0.5, flange_restrained=True))
     accepted = match([SupplyItem(id="d300", section="IPE300", grade="S275", length_mm=7000)],
                      slots_off, cat)
     assert len(accepted.assignments) == 1
@@ -516,8 +517,9 @@ def test_construction_stage_governs_and_can_reject_a_slender_beam(cat):
     # IPE330 donor sits at 124.5/221.1 = 0.56. The erection-stage entry (w_c = 17.55 N/mm,
     # M = 78.975 kNm, UNRESTRAINED -> chi_LT * M_pl,Rd) is the worse case for the donor, so it must
     # be reported as governing. An IPE300 donor passes gravity restrained (0.72) but FAILS the
-    # construction case (chi_LT(6 m) ~ 0.45 -> M_b,Rd ~ 77.7 kNm < 78.975), so with the stage enabled
-    # it may not be assigned to its own slot.
+    # construction case (chi_LT(6 m) ~ 0.35 with top-flange/destabilising load -> M_b,Rd ~ 61 kNm <
+    # 78.975), as does an IPE330 (M_b,Rd ~ 75 kNm); an IPE360 (M_b,Rd ~ 101 kNm) passes. So with the
+    # stage enabled the slender donors may not be assigned to the slot.
     from steelreuse.core.loads import AreaLoadModel
     from steelreuse.pipeline import build_slots
     from steelreuse.schema import ExtractedMember, ExtractedModel
@@ -529,7 +531,7 @@ def test_construction_stage_governs_and_can_reject_a_slender_beam(cat):
     # service = slab-restrained; erection (construction_stage) = bare-steel unrestrained
     slots = build_slots(demand, AreaLoadModel(construction_stage=True, flange_restrained=True))
 
-    ok = match([SupplyItem(id="d330", section="IPE330", grade="S275", length_mm=7000)], slots, cat)
+    ok = match([SupplyItem(id="d360", section="IPE360", grade="S275", length_mm=7000)], slots, cat)
     assert len(ok.assignments) == 1
     assert ok.assignments[0].governing_combination == "ULS construction stage"
 

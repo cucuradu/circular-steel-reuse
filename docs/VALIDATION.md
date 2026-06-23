@@ -146,7 +146,28 @@ flange → χ_y = 0.9606, χ_z = 0.3924, k_yy = 1.0358, eq. 6.61 = 0.4510, gover
 (every intermediate is in the test-file comment); a biaxial variant adds M_z = 10 kNm and flips the
 member to FAIL (eq. 6.62 = 1.162), exercising the `k_yz`/`k_zz` terms.
 
-**Residual:** the worked example above is hand-derived (closed-form statics + the published section
-tables of §2–§3) and runs the pipeline start-to-finish. What remains open is corroborating it against
-an independently *published* design example (e.g. an SCI / Access Steel beam-column), which would add
-external authority beyond our own hand algebra.
+## §6 Independently published worked examples
+
+§1–§5 validate the engine against our *own* hand algebra. This section closes that gap: the engine is
+cross-checked against worked examples published by external authorities, every one reproduced by a test
+in `tests/test_published_examples.py` (both sources are free; γ_M0 = γ_M1 = 1.0, matching the engine).
+
+Sources: **SCI P387** *Steel Building Design: Worked examples for students* (Eurocodes + UK NA) and
+**ArcelorMittal/SECEU MSB04** *Multi-Storey Steel Buildings, Part 4: Detailed Design* (base EN 1993-1-1).
+
+| Source | Member | Quantity | Published | Engine |
+|--------|--------|----------|-----------|--------|
+| P387 Ex01 | 457×191×82 UKB S275 | M_c,Rd / V_c,Rd / δ | 503 kNm / 756 kN / 13.6 mm | match |
+| P387 Ex02 | 457×191×98 UKB | M_cr (C1=1.127, z_g=0) | 534.0 kNm | <1 % |
+| MSB04 A.1 | IPE 330 S235 | M_c,Rd / V_pl,Rd | 189.0 kNm / 417.9 kN | match |
+| P387 Ex05 | 254×254×73 UKC S275 | χ_z / N_b,z,Rd | 0.61 / 1562 kN | <1 % |
+| MSB04 A.5 | HE 300 B S235 | χ_y / χ_z / N_b,Rd (k_z=0.7) | 0.808 / 0.671 / 2349 kN | <0.5 % |
+
+Two engine refinements came out of this exercise and are now in place:
+
+- **LTB load height.** `M_cr` now carries the EN load-height terms (`C2`, `z_g`); the member LTB check
+  defaults to the destabilising top-flange case (`z_g = +h/2`), reproducing MSB04 A.1's behaviour. The
+  earlier shear-centre (`z_g = 0`) form over-stated `M_cr` for top-flange-loaded unrestrained beams.
+- **f_y product banding.** Nominal `f_y` now follows the finer EN 10025-2/-3 product bands (16/40/63/80
+  mm) rather than EN 1993-1-1 Table 3.1's two bands — e.g. S275 = 265 for 16 < t ≤ 40 mm — matching
+  P387 and the UK NA. (All §1–§5 reference sections have t_f ≤ 16 mm, so those numbers are unchanged.)
