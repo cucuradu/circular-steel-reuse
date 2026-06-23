@@ -52,7 +52,8 @@ def test_worked_frame_load_path_to_check_end_to_end():
     from steelreuse.schema import ExtractedMember
 
     full = load_default_catalog()
-    loads = AreaLoadModel()  # defaults: 1.35·3.5 + 1.5·3.0 = 9.225 kPa, 3 m tributary
+    # slab-restrained floor beam (util ~0.72 from full M_c,Rd); restraint now asserted explicitly
+    loads = AreaLoadModel(flange_restrained=True)  # defaults: 1.35·3.5 + 1.5·3.0 = 9.225 kPa, 3 m trib
     assert loads.factored_area_kpa() == pytest.approx(9.225, rel=1e-6)
     members = [
         ExtractedMember(id="c1", role="column", section="IPE300", material_grade="S275",

@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .core.carbon import passport_rows
 from .core.loads import NATIONAL_ANNEXES, OCCUPANCY_PRESETS, AreaLoadModel, ZoneSpec, presets_for_na
 from .llm.providers import select_provider
 from .llm.report import build_report_context, generate_narrative, render_html
@@ -155,12 +156,15 @@ def build_parser() -> argparse.ArgumentParser:
                          "(default: no cap). Anti-Frankenstein: section variety has fabrication, "
                          "QA, connection-detailing and procurement costs no carbon term sees; "
                          "the MILP consolidates onto at most N section families")
-    ap.add_argument("--reserve", type=float, default=0.0, metavar="W",
-                    help="EXPERIMENTAL scarcity/reserve weight (default 0 = off): softly penalize "
-                         "consuming donors from scarce capacity classes on slots that abundant "
-                         "donors could also serve — a single-project proxy for option value "
-                         "(unseen future demand); the principled tool is portfolio matching "
-                         "(--demand with several models). Selection only, booked CO2 unchanged")
+    ap.add_argument("--lab", action="store_true",
+                    help="unlock EXPERIMENTAL, non-certified features so the default CLI shows only the "
+                         "validated core: --reserve (single-project scarcity weight) and --solver "
+                         "sap2000 (OAPI backend). Without --lab these are rejected and stay at their "
+                         "safe defaults (reserve 0, solver pynite)")
+    # --reserve is EXPERIMENTAL: hidden from --help and gated behind --lab. A single-project scarcity
+    # proxy for option value (selection only, booked CO2 unchanged); the principled tool is portfolio
+    # matching (--demand with several models).
+    ap.add_argument("--reserve", type=float, default=0.0, metavar="W", help=argparse.SUPPRESS)
     ap.add_argument("--moment-shape", action="store_true",
                     help="sharper (less conservative) checks from the real moment diagram: derive the "
                          "LTB moment-gradient C1 (4-moment / Cb formula) and the 6.3.3 Cm factors "
@@ -179,6 +183,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--disposition-csv",
                     help="also write the per-donor disposition advisory rows to this CSV "
                          "(implies --disposition)")
+    ap.add_argument("--passport-out",
+                    help="write the material passport to this path as CSV (every mapped donor member: "
+                         "mass, audit provenance, avoided-new carbon, and the EN 1993 reuse verdict for "
+                         "the matched ones), plus a JSON sibling with stock totals")
+    ap.add_argument("--uncertainty", type=int, default=0, metavar="N",
+                    help="run N Monte Carlo samples to show a P5–P95 CO2-saved confidence band next to "
+                         "the headline (default 0 = off): varies knockdown, loads and the EN 1990 "
+                         "partial factors over their documented ranges — the carbon figure's sensitivity")
     ap.add_argument("--connections", action="store_true",
                     help="enable the connection feasibility screen: exclude donors geometrically "
                          "incompatible with the slot's design section (wrong shape family, too deep "
@@ -188,10 +200,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "per-member closed forms; column axials then come from the real load path. "
                          "With --phi, the sway imperfection is applied as frame equivalent horizontal "
                          "forces (EN 5.3.2) + a 2nd-order P-Delta solve")
-    ap.add_argument("--solver", choices=["pynite", "sap2000"], default="pynite",
-                    help="frame solver for --frame-analysis: 'pynite' (default) or the experimental "
-                         "'sap2000' OAPI backend (gravity only; Windows + SAP2000 + the [sap2000] "
-                         "extra; falls back to analytic when unavailable)")
+    # --solver sap2000 is EXPERIMENTAL (gravity only; Windows + SAP2000 + the [sap2000] extra; falls
+    # back to analytic when unavailable): hidden from --help and gated behind --lab. pynite is default.
+    ap.add_argument("--solver", choices=["pynite", "sap2000"], default="pynite", help=argparse.SUPPRESS)
     ap.add_argument("--pdelta", action="store_true",
                     help="force a 2nd-order (P-Delta) frame solve even without --phi "
                          "(only with --frame-analysis)")
@@ -210,6 +221,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     ap = build_parser()
     args = ap.parse_args(argv)
+
+    # Experimental features are gated behind --lab so the default CLI exposes only the validated core.
+    if not args.lab:
+        if args.reserve:
+            ap.error("--reserve is experimental; pass --lab to enable it")
+        if args.solver != "pynite":
+            ap.error(f"--solver {args.solver} is experimental; pass --lab to enable it")
 
     # Resolve the input models: --demo uses the bundled samples, otherwise both paths are required.
     # A single demand path is passed as a plain string (the historical case); several paths flow
@@ -293,7 +311,19 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         solver=args.solver,
     )
 
-    ctx = build_report_context(res)
+    uncertainty = None
+    if args.uncertainty > 0 and isinstance(demand, str):
+        from .sensitivity import RunParams, run_monte_carlo
+        base = (RunParams(dead_kpa=loads.dead_kpa, live_kpa=loads.live_kpa, gamma_g=loads.gamma_g,
+                          gamma_q=loads.gamma_q, knockdown=args.knockdown,
+                          counterfactual=args.counterfactual)
+                if isinstance(loads, AreaLoadModel)
+                else RunParams(knockdown=args.knockdown, counterfactual=args.counterfactual))
+        band = run_monte_carlo(donor, demand, base, n=args.uncertainty)
+        uncertainty = {"p5": round(band.p5, 1), "p50": round(band.p50, 1),
+                       "p95": round(band.p95, 1), "n": band.n}
+
+    ctx = build_report_context(res, uncertainty)
     narrative, source = generate_narrative(ctx, select_provider())
     html = render_html(ctx, narrative, source)
 
@@ -411,6 +441,10 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
               + (" [pilot-scale research-grade factor]" if args.counterfactual == "rerolling" else ""))
     print(f"CO2e saved by matches: {res.match.total_co2_saved_kg:.1f} kg "
           f"(full donor stock potential: {res.passport.total_saved_kgco2e:.1f} kg)")
+    if uncertainty is not None:
+        print(f"  uncertainty (n={uncertainty['n']}): P5 {uncertainty['p5']} | P50 "
+              f"{uncertainty['p50']} | P95 {uncertainty['p95']} kg CO2e "
+              f"(knockdown / load / EN 1990 factor ranges)")
     if args.cut and res.match.donor_leftover_mm:
         print(f"Cut donors: {len(res.match.donor_leftover_mm)} | reusable remainder "
               f"{res.match.total_donor_leftover_mm / 1000.0:.1f} m")
@@ -429,6 +463,24 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
                     w.writeheader()
                     w.writerows(res.disposition)
             print(f"Disposition advisory written -> {dpath}")
+    if args.passport_out:
+        rows = passport_rows(res.passport, res.match.assignments)
+        ppath = Path(args.passport_out)
+        ppath.parent.mkdir(parents=True, exist_ok=True)
+        with ppath.open("w", newline="", encoding="utf-8") as fh:
+            if rows:
+                w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+                w.writeheader()
+                w.writerows(rows)
+        jpath = ppath.with_suffix(".json")
+        payload = {
+            "totals": {"mass_kg": round(res.passport.total_mass_kg, 1),
+                       "new_kgco2e": round(res.passport.total_new_kgco2e, 1),
+                       "saved_kgco2e": round(res.passport.total_saved_kgco2e, 1)},
+            "entries": rows,
+        }
+        jpath.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"Material passport written -> {ppath} (+ {jpath.name})")
     if res.match.unmatched_slots:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
     print(f"Narrative source: {source}")

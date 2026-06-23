@@ -144,3 +144,32 @@ def build_passport(
             condition_grade=getattr(m, "condition_grade", None),
         ))
     return Passport(entries=entries)
+
+
+def passport_rows(passport: Passport, assignments=()) -> list[dict]:
+    """Flatten the material passport to per-member rows for CSV/JSON export.
+
+    Each row carries the donor's identity, mass, audit provenance (condition/verification) and the
+    avoided-new carbon; for the members the matcher actually reused, the EN 1993 reuse verdict (status,
+    utilisation, slot) is joined in. ``assignments`` is any iterable of objects exposing
+    ``supply_id``/``slot_id``/``status``/``utilization`` (duck-typed to avoid importing the matcher)."""
+    by_supply = {a.supply_id: a for a in assignments}
+    rows: list[dict] = []
+    for e in passport.entries:
+        a = by_supply.get(e.id)
+        rows.append({
+            "id": e.id,
+            "section": e.section,
+            "grade": e.grade or "",
+            "length_mm": round(e.length_mm, 1),
+            "mass_kg": round(e.mass_kg, 1),
+            "condition_grade": e.condition_grade or "",
+            "verification_status": e.verification_status or "",
+            "ec_new_kgco2e": round(e.ec_new_kgco2e, 1),
+            "ec_reuse_kgco2e": round(e.ec_reuse_kgco2e, 1),
+            "ec_saved_kgco2e": round(e.ec_saved_kgco2e, 1),
+            "reuse_verdict": a.status if a else "not reused",
+            "reuse_slot": a.slot_id if a else "",
+            "reuse_utilisation": round(a.utilization, 3) if a else "",
+        })
+    return rows

@@ -572,7 +572,7 @@ because reclamation stockists cut members to length routinely and a one‑piece 
 an 18.8 m donor that fills a single 7.6 m slot wastes 11 m. With cutting on, the off‑cut penalty is
 dropped (the remainder is genuinely reusable) and each donor's leftover is reported. `--no-cut` restores
 whole‑member‑only reuse for cases where field cutting is undesirable; on the case study that one switch
-is the difference between 71 reused / 60.6 t and 50 reused / 39.3 t (§12).
+is the difference between 71 reused / 59.6 t and 50 reused / 38.5 t (§12).
 
 ## 9.4 Stock stewardship and the wider problem
 
@@ -675,10 +675,10 @@ the remainder (overwhelmingly open‑web bar joists, plus concrete, channels and
 reported as unknown; missing grades are assigned flagged defaults. The demand model is assembled into a
 **global frame of 274 nodes and 492 elements** and solved, so the design forces come from the real load
 path; the new design resolves to 181 steel positions, of which the optimiser fills **71** with reclaimed
-members that pass every EN 1993‑1‑1 combination (54 donors cut to length, ≈ 160 m of reusable remainder),
-saving **≈ 60.6 t CO₂e** on the avoided‑new basis — reported separately from the donor stock's ≈ 315 t
+members that pass every EN 1993‑1‑1 combination (54 donors cut to length, ≈ 168 m of reusable remainder),
+saving **≈ 59.6 t CO₂e** on the avoided‑new basis — reported separately from the donor stock's ≈ 315 t
 total embodied carbon so the design's absorptive capacity is visible. Restricting to whole‑member reuse
-(`--no-cut`) fills 50 slots for ≈ 39.3 t, the difference being long donors stranded by the one‑piece rule;
+(`--no-cut`) fills 50 slots for ≈ 38.5 t, the difference being long donors stranded by the one‑piece rule;
 the bare steel skeleton's α_cr ≈ 0.2 correctly exposes that it carries no lateral system of its own (§7.3).
 On a hand‑checkable two‑bay two‑storey demand, frame analysis yields an interior column of
 332 kN against a corner column of 166 kN — the 2:1 ratio confirmed by hand statics — demonstrating the

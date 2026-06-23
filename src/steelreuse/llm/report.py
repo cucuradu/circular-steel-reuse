@@ -23,8 +23,11 @@ SCOPE_DISCLAIMER = (
 _OBJECTIVE_LABEL = {"co2": "net-CO2", "members": "members-reused", "mass": "reclaimed-mass"}
 
 
-def build_report_context(res: PipelineResult) -> dict:
-    """Flatten a :class:`PipelineResult` into a JSON-ish dict of pre-computed values for the template."""
+def build_report_context(res: PipelineResult, uncertainty: dict | None = None) -> dict:
+    """Flatten a :class:`PipelineResult` into a JSON-ish dict of pre-computed values for the template.
+
+    ``uncertainty`` (optional): the Monte-Carlo P5/P50/P95 CO2-saved band (keys ``p5``/``p50``/``p95``/
+    ``n``) computed by ``steelreuse.sensitivity``; when present it is surfaced next to the headline."""
     m = res.match
     p = res.passport
     decisions = res.audit.decisions if res.audit else {}
@@ -75,6 +78,7 @@ def build_report_context(res: PipelineResult) -> dict:
         "n_reused": m.n_reused,
         "reuse_rate_pct": round(100.0 * m.n_reused / res.slot_count) if res.slot_count else 0,
         "match_co2_saved_kg": round(m.total_co2_saved_kg, 1),
+        "uncertainty": uncertainty,
         "total_offcut_mm": round(m.total_offcut_mm, 1),
         "n_unmatched": len(m.unmatched_slots),
         "n_unused": len(m.unused_supply),
@@ -312,6 +316,7 @@ _TEMPLATE = """<!doctype html>
 <div class="kpis">
  <div class="kpi"><b>{{ ctx.n_reused }}</b>members reused</div>
  <div class="kpi"><b>{{ ctx.match_co2_saved_kg }}</b>kg CO2e saved</div>
+ {% if ctx.uncertainty %}<div class="kpi"><b>{{ ctx.uncertainty.p5 }}–{{ ctx.uncertainty.p95 }}</b>kg CO2e P5–P95 (n={{ ctx.uncertainty.n }})</div>{% endif %}
  <div class="kpi"><b>{{ ctx.donor_saved_co2_kg }}</b>kg CO2e in full donor stock</div>
  <div class="kpi"><b>{{ ctx.unmatched_slots|length }}</b>slots need new steel</div>
 </div>

@@ -345,6 +345,12 @@ def _stabilize_topology(topo: Topology) -> list[str]:
 # Wind storey forces
 # ---------------------------------------------------------------------------
 
+# EN 1993-1-1 §5.3.2 base global sway imperfection (phi_0 = 1/200). Used as a *probe* magnitude so the
+# sway stiffness alpha_cr is measured on every frame solve even when no design imperfection is requested
+# (--phi 0): alpha_cr = (H/V)(h/delta) is a stiffness ratio, independent of the probe force magnitude.
+_ACR_PROBE_PHI = 0.005
+
+
 def sway_alpha_cr(storeys: list[tuple[float, float, float, float]]) -> float | None:
     """EN 1993-1-1 eq. (5.2): alpha_cr = (H_Ed/V_Ed)*(h/delta_H), minimum over storeys.
 
@@ -787,7 +793,13 @@ def analyze_frame(
     # the sway load cases + combinations, and re-solve (below) — with P-Delta, so 2nd-order sway is
     # captured. The lateral load is carried by whatever lateral system the model has (vertical bracing,
     # or the fixed column bases).
-    if auto_combos and options.notional_phi > 0.0:
+    # Equivalent horizontal forces (EHF). With --phi > 0 these are the EN 5.3.2 design sway
+    # imperfection. With --phi 0 a small probe (phi_0 = 1/200) is still applied — solely to measure the
+    # sway stiffness alpha_cr so the k = 1.0 system-length route is never left unchecked — but it is
+    # NOT added as a design situation (no extra design combo, no leak into wind/seismic).
+    design_imperfection = options.notional_phi > 0.0
+    phi_eff = options.notional_phi if design_imperfection else _ACR_PROBE_PHI
+    if auto_combos:
         grav_name = uls_combos[0][0]
         columns = [(mid, topo.member_nodes[mid]) for mid in topo.member_nodes
                    if members_by_id[mid].role == "column"]
@@ -803,19 +815,20 @@ def analyze_frame(
                     n = _governing_axial(fm.members[mid], grav_name)
                     if n > 0.0:                       # compression columns shed a notional sway force
                         top = i if topo.nodes[i].z >= topo.nodes[j].z else j
-                        force = options.notional_phi * n
+                        force = phi_eff * n
                         fm.add_node_load(top, d, force, case=case)
                         applied[top] = applied.get(top, 0.0) + force
                 if applied:
-                    nhf_cases[d] = case
                     nhf_forces[d] = applied
-                    sway = (f"ULS gravity + sway {d[-1]}",
-                            {"DL": gamma_g, "LL": gamma_q, case: 1.0})
-                    fm.add_load_combo(sway[0], dict(sway[1]))
-                    uls_combos.append(sway)
                     # Lateral-only combination, used solely to read the sway drifts for alpha_cr
                     # (EN 5.2.1(4)B). Not a design situation -> NOT appended to uls_combos.
                     fm.add_load_combo(f"_acr_{d}", {case: 1.0})
+                    if design_imperfection:           # promote to a real design situation
+                        nhf_cases[d] = case
+                        sway = (f"ULS gravity + sway {d[-1]}",
+                                {"DL": gamma_g, "LL": gamma_q, case: 1.0})
+                        fm.add_load_combo(sway[0], dict(sway[1]))
+                        uls_combos.append(sway)
             if nhf_cases:
                 warnings.append(f"applied EN 5.3.2 sway imperfection (EHF) in {len(nhf_cases)} direction(s)")
 
@@ -889,12 +902,15 @@ def analyze_frame(
             if worst >= 10.0:
                 warnings.append(f"sway check: alpha_cr = {worst:.1f} >= 10 (non-sway; "
                                 "k = 1.0 system lengths justified)")
-            elif worst >= 3.0:
-                warnings.append(f"sway-sensitive frame: alpha_cr = {worst:.1f} < 10 — "
-                                "2nd-order effects significant (P-Delta solve engaged)")
             else:
-                warnings.append(f"STRONGLY sway-sensitive frame: alpha_cr = {worst:.1f} < 3 — "
-                                "verify global stability by a dedicated analysis")
+                # Below alpha_cr = 10 the k = 1.0 system-length route the checker uses is no longer
+                # self-evidently safe. Flag it loudly; if this was only the probe (--phi 0), point there.
+                sway = "STRONGLY sway-sensitive" if worst < 3.0 else "sway-sensitive"
+                tail = ("2nd-order effects significant (P-Delta solve engaged)" if design_imperfection
+                        else "rerun with --phi to engage the 2nd-order sway design")
+                extra = " — verify global stability by a dedicated analysis" if worst < 3.0 else ""
+                warnings.append(f"{sway} frame: alpha_cr = {worst:.1f} < 10 — k = 1.0 system lengths "
+                                f"NOT justified; {tail}{extra}")
 
     flange_restrained = bool(getattr(loads, "beam_flange_restrained", True))
     demands_by_member: dict[str, list[tuple[str, MemberDemand]]] = {}

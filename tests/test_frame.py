@@ -106,7 +106,7 @@ def test_torsion_constant_is_positive_and_small_vs_inertia():
 def test_portal_beam_recovers_simply_supported_closed_form():
     pytest.importorskip("Pynite")
     cat = load_default_catalog()
-    loads = AreaLoadModel()                       # defaults: 9.225 kPa factored, 3 m tributary
+    loads = AreaLoadModel(flange_restrained=True)  # slab-restrained floor beam; 9.225 kPa, 3 m trib
     members = [_col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000)]
     res = analyze_frame(members, loads, cat)
     assert res.ok and "b1" in res.demands_by_member
@@ -252,8 +252,10 @@ def test_phi_zero_leaves_a_single_gravity_combination():
     cat = load_default_catalog()
     members = [_col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000)]
     res = analyze_frame(members, AreaLoadModel(), cat, options=FrameOptions(notional_phi=0.0))
-    assert [n for n, _ in res.demands_by_member["b1"]] == ["ULS gravity"]
-    assert res.warnings == []                        # no sway, linear solve
+    assert [n for n, _ in res.demands_by_member["b1"]] == ["ULS gravity"]   # no extra DESIGN combo
+    # phi=0 still runs the always-on alpha_cr probe: this bare portal is sway-sensitive, so k = 1.0 is
+    # flagged (the probe measures stiffness, it is not a design action -> design combos unchanged above).
+    assert any("alpha_cr" in w and "k = 1.0 system lengths NOT justified" in w for w in res.warnings)
 
 
 def test_pdelta_option_runs_without_phi():

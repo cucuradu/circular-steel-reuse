@@ -17,7 +17,7 @@ recomputes them.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import pulp
 
@@ -218,10 +218,20 @@ def _apply_reserve(cells: list[_Cell], supply: list[SupplyItem], reserve_w: floa
             c.score -= reserve_w * (scarcity[fams[c.si]] / mx) * c.mass_used_kg * factor.saved_per_kg
 
 
-def _passes_all(sec: SectionProps, grade: str, slot: DemandSlot, knockdown: float = 1.0) -> bool:
+def _passes_all(sec: SectionProps, grade: str, slot: DemandSlot, knockdown: float = 1.0,
+                restrained_baseline: bool = False) -> bool:
     """Feasibility bar across the whole load-combination envelope: the section must pass *every*
-    combination. Reused by both the supply check and the avoided-new baseline."""
+    combination. Reused by both the supply check and the avoided-new baseline.
+
+    ``restrained_baseline`` (avoided-new baseline only): size the new section as if the compression
+    flange were restrained. A competent new design specifies a slab-restrained floor beam, so the steel
+    you would *otherwise buy* is the lighter restrained section. The reclaimed donor's own feasibility
+    stays on the slot's actual (conservative, possibly unrestrained) assumption — only the baseline is
+    decoupled this way, so a conservative feasibility check never over-credits CO2-saved (see
+    docs/CASE_STUDY.md, "restraint")."""
     for _name, demand in slot.combinations:
+        if restrained_baseline and not demand.compression_flange_restrained:
+            demand = replace(demand, compression_flange_restrained=True)
         res = check_member(sec, grade, demand, knockdown)
         if res.status == "FAIL" or res.utilization > 1.0:
             return False
@@ -326,7 +336,8 @@ def lightest_adequate_section(
             continue
         if _shape_family(sec) != want_family:
             continue
-        if _passes_all(sec, grade, slot) and (best is None or sec.mass_kgm < best.mass_kgm):
+        if (_passes_all(sec, grade, slot, restrained_baseline=True)
+                and (best is None or sec.mass_kgm < best.mass_kgm)):
             best = sec
     return best
 

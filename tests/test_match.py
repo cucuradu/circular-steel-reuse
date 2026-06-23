@@ -526,7 +526,8 @@ def test_construction_stage_governs_and_can_reject_a_slender_beam(cat):
         ExtractedMember(id="b1", role="beam", section="IPE300", raw_section="IPE300",
                         material_grade="S275", length_mm=6000, spans_mm=[6000]),
     ])
-    slots = build_slots(demand, AreaLoadModel(construction_stage=True))
+    # service = slab-restrained; erection (construction_stage) = bare-steel unrestrained
+    slots = build_slots(demand, AreaLoadModel(construction_stage=True, flange_restrained=True))
 
     ok = match([SupplyItem(id="d330", section="IPE330", grade="S275", length_mm=7000)], slots, cat)
     assert len(ok.assignments) == 1
@@ -537,7 +538,7 @@ def test_construction_stage_governs_and_can_reject_a_slender_beam(cat):
     assert rejected.assignments == []   # fails the bare-steel stage despite passing gravity
 
     # without the stage, the same IPE300 donor is accepted (gravity restrained only)
-    slots_off = build_slots(demand, AreaLoadModel())
+    slots_off = build_slots(demand, AreaLoadModel(flange_restrained=True))  # slab-restrained gravity
     accepted = match([SupplyItem(id="d300", section="IPE300", grade="S275", length_mm=7000)],
                      slots_off, cat)
     assert len(accepted.assignments) == 1

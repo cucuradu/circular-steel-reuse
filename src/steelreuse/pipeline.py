@@ -62,7 +62,7 @@ class LoadModel:
 
     beam_udl_Npmm: float = 15.0      # kN/m
     column_axial_N: float = 400e3    # kN
-    beam_flange_restrained: bool = True
+    beam_flange_restrained: bool = False   # conservative default: LTB as unrestrained unless asserted
 
     def loads_for(self, member) -> Load:
         if member.role == "column":
