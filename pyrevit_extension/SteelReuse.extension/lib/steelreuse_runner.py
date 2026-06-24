@@ -161,6 +161,18 @@ def build_command(interpreter, opts, out_dir):
     return cmd
 
 
+def run_inventory_template(interpreter, target):
+    """Write a blank donor-inventory template (xlsx/csv) by shelling out to the engine CLI.
+
+    ``target``'s extension picks the format (.xlsx else .csv). Returns the same dict shape as
+    run_match. Synchronous and Revit-free, so it is safe to call from a button handler directly
+    (the write is near-instant -- no background thread needed).
+    """
+    cmd = [interpreter, "-m", "steelreuse.cli", "--inventory-template", target]
+    out_dir = os.path.dirname(target) or "."
+    return _run_logged(cmd, out_dir, {"template": target}, "inventory_template.log")
+
+
 def candidate_interpreters(start_dir):
     """Auto-detect likely interpreters by walking up from ``start_dir`` looking for venvs.
 

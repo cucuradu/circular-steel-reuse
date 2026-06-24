@@ -56,13 +56,21 @@
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Label Grid.Row="0" Grid.Column="0" Content="Donor JSON"/>
+        <Label Grid.Row="0" Grid.Column="0" Content="Donor model"/>
         <TextBox Grid.Row="0" Grid.Column="1" x:Name="donor_box" Margin="6,4" Padding="3"/>
         <Button Grid.Row="0" Grid.Column="2" x:Name="donor_browse" Content="Browse..."/>
-        <Label Grid.Row="1" Grid.Column="0" Content="Demand JSON"/>
+        <Label Grid.Row="1" Grid.Column="0" Content="Demand model"/>
         <TextBox Grid.Row="1" Grid.Column="1" x:Name="demand_box" Margin="6,4" Padding="3"/>
         <Button Grid.Row="1" Grid.Column="2" x:Name="demand_browse" Content="Browse..."/>
+        <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    Margin="6,0,0,0">
+          <TextBlock Text="Models accept .json, .csv or .xlsx (no Revit needed)."
+                     VerticalAlignment="Center" Foreground="#666" FontSize="11"/>
+          <Button x:Name="template_button" Content="Blank inventory template..."
+                  Margin="10,0,0,0" Padding="6,1"/>
+        </StackPanel>
       </Grid>
       <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
         <Label Content="Run name"/>
@@ -337,6 +345,10 @@
       </TabItem>
       <TabItem Header="Warnings" x:Name="tab_warnings">
         <TextBox x:Name="warnings_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Provenance" x:Name="tab_provenance">
+        <TextBox x:Name="provenance_text" IsReadOnly="True" FontFamily="Consolas"
                  TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
       </TabItem>
     </TabControl>

@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .core.sections import load_default_catalog
 from .extraction_review import extraction_review
+from .inventory_sheet import load_model_file
 from .schema import ExtractedModel, ExtractionError
 
 
@@ -48,7 +49,8 @@ def _schedule_row_count(path: str | Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Validate a steelreuse extraction JSON")
-    ap.add_argument("json", help="extraction JSON written by the pyRevit/IFC extractor")
+    ap.add_argument("json", help="extraction JSON written by the pyRevit/IFC extractor, or a "
+                                  ".csv/.xlsx inventory spreadsheet (see steelreuse --inventory-template)")
     ap.add_argument("--expect", type=int, default=None, help="expected total member count")
     ap.add_argument("--schedule", default=None,
                     help="Revit schedule CSV; its data-row count is compared to the member count")
@@ -64,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     try:
-        model = ExtractedModel.load(args.json)
+        model = load_model_file(args.json, "donor")
         s = summarize(model)
     except ExtractionError as e:
         print(f"error: {e}", file=sys.stderr)

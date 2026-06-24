@@ -1,0 +1,8 @@
+title: |-
+  Inventory
+  Template
+tooltip: >-
+  Write a BLANK reusable-steel inventory template (Excel .xlsx or .csv) with column headers, one
+  worked example row, and the conservative "unverified" provenance flag. Fill one row per reclaimed
+  member in any spreadsheet -- no Revit model needed -- then use it as the Donor (or Demand) model in
+  Run Match, Value Case or Review. The matcher reads .json, .csv and .xlsx alike.

@@ -30,12 +30,16 @@ def resolve_interpreter(ext_root, alert=True):
     return interp
 
 
-def resolve_donor(ext_root, title="Select the extracted donor.json"):
-    """The last extracted donor.json if it still exists, else ask the user to pick one (None if cancelled)."""
+def resolve_donor(ext_root, title="Select the donor model or inventory"):
+    """The last donor model if it still exists, else ask the user to pick one (None if cancelled).
+
+    Accepts the extractor's .json or a .csv/.xlsx inventory spreadsheet (the engine dispatches by
+    extension), so the donor-only buttons (Value Case, Review, PDA) take a no-Revit inventory too.
+    """
     donor = runner.load_settings(ext_root).get("last_donor")
     if donor and os.path.isfile(donor):
         return donor
-    return forms.pick_file(file_ext="json", title=title)
+    return forms.pick_file(file_ext="json|csv|xlsx", title=title)
 
 
 def interpreter_and_donor(ext_root, title="Select the extracted donor.json"):

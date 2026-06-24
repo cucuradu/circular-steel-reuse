@@ -13,8 +13,8 @@ from pathlib import Path
 
 from .core.audit import apply_audit, load_audit_csv
 from .core.value_case import MarketParams, value_case
+from .inventory_sheet import load_model_file
 from .resources import sample_path
-from .schema import ExtractedModel
 from .writeback import build_value_case_writeback
 
 
@@ -133,7 +133,7 @@ def main() -> None:
 
     try:
         donor_path = sample_path("donor.json") if args.demo else Path(args.donor)
-        donor = ExtractedModel.load(donor_path)
+        donor = load_model_file(donor_path, "donor")
 
         if args.pda:
             apply_audit(donor.members, load_audit_csv(args.pda))

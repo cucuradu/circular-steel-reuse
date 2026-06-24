@@ -41,6 +41,7 @@ class SteelReusePanel(forms.WPFWindow):
         self.donor_browse.Click += self._pick_donor
         self.demand_browse.Click += self._pick_demand
         self.pda_browse.Click += self._pick_pda
+        self.template_button.Click += self._make_template
         self.run_button.Click += self._on_run
         self.status_filter.SelectionChanged += self._apply_filters
         self.section_filter.TextChanged += self._apply_filters
@@ -153,12 +154,13 @@ class SteelReusePanel(forms.WPFWindow):
         }
 
     def _pick_donor(self, sender, args):
-        path = forms.pick_file(file_ext="json", title="Donor (supply) JSON")
+        path = forms.pick_file(file_ext="json|csv|xlsx", title="Donor (supply) model or inventory")
         if path:
             self.donor_box.Text = path
 
     def _pick_demand(self, sender, args):
-        picked = forms.pick_file(file_ext="json", title="New-design (demand) JSON", multi_file=True)
+        picked = forms.pick_file(file_ext="json|csv|xlsx", title="New-design (demand) model or inventory",
+                                 multi_file=True)
         if picked:
             self.demand_box.Text = "; ".join(picked) if isinstance(picked, list) else picked
 
@@ -167,11 +169,34 @@ class SteelReusePanel(forms.WPFWindow):
         if path:
             self.pda_box.Text = path
 
+    def _make_template(self, sender, args):
+        """Write a blank donor-inventory template (xlsx/csv) via the engine, then offer to open it."""
+        target = forms.save_file(file_ext="xlsx", default_name="donor_inventory_template")
+        if not target:
+            return
+        interp = runner.discover_interpreter(self._settings.get("interpreter"), self._ext_root)
+        if not interp:
+            forms.alert("Locate the signed-venv python first (use Run Match once to set it).",
+                        title="SteelReuse")
+            return
+        res = runner.run_inventory_template(interp, target)
+        if res["ok"]:
+            self._settings["interpreter"] = interp
+            runner.save_settings(self._ext_root, self._settings)
+            if forms.alert("Blank inventory template written to:\n%s\n\nFill one row per reclaimed "
+                           "member, then Browse to it as the Donor model. Open it now?" % target,
+                           title="SteelReuse", ok=False, yes=True, no=True):
+                os.startfile(target)
+        else:
+            detail = (res.get("stdout") or res.get("stderr") or "").strip()
+            forms.alert("Could not write the template:\n\n%s" % detail[-1500:], title="SteelReuse")
+
     # -- run (background thread) ------------------------------------------------------------------
     def _on_run(self, sender, args):
         opts = self.collect_options()
         if not opts["donor"] or not opts["demand"]:
-            forms.alert("Pick a donor and a demand JSON first.", title="SteelReuse")
+            forms.alert("Pick a donor and a demand model first (.json, .csv or .xlsx).",
+                        title="SteelReuse")
             return
 
         interp = runner.discover_interpreter(self._settings.get("interpreter"), self._ext_root)
@@ -231,11 +256,22 @@ class SteelReusePanel(forms.WPFWindow):
             return
         self._view = panelmodel.parse(data)
         k = self._view.kpis
-        self.kpi_text.Text = (
+        line = (
             "%s / %s slots reused    |    %s kg CO2e saved    |    %s kg reused    |    %s"
             % (k.get("reused", "?"), k.get("slots", "?"), k.get("co2_saved_kg", "?"),
                k.get("mass_reused_kg", "?"),
                "proven optimal" if k.get("proven_optimal") else "heuristic (not proven)"))
+        # Roadmap §1.2: name the rule-data version + donor-provenance coverage on the header, so the
+        # externalised-rules / mismatch-log work is visible right here (details on the Provenance tab).
+        rules = self._view.rules or {}
+        if rules.get("ruleset_version"):
+            line += "    |    rules v%s" % rules.get("ruleset_version")
+        ms = (self._view.mismatch or {}).get("summary") or {}
+        if ms:
+            line += ("    |    donors: %s mapped / %s fuzzy / %s unknown / %s quarantined"
+                     % (ms.get("mapped", 0), ms.get("fuzzy", 0),
+                        ms.get("unknown", 0), ms.get("quarantined", 0)))
+        self.kpi_text.Text = line
         # Show the FULL engine log (scrollable), so the "Forces: frame analysis (solver) -- N nodes"
         # line and other run details are visible -- the tail alone hid which backend actually ran.
         warn = "" if self._view.schema_ok else "WARNING: unexpected results schema version.\n"
@@ -273,6 +309,8 @@ class SteelReusePanel(forms.WPFWindow):
         self._opt_tab(self.tab_disposition, v.has_disposition,
                       self.disposition_text, self._fmt_disposition)
         self._opt_tab(self.tab_audit, v.has_audit, self.audit_text, self._fmt_audit)
+        self._opt_tab(self.tab_provenance, v.has_mismatch,
+                      self.provenance_text, self._fmt_provenance)
 
     def _opt_tab(self, tab, present, box, fmt):
         if present:
@@ -351,6 +389,37 @@ class SteelReusePanel(forms.WPFWindow):
             out += ["", "Quarantined (%s):" % len(quarantined)]
             for q in quarantined:
                 out.append("  %-14s %s" % (q.get("id", ""), q.get("reason", "")))
+        return "\n".join(out)
+
+    def _fmt_provenance(self):
+        """Rule-data versions + the donor mismatch log (Roadmap §1.2): every donor classified with a
+        reason, so 'nothing was silently dropped' is visible here, not only in the evidence file."""
+        v = self._view
+        rules = v.rules or {}
+        mismatch = v.mismatch or {}
+        summary = mismatch.get("summary", {})
+        rows = mismatch.get("rows", [])
+        out = []
+        if rules.get("ruleset_version"):
+            tables = ", ".join("%s v%s" % (t.get("name", ""), t.get("version", ""))
+                               for t in rules.get("tables", []))
+            out += ["Rule data (externalised + versioned):",
+                    "  ruleset v%s" % rules.get("ruleset_version"),
+                    "  tables: %s" % tables,
+                    "  carbon factors: v%s" % rules.get("carbon_factors_version", "?"), ""]
+        cover = "100%" if summary.get("accounts_for_all") else "INCOMPLETE"
+        out += ["Donor provenance -- %s of %s donor row(s) accounted for:"
+                % (cover, summary.get("n_donor_rows", "?")),
+                "  %s mapped | %s fuzzy | %s unknown | %s quarantined"
+                % (summary.get("mapped", 0), summary.get("fuzzy", 0),
+                   summary.get("unknown", 0), summary.get("quarantined", 0)), ""]
+        out.append("%-14s %-11s %-9s %s" % ("donor id", "class", "outcome", "reason"))
+        for r in rows:
+            out.append("%-14s %-11s %-9s %s"
+                       % (r.get("id", ""), r.get("classification", ""),
+                          r.get("outcome", ""), r.get("reason", "")))
+        out += ["", "The full signable evidence package (evidence.json) and this log (mismatch.csv)",
+                "are in this run's folder -- use 'Open folder' below."]
         return "\n".join(out)
 
     # -- display filters (never re-run the match) -------------------------------------------------

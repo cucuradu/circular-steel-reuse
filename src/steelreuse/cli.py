@@ -50,11 +50,17 @@ def build_parser() -> argparse.ArgumentParser:
                     help="run on the bundled sample donor/demand models (no --donor/--demand needed)")
     ap.add_argument("--debug", action="store_true",
                     help="show the full Python traceback on error (default: a short message)")
-    ap.add_argument("--donor", help="donor (supply) extraction JSON")
-    ap.add_argument("--demand", nargs="+", metavar="JSON",
-                    help="new-design (demand) extraction JSON; pass SEVERAL paths for portfolio "
-                         "matching (one optimization allocates the donor stock across all the "
-                         "projects at once, with a per-project breakdown)")
+    ap.add_argument("--inventory-template", metavar="PATH",
+                    help="write a BLANK donor-inventory template (headers + one worked example row, "
+                         "incl. the conservative 'unverified' provenance flag) to PATH and exit; "
+                         "format chosen by extension (.xlsx needs the 'xlsx' extra, else .csv). Build "
+                         "an inventory in a spreadsheet without Revit, then pass it to --donor")
+    ap.add_argument("--donor", help="donor (supply) inventory: extraction JSON, or a .csv/.xlsx "
+                                    "spreadsheet (see --inventory-template for the column layout)")
+    ap.add_argument("--demand", nargs="+", metavar="MODEL",
+                    help="new-design (demand) inventory: extraction JSON or a .csv/.xlsx spreadsheet; "
+                         "pass SEVERAL paths for portfolio matching (one optimization allocates the "
+                         "donor stock across all the projects at once, with a per-project breakdown)")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
     ap.add_argument("--apply-matches-out",
                     help="write a per-element status JSON (donor: reused/available/quarantined/"
@@ -239,6 +245,20 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     ap = build_parser()
     args = ap.parse_args(argv)
+
+    # Emit a blank donor-inventory template and exit — no models needed. Lets a user assemble a
+    # reusable-steel inventory in Excel/CSV (no Revit) and feed it straight to --donor.
+    if args.inventory_template:
+        from .inventory_sheet import write_inventory_template
+        try:
+            path = write_inventory_template(args.inventory_template)
+        except RuntimeError as e:  # missing optional 'xlsx' extra
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        print(f"Blank inventory template written -> {path}")
+        print("Fill one row per reclaimed member, then run: "
+              "steelreuse --donor <that file> --demand demand.json")
+        return 0
 
     # Experimental features are gated behind --lab so the default CLI exposes only the validated core.
     if not args.lab:

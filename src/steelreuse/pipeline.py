@@ -24,6 +24,7 @@ from .core.sections import (
     load_default_catalog,
     resolve_members,
 )
+from .inventory_sheet import load_model_file
 from .match.optimize import (
     OBJECTIVES,
     DemandSlot,
@@ -469,7 +470,7 @@ def run_pipeline(
                 "flat LoadModel has no floor pressure to distribute through the frame — pass an "
                 "AreaLoadModel (or drop --beam-udl/--column-axial on the CLI)"
             )
-    donor = ExtractedModel.load(donor_path)
+    donor = load_model_file(donor_path, "donor")
 
     # Portfolio matching (C1): --demand may carry SEVERAL demand models. Each is loaded, analyzed
     # (frame solve per model) and slotted independently; slot ids are namespaced "tag::slotid" to
@@ -494,7 +495,7 @@ def run_pipeline(
     project_rows: list[dict] | None = [] if portfolio else None
     tags = _project_tags(demand_paths) if portfolio else [None]
     for path, tag in zip(demand_paths, tags, strict=True):
-        demand = ExtractedModel.load(path)
+        demand = load_model_file(path, "demand")
         # Map the new-design sections too, so each slot carries its design grade/section for the
         # avoided-new CO2 baseline (A1/A6). Matching itself stays force-based, not section-based.
         resolve_members(demand.members, catalog)

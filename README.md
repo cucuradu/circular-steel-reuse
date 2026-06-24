@@ -141,6 +141,12 @@ Once installed, the `steelreuse` command is on your PATH:
 steelreuse --demo                                  # bundled sample models -> reports/demo_report.html
 steelreuse --donor donor.json --demand demand.json --out reports/report.html
 
+# no Revit model? build the donor inventory in a spreadsheet. Write a blank template
+# (headers + one worked example + the conservative "unverified" flag), fill one row per
+# reclaimed member, then feed the .csv/.xlsx straight to --donor (or --demand):
+steelreuse --inventory-template donor_inventory.xlsx       # or .csv
+steelreuse --donor donor_inventory.xlsx --demand demand.json --out reports/report.html
+
 # portfolio: match ONE donor stock across SEVERAL demand models at once:
 steelreuse --donor donor.json --demand projectA.json projectB.json --out reports/portfolio.html
 
