@@ -10,6 +10,15 @@
 
 Severity: 🔴 blocks credibility / wrong result · 🟠 important methodology gap · 🟡 minor / cosmetic.
 
+> **Certifiability & market positioning.** The goal-specific roadmap for making the tool *certifiable*
+> (reproducible audit trail + auditable rules/provenance + per-member EN evidence) and positioning it
+> against the 2026 startup field lives in its own file:
+> **[docs/ROADMAP_CERTIFIABLE_REUSE.md](docs/ROADMAP_CERTIFIABLE_REUSE.md)** (the *what to build*), with
+> the literature/competitor analysis and redefined scope in **[docs/POSITIONING.md](docs/POSITIONING.md)**
+> (the *why*). That roadmap is the home for the evidence-package export, versioned rule-mapping +
+> mismatch log, coverage/time-to-result metrics, marketplace interop adapters and SCI P427 / BS 8001
+> alignment — they are **not** repeated below (this file stays the engine/methodology backlog).
+
 > **Context for agents — what is already done** (do not re-propose): global frame analysis (gravity load
 > path, EN 5.3.2 sway EHF + P-Δ, wind, EN 1998 lateral-force seismic, multi-span splitting, α_cr
 > classification), full 6.3.3 biaxial interaction, shear–moment (6.2.8), construction-stage and

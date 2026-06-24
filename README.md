@@ -19,6 +19,13 @@ clause→code mapping and every assumption · **[docs/VALIDATION.md](docs/VALIDA
 section-table validation · **[docs/CASE_STUDY.md](docs/CASE_STUDY.md)** — a real 1000-member building
 run · **[docs/DESIGN_PRINCIPLES.md](docs/DESIGN_PRINCIPLES.md)** — the five engineering ground rules.
 
+🧭 **Positioning & scope:** **[docs/POSITIONING.md](docs/POSITIONING.md)** — how this tool relates to
+the literature and the 2026 startup field (ēfestos, WSP, FerrousWheel, Loopfront…), and its redefined
+scope: *the open, verifiable matcher that proves a donor→slot assignment passes Eurocode and books
+honest carbon — interoperating with marketplaces, not competing with them.*
+**[docs/ROADMAP_CERTIFIABLE_REUSE.md](docs/ROADMAP_CERTIFIABLE_REUSE.md)** — the roadmap to a
+certifiable, publishable reference tool.
+
 <!-- TODO: add docs/img/steelreuse_panel.png — the SteelReuse ribbon + a colour-coded model -->
 
 ---

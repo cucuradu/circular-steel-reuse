@@ -701,6 +701,12 @@ Narrative source: deterministic
 Severity follows the project register: 🔴 affects credibility or correctness · 🟠 methodology gap (usually
 conservative and documented) · 🟡 minor. Items marked *(out of scope)* are deliberate non‑goals.
 
+> **Positioning & certifiability roadmap.** This chapter is the thesis‑frozen *engine* limitation
+> register. The tool's market/literature positioning and its redefined scope are in
+> [POSITIONING.md](POSITIONING.md); the goal‑specific plan to make results *certifiable* (evidence
+> package, versioned rule‑mapping, coverage/time metrics, marketplace interop, SCI P427 / BS 8001
+> alignment) is in [ROADMAP_CERTIFIABLE_REUSE.md](ROADMAP_CERTIFIABLE_REUSE.md).
+
 **Real‑world feasibility (governing).**
 🔴 *Connection design (out of scope):* bolts, welds and plates are not designed, yet often govern reuse.
 The tool now ships a **connection feasibility screen** (§9.1.1) — shape family, depth band, web and
