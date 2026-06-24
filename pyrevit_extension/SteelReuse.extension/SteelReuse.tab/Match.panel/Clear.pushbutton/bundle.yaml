@@ -1,0 +1,6 @@
+title: |-
+  Clear
+tooltip: >-
+  Undo everything SteelReuse drew in the active view: reset the colour overrides from Apply Matches
+  and Highlight Problems, and clear the reuse-passport data (the parameter columns stay so schedules
+  keep working). One button for both old Clear actions.

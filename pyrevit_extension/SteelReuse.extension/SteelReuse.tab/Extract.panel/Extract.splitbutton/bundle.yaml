@@ -1,0 +1,5 @@
+title: |-
+  Extract
+tooltip: >-
+  Extract the active model's structural steel members to a JSON file. Pick from the dropdown: Donor
+  (reclaimed supply stock) or Demand (new design to be filled).

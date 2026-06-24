@@ -25,6 +25,22 @@ PARAM_PAIRED = "Reuse Paired With"
 PARAM_CO2 = "Reuse CO2 Saved (kg)"
 SHARED_PARAMS = ((PARAM_STATUS, "text"), (PARAM_NOTE, "text"),
                  (PARAM_PAIRED, "text"), (PARAM_CO2, "number"))
+
+# Value-case parameters (written by apply_value_case; enables a native Revit reuse-passport schedule).
+PARAM_VC_VERDICT = "Reuse VC Verdict"
+PARAM_VC_RECLAIMED = "Reuse VC Reclaimed Value (GBP)"
+PARAM_VC_PREMIUM = "Reuse VC Premium (GBP)"
+PARAM_VC_CO2 = "Reuse VC CO2 Saved (kg)"
+PARAM_VC_VERIFY = "Reuse VC Verification"
+PARAM_VC_NOTE = "Reuse VC Note"
+VC_SHARED_PARAMS = (
+    (PARAM_VC_VERDICT, "text"),
+    (PARAM_VC_RECLAIMED, "number"),
+    (PARAM_VC_PREMIUM, "number"),
+    (PARAM_VC_CO2, "number"),
+    (PARAM_VC_VERIFY, "text"),
+    (PARAM_VC_NOTE, "text"),
+)
 SP_GROUP = "SteelReuse"
 # lib/ -> SteelReuse.extension -> pyrevit_extension (where the persistent shared-param file lives).
 DEFAULT_SP_FILE = os.path.abspath(
@@ -248,6 +264,60 @@ def clear_overrides(doc, view, element_ids):
             t.RollBack()
         raise
     return {"cleared": cleared, "missing": missing}
+
+
+def apply_value_case(doc, view, members_data, sp_file=None):
+    """Colour donor elements by reuse / review / scrap verdict and write the VC passport params.
+
+    ``members_data`` is the ``data["members"]`` dict from value_case.json. Writes the schedulable
+    reuse-passport parameters per element (Verdict, Reclaimed Value, Premium, CO2 Saved,
+    Verification, Note) so the engineer gets a native Revit schedule without any extra button.
+    Returns ``{applied, missing, by_status}``.
+    """
+    if sp_file is None:
+        sp_file = DEFAULT_SP_FILE
+    solid_fill_id = _solid_fill_pattern_id(doc)
+    applied, missing, by_status = 0, 0, {}
+    t = DB.Transaction(doc, "SteelReuse: Value Case")
+    t.Start()
+    try:
+        _ensure_shared_params(doc, sp_file, params=VC_SHARED_PARAMS)
+        for elem_id_str, info in members_data.items():
+            try:
+                eid = DB.ElementId(int(elem_id_str))
+            except Exception:  # noqa: BLE001 -- non-numeric id (IFC global id) -> skip
+                missing += 1
+                continue
+            elem = doc.GetElement(eid)
+            if elem is None:
+                missing += 1
+                continue
+            color = info.get("color")
+            if color is not None:
+                ogs = _overrides(tuple(color), solid_fill_id)
+                if ogs is not None:
+                    view.SetElementOverrides(eid, ogs)
+            _set_param(elem, PARAM_VC_VERDICT, info.get("verdict", ""))
+            _set_param(elem, PARAM_VC_NOTE, info.get("note", ""))
+            _set_param(elem, PARAM_VC_VERIFY, info.get("verification_status", "") or "")
+            reclaimed = info.get("reclaimed_value_gbp")
+            if reclaimed is not None:
+                _set_param(elem, PARAM_VC_RECLAIMED, float(reclaimed))
+            premium = info.get("reuse_premium_gbp")
+            if premium is not None:
+                _set_param(elem, PARAM_VC_PREMIUM, float(premium))
+            co2 = info.get("co2_saved_kg")
+            if co2 is not None:
+                _set_param(elem, PARAM_VC_CO2, float(co2))
+            status = info.get("status", "")
+            applied += 1
+            by_status[status] = by_status.get(status, 0) + 1
+        t.Commit()
+    except Exception:
+        if t.HasStarted() and not t.HasEnded():
+            t.RollBack()
+        raise
+    return {"applied": applied, "missing": missing, "by_status": by_status}
 
 
 def write_pda(doc, element_ids, values, sp_file=None):

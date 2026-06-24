@@ -12,7 +12,7 @@ to a configured CPython interpreter via ``python -m steelreuse.cli`` -- not the 
 (Application Control / WDAC).
 
 Split of concerns (so most of this is testable without Revit):
-  * ``build_command`` / ``output_paths`` / ``find_interpreter`` / settings -- pure, unit-tested.
+  * ``build_command`` / ``output_paths`` / ``discover_interpreter`` / settings -- pure, unit-tested.
   * ``run_match`` -- a synchronous subprocess call (stdlib). The Run Match button wraps this on a
     .NET background thread so Revit's UI does not freeze; that thread glue is Revit-side.
 """
@@ -20,11 +20,15 @@ Split of concerns (so most of this is testable without Revit):
 import json
 import os
 import subprocess
+import webbrowser
 
 # Output artifact filenames written by a run, all under one per-run folder.
 _OUTPUT_NAMES = {"status": "status.json", "report": "report.html", "results": "results.json"}
 
 _SETTINGS_FILE = "steelreuse_runner_config.json"
+# Transient view state (the element ids Highlight Problems coloured) lives in its OWN file, not the
+# settings config: that list runs to ~1000 ids and every button reads the settings on each click.
+_HIGHLIGHT_FILE = "steelreuse_highlight.json"
 
 
 def output_paths(out_dir):
@@ -150,18 +154,6 @@ def build_command(interpreter, opts, out_dir):
     return cmd
 
 
-def find_interpreter(candidates):
-    """First path in ``candidates`` that is an existing file, else ``None``.
-
-    The button passes the configured signed-venv python first, then any fallback guesses. A directory
-    or a missing path is rejected so the caller can prompt the user to locate python.exe.
-    """
-    for path in candidates:
-        if path and os.path.isfile(path):
-            return path
-    return None
-
-
 def candidate_interpreters(start_dir):
     """Auto-detect likely interpreters by walking up from ``start_dir`` looking for venvs.
 
@@ -249,6 +241,31 @@ def save_settings(ext_dir, settings):
         json.dump(settings, handle, indent=2)
 
 
+def _highlight_path(ext_dir):
+    return os.path.join(ext_dir, _HIGHLIGHT_FILE)
+
+
+def load_highlight(ext_dir):
+    """The element ids currently highlighted by Highlight Problems (list of str); [] if none.
+
+    Kept out of the settings config so the bulky id list is not parsed by every other button.
+    """
+    path = _highlight_path(ext_dir)
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path) as handle:
+            return json.load(handle).get("highlighted_ids", [])
+    except Exception:  # noqa: BLE001 -- a corrupt/stale file just means nothing to clear
+        return []
+
+
+def save_highlight(ext_dir, ids):
+    """Persist the highlighted element ids (list of str) for Clear Highlights to undo later."""
+    with open(_highlight_path(ext_dir), "w") as handle:
+        json.dump({"highlighted_ids": list(ids)}, handle, indent=2)
+
+
 # Windows NTSTATUS-style exit codes that mean "the OS killed the process", not a clean Python error
 # (a Python exception exits 1 with a traceback). These appear as large-magnitude negative returncodes.
 _CRASH_CODES = {
@@ -322,3 +339,98 @@ def run_review(interpreter, opts, out_dir):
     """Run a review synchronously via subprocess; return the same dict shape as run_match."""
     return _run_logged(build_review_command(interpreter, opts, out_dir), out_dir,
                        review_paths(out_dir), "review.log")
+
+
+# Value-case artifact filenames.
+_VALUE_CASE_NAMES = {
+    "writeback": "value_case.json",
+    "results": "value_case_results.json",
+    "csv": "value_case.csv",
+}
+
+
+def value_case_paths(out_dir):
+    """The two value-case artifact paths under ``out_dir``."""
+    paths = {}
+    for key in _VALUE_CASE_NAMES:
+        paths[key] = os.path.join(out_dir, _VALUE_CASE_NAMES[key])
+    return paths
+
+
+def build_value_case_command(interpreter, opts, out_dir):
+    """argv for a value-case run: ``python -m steelreuse.value_case_cli --donor ...``.
+
+    ``opts`` must carry ``donor``; market-price keys are all optional (CLI defaults apply when
+    absent). No demand model is needed -- the whole point of the feature.
+    """
+    paths = value_case_paths(out_dir)
+    cmd = [interpreter, "-m", "steelreuse.value_case_cli",
+           "--donor", opts["donor"],
+           "--out-writeback", paths["writeback"],
+           "--out-json", paths["results"],
+           "--out-csv", paths["csv"]]
+    for key, flag in (("scrap_price", "--scrap-price"),
+                      ("reclaimed_price", "--reclaimed-price"),
+                      ("co2_price", "--co2-price"),
+                      ("knockdown", "--knockdown")):
+        val = opts.get(key)
+        if val is not None:
+            cmd.append(flag)
+            cmd.append(str(val))
+    if opts.get("pda"):
+        cmd.extend(["--pda", opts["pda"]])
+    if opts.get("include_unverified"):
+        cmd.append("--include-unverified")
+    if opts.get("include_unmapped"):
+        cmd.append("--include-unmapped")
+    return cmd
+
+
+def run_value_case(interpreter, opts, out_dir):
+    """Run the per-member business-case generator synchronously; return the same dict as run_match.
+
+    ``opts`` needs only ``donor`` -- no demand model required. Market-price opts are optional.
+    Safe to call on a background thread (no Revit API touched here).
+    """
+    return _run_logged(build_value_case_command(interpreter, opts, out_dir), out_dir,
+                       value_case_paths(out_dir), "value_case.log")
+
+
+# Default CSS for the report buttons' standalone HTML (Results / Problems / PDA QA). The bare
+# problem/PDA fragments carry no <style>, so this gives them a readable table; the results view ships
+# its own scoped <style>, which still applies once dropped inside <body>.
+_REPORT_CSS = (
+    "<style>"
+    "body{font-family:'Segoe UI',Arial,sans-serif;margin:1.2em;color:#222;}"
+    "table{border-collapse:collapse;width:100%;font-size:0.93em;margin-top:0.5em;}"
+    "th,td{border:1px solid #ccc;padding:3px 6px;text-align:left;}"
+    "th{background:#eee;}h2{margin:0.3em 0;}.review{color:#c33;font-weight:bold;}"
+    "</style>"
+)
+
+
+def open_html_report(out_path, title, body_html):
+    """Write ``body_html`` as a self-contained HTML document to ``out_path``, open it in the default
+    browser, and return ``out_path``.
+
+    The report buttons call this instead of relying on the pyRevit output window: under Revit 2026
+    that window's WebView renders blank -- even plain ``print_md`` never appears -- so the only
+    reliable channel is a file on disk opened in the system browser (the same ``os.startfile`` route
+    as Run Match's "Open report" footer). Best-effort launch: if the browser cannot be opened the
+    file is still written, so the caller can print the path as a fallback link.
+    """
+    out_dir = os.path.dirname(out_path)
+    if out_dir and not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+    doc = ("<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>" + title + "</title>"
+           + _REPORT_CSS + "</head><body>" + body_html + "</body></html>")
+    with open(out_path, "w", encoding="utf-8") as handle:
+        handle.write(doc)
+    try:
+        os.startfile(out_path)  # Windows: hand the file to the default browser
+    except Exception:  # noqa: BLE001 -- non-Windows dev box, or no file association
+        try:
+            webbrowser.open("file:///" + out_path.replace("\\", "/"))
+        except Exception:  # noqa: BLE001 -- file is on disk regardless; caller prints the path
+            pass
+    return out_path

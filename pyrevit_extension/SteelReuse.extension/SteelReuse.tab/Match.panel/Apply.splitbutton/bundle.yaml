@@ -1,0 +1,7 @@
+title: |-
+  Apply
+  Matches
+tooltip: >-
+  Colour this model's elements by their reuse status from a SteelReuse run and write the reuse
+  passport parameters. Pick the side from the dropdown: Donor (this model is the reclaimed supply)
+  or Demand (this model is the new design).

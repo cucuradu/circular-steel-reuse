@@ -1,6 +1,0 @@
-title: |-
-  Highlight
-  Problems
-tooltip: >-
-  Colour the active view by extraction-review severity: red = unknown section, amber = fuzzy /
-  audit quarantine, grey = info (missing grade/coords, not audited). Use Clear Highlight to remove.

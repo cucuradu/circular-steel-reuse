@@ -130,6 +130,24 @@ def _slot_donors(data):
     return out
 
 
+def _slot_demand_ids(*datasets):
+    """Map slot_id -> demand element id across the given results dicts (assignments + unfilled).
+
+    The demand id is the same in both runs (it is the new-design member the slot represents), so the
+    Compare window can zoom to a changed slot's demand member even when the slot went from filled to
+    unfilled. Later datasets win, but the value is stable so order does not matter in practice.
+    """
+    out = {}
+    for data in datasets:
+        for a in data.get("assignments", []):
+            if a.get("demand_id"):
+                out[a.get("slot_id")] = a.get("demand_id")
+        for u in data.get("unfilled", []):
+            if u.get("demand_id"):
+                out[u.get("slot_id")] = u.get("demand_id")
+    return out
+
+
 def _delta(baseline, current):
     """current - baseline, rounded to 1 dp when either side is a float."""
     if isinstance(baseline, float) or isinstance(current, float):
@@ -141,9 +159,11 @@ def diff(baseline_data, current_data):
     """Compare two results.json v2 dicts: KPI deltas + per-slot outcome changes.
 
     Returns ``{"kpis": [{"label","baseline","current","delta"}, ...],
-    "slots": [{"slot_id","change","detail"}, ...]}`` where ``change`` is 'lost' (was filled, now
-    unfilled), 'gained' (was unfilled, now filled) or 'donor' (filled by a different member).
-    Unchanged slots are omitted. Pure data in/out, so it is unit-tested headless.
+    "slots": [{"slot_id","demand_id","change","donor_baseline","donor_current","detail"}, ...]}``
+    where ``change`` is 'lost' (was filled, now unfilled), 'gained' (was unfilled, now filled) or
+    'donor' (filled by a different member). ``demand_id``/``donor_*`` are the element ids the Compare
+    window zooms to (donor ids are None when that side is unfilled). Unchanged slots are omitted.
+    Pure data in/out, so it is unit-tested headless.
     """
     bk = baseline_data.get("kpis", {})
     ck = current_data.get("kpis", {})
@@ -158,6 +178,7 @@ def diff(baseline_data, current_data):
 
     base = _slot_donors(baseline_data)
     cur = _slot_donors(current_data)
+    demand_ids = _slot_demand_ids(baseline_data, current_data)
     slots = []
     for slot_id in sorted(set(base) | set(cur)):
         b = base.get(slot_id)
@@ -165,13 +186,13 @@ def diff(baseline_data, current_data):
         if b == c:
             continue
         if b is not None and c is None:
-            slots.append({"slot_id": slot_id, "change": "lost", "detail": "filled -> unfilled"})
+            change, detail = "lost", "filled -> unfilled"
         elif b is None and c is not None:
-            slots.append({"slot_id": slot_id, "change": "gained",
-                          "detail": "unfilled -> filled (" + str(c) + ")"})
+            change, detail = "gained", "unfilled -> filled (" + str(c) + ")"
         else:
-            slots.append({"slot_id": slot_id, "change": "donor",
-                          "detail": "donor " + str(b) + " -> " + str(c)})
+            change, detail = "donor", "donor " + str(b) + " -> " + str(c)
+        slots.append({"slot_id": slot_id, "demand_id": demand_ids.get(slot_id),
+                      "change": change, "donor_baseline": b, "donor_current": c, "detail": detail})
     return {"kpis": kpis, "slots": slots}
 
 

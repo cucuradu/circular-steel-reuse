@@ -17,89 +17,15 @@ import json
 import os
 import threading
 
-import steelreuse_apply as apply_mod  # shared Apply-Matches logic (also used by the ribbon button)
 import steelreuse_panel_model as panelmodel  # extension lib/ is on the engine path
+import steelreuse_revit_events as revit_events  # shared select/zoom/apply ExternalEvent handlers
 import steelreuse_runner as runner
 import steelreuse_runs as runhist  # auto-save each run to the Compare Runs history
-from Autodesk.Revit.DB import ElementId
-from Autodesk.Revit.UI import ExternalEvent, IExternalEventHandler
 from pyrevit import forms
 from System import Action  # marshal worker-thread results back to the WPF UI thread
-from System.Collections.Generic import List
 from System.Windows import Visibility  # show/hide the optional result tabs
 
 _DIR = os.path.dirname(__file__)
-
-
-class _ZoomHandler(IExternalEventHandler):
-    """Select + zoom an assignment's element in the ACTIVE document, off an ExternalEvent.
-
-    A modeless window may not touch the Revit API directly; document actions must run here, when
-    Revit raises the event in a valid API context. ``ids`` holds the row's candidate element ids
-    (its demand element id and its donor element id); whichever exists in the open model is
-    selected, so the same Zoom works whether the donor or the demand model is active.
-    """
-
-    def __init__(self):
-        self.ids = []
-
-    def Execute(self, uiapp):
-        uidoc = uiapp.ActiveUIDocument
-        if uidoc is None:
-            return
-        doc = uidoc.Document
-        found = List[ElementId]()
-        for raw in self.ids:
-            try:
-                eid = ElementId(int(raw))
-            except (ValueError, TypeError):
-                continue
-            try:
-                if doc.GetElement(eid) is not None:
-                    found.Add(eid)
-            except Exception:  # noqa: BLE001 -- a bad id must never break the handler
-                pass
-        if found.Count == 0:
-            return
-        try:
-            uidoc.Selection.SetElementIds(found)
-            uidoc.ShowElements(found)
-        except Exception:  # noqa: BLE001
-            pass
-
-    def GetName(self):
-        return "SteelReuse: zoom to element"
-
-
-class _ApplyHandler(IExternalEventHandler):
-    """Apply the colour overrides + reuse-passport params to the active model, off an ExternalEvent.
-
-    The transaction must run in a valid Revit API context, which a modeless window is not -- so the
-    window stages ``statuses``/``side`` and raises this. Reuses the shared ``steelreuse_apply`` code
-    the ribbon button uses, then reports the outcome.
-    """
-
-    def __init__(self):
-        self.statuses = None
-        self.side = None
-
-    def Execute(self, uiapp):
-        uidoc = uiapp.ActiveUIDocument
-        if uidoc is None:
-            return
-        doc = uidoc.Document
-        try:
-            result = apply_mod.apply_matches(doc, doc.ActiveView, self.statuses, self.side)
-        except Exception as ex:  # noqa: BLE001 -- surface a failed apply, never crash Revit
-            forms.alert("Apply Matches failed:\n" + str(ex), title="SteelReuse")
-            return
-        forms.alert("Applied %s %s element(s) in '%s'.\n%s id(s) were not in this model "
-                    "(open the other side's model to colour those)."
-                    % (result["applied"], self.side, doc.ActiveView.Name, result["missing"]),
-                    title="SteelReuse: Apply Matches")
-
-    def GetName(self):
-        return "SteelReuse: apply matches"
 
 
 class SteelReusePanel(forms.WPFWindow):
@@ -123,12 +49,12 @@ class SteelReusePanel(forms.WPFWindow):
         self.open_folder_button.Click += self._open_folder
         self.export_button.Click += self._export_csv
         # Document actions (select/zoom) from this modeless window go through an ExternalEvent.
-        self._zoom_handler = _ZoomHandler()
-        self._zoom_event = ExternalEvent.Create(self._zoom_handler)
+        self._zoom_handler = revit_events.ZoomHandler()
+        self._zoom_event = revit_events.make_event(self._zoom_handler)
         self.zoom_button.Click += self._on_zoom
         self.grid.MouseDoubleClick += self._on_zoom
-        self._apply_handler = _ApplyHandler()
-        self._apply_event = ExternalEvent.Create(self._apply_handler)
+        self._apply_handler = revit_events.ApplyHandler()
+        self._apply_event = revit_events.make_event(self._apply_handler)
         self.apply_button.Click += self._on_apply
         # Optional result tabs start hidden; a run reveals the ones whose data is present.
         for tab in (self.tab_unfilled, self.tab_portfolio, self.tab_pareto,

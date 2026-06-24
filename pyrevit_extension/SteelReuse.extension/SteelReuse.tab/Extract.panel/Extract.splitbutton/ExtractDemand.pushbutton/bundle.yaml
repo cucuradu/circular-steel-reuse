@@ -1,0 +1,6 @@
+title: |-
+  Extract
+  Demand
+tooltip: >-
+  Extract this model as the DEMAND (new design): each member is split at supports into structural
+  spans to be filled by donor stock. Writes a demand.json for the matcher.

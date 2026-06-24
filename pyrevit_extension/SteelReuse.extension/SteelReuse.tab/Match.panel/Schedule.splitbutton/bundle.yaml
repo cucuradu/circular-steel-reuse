@@ -1,0 +1,7 @@
+title: |-
+  Reuse
+  Schedule
+tooltip: >-
+  Create or open a native Revit schedule over the SteelReuse parameters. Pick from the dropdown:
+  Passport (reuse status, partner, CO2e from Apply Matches) or Value Case (keep / marginal / scrap
+  verdict and net surplus from Value Case).

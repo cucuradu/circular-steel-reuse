@@ -1,7 +1,0 @@
-title: |-
-  Clear
-  Matches
-tooltip: >-
-  Undo "Apply Matches": reset the colour overrides (active view) and remove the "SteelReuse: ..."
-  Comments it wrote. Only elements marked by Apply Matches are touched; all other overrides and
-  comments stay as they are.

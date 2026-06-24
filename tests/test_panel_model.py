@@ -119,6 +119,17 @@ def test_diff_slot_detail_strings():
     assert "D3" in detail and "D9" in detail
 
 
+def test_diff_slot_changes_carry_zoom_ids():
+    # Each change carries the demand element id + both donor ids so Compare can zoom to the member.
+    base = _data(1, 1.0, 1.0, 1, [("S_donor#0", "D3"), ("S_lost#0", "D2")], ["S_gain#0"])
+    cur = _data(1, 1.0, 1.0, 1, [("S_donor#0", "D9"), ("S_gain#0", "D8")], ["S_lost#0"])
+    by = {c["slot_id"]: c for c in model.diff(base, cur)["slots"]}
+    assert by["S_donor#0"]["demand_id"] == "S_donor"          # demand id stripped of the #span
+    assert by["S_donor#0"]["donor_baseline"] == "D3" and by["S_donor#0"]["donor_current"] == "D9"
+    assert by["S_lost#0"]["donor_baseline"] == "D2" and by["S_lost#0"]["donor_current"] is None
+    assert by["S_gain#0"]["donor_baseline"] is None and by["S_gain#0"]["donor_current"] == "D8"
+
+
 def test_kpi_table_columns_and_aligned_values():
     a = _data(90, 1000.0, 800.0, 8, [("N1#0", "D1")], ["N2#0"])
     b = _data(71, 700.0, 600.0, 6, [("N1#0", "D1")], ["N2#0", "N3#0"])

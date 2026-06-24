@@ -1,0 +1,10 @@
+title: |-
+  Value
+  Case
+tooltip: >-
+  Per-member reuse value + suitability — no demand model needed. Runs the signed Python engine on the
+  last extracted donor model and colours each member: green = REUSE (reuse-ready: mapped, grade
+  verified, sound), amber = REVIEW (reusable but needs a coupon test / inspection first), grey = SCRAP
+  (not reusable -> recycle). Reports the reuse prize: reclaimed value, premium over scrap, and CO2
+  saved vs new steel. Deconstruction cost is out of scope. Writes the reuse-passport parameters for
+  the Schedule -> Value Case button.

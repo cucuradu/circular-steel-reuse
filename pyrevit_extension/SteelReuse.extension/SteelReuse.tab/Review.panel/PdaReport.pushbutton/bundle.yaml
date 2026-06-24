@@ -1,7 +1,0 @@
-title: |-
-  PDA
-  Report
-tooltip: >-
-  Show the pre-demolition-audit QA report for the active model's extraction: coverage (audited /
-  admitted / quarantined / average knockdown) and the per-member condition, verification basis and
-  knockdown. Produced without running a match.

@@ -1,7 +1,0 @@
-title: |-
-  Apply
-  Matches
-tooltip: >-
-  Colour this model's elements by their reuse status from a SteelReuse run (green = reused/filled,
-  amber = partially filled, red = quarantined, orange = unfilled, grey = available/unmapped) and
-  write a one-line summary to "Comments". Reads the JSON from `steelreuse --apply-matches-out`.

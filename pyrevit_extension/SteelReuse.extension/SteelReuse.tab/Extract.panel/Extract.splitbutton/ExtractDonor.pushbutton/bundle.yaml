@@ -1,0 +1,6 @@
+title: |-
+  Extract
+  Donor
+tooltip: >-
+  Extract this model as the DONOR (reclaimed supply): each member's physical stock length becomes
+  available reuse stock. Writes a donor.json for the matcher.

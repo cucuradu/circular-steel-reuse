@@ -1,0 +1,7 @@
+title: |-
+  Highlight
+  Problems
+tooltip: >-
+  Colour the active view by extraction-review severity (red = error, amber = warning, blue = info)
+  so problem members stand out. Use Clear Highlights to undo. Shares one extraction review with the
+  other Review tools.

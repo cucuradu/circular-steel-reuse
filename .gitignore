@@ -24,6 +24,8 @@ models/
 
 # SteelReuse Revit add-on: machine-specific interpreter config + per-run match outputs
 steelreuse_runner_config.json
+# Runtime view state written by Highlight Problems (the coloured element ids); not a deliverable
+steelreuse_highlight.json
 steelreuse_reports/
 steelreuse_runs/
 pyrevit_extension/*_test_*.json
@@ -44,6 +46,11 @@ _commitmsg.txt
 # Local tooling state (editor/agent worktrees, local settings, agent instructions)
 .claude/
 AGENTS.md
+# Local-only Claude config-path repair helper (machine plumbing, not a deliverable)
+scripts/repair-claude-config-path.*
+# Stray Claude config from a HOME-less `~` expansion inside the repo (see CLAUDE.md) -- never track
+# (it holds a .credentials.json secret). Remove the folder once no terminal is using it.
+/~/
 
 # Editor / OS
 .vscode/

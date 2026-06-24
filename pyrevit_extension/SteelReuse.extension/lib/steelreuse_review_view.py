@@ -6,6 +6,19 @@ steelreuse_results_view so escaping/styling stay identical. Tested in CPython vi
 
 import steelreuse_results_view as rv  # noqa: E402 -- reuse _esc + style discipline
 
+# A single huge HTML table can render blank/freeze the pyRevit output WebView, so cap the rows shown
+# and point at the full CSV/HTML report on disk (a 1000-member donor is normal).
+_MAX_ROWS = 200
+
+
+def _more_note(shown, total, out_dir_hint="steelreuse_reports/"):
+    """A footer row noting how many rows were hidden, or '' when nothing was truncated."""
+    if shown >= total:
+        return ""
+    return ("<tr><td colspan='9'><em>&hellip; and %d more &mdash; see the full report in %s</em>"
+            "</td></tr>" % (total - shown, out_dir_hint))
+
+
 _LEVER = {
     "UNKNOWN_SECTION": "section not recognised; rename the type or add a mapping override",
     "FUZZY_MATCH": "near-miss name; confirm via override CSV or fix the type name",
@@ -26,11 +39,12 @@ def render_problem_report(review):
              % (len(members), cov["total"], cov["unknown"], cov["fuzzy"]),
              "<table><thead><tr><th>Element id</th><th>Role</th><th>Raw</th>"
              "<th>Mapped</th><th>Method</th><th>Issues</th></tr></thead><tbody>"]
-    for m in members:
+    for m in members[:_MAX_ROWS]:
         badges = ", ".join(rv._esc(c) for c, _ in m["issues"])
         parts.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
                      % (rv._esc(m["id"]), rv._esc(m["role"]), rv._esc(m["raw_section"]),
                         rv._esc(m["section"] or "-"), rv._esc(m["mapping_method"]), badges))
+    parts.append(_more_note(_MAX_ROWS, len(members)))
     parts.append("</tbody></table>")
     return "".join(parts)
 
@@ -44,11 +58,13 @@ def render_pda_report(review):
              "<table><thead><tr><th>Element id</th><th>Role</th><th>Condition</th>"
              "<th>Verification</th><th>Knockdown</th><th>Admitted</th><th>Defects</th>"
              "</tr></thead><tbody>"]
-    for m in review["members"]:
+    members = review["members"]
+    for m in members[:_MAX_ROWS]:
         parts.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%.3f</td>"
                      "<td>%s</td><td>%s</td></tr>"
                      % (rv._esc(m["id"]), rv._esc(m["role"]), rv._esc(m["condition"] or "-"),
                         rv._esc(m["verification"] or "-"), m["knockdown"],
                         "yes" if m["admitted"] else "no", rv._esc(m["defects"] or "")))
+    parts.append(_more_note(_MAX_ROWS, len(members)))
     parts.append("</tbody></table>")
     return "".join(parts)

@@ -1,0 +1,6 @@
+title: |-
+  Problems
+tooltip: >-
+  List the extracted members that need attention (unrecognised section, fuzzy name match, missing
+  grade, no coordinates), with clickable element ids. Shares one extraction review with the other
+  Review tools.

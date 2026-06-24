@@ -165,16 +165,6 @@ def test_discover_interpreter_none_when_saved_missing_and_no_working_venv(tmp_pa
     assert runner.discover_interpreter(str(tmp_path / "gone.exe"), str(tmp_path)) is None
 
 
-def test_find_interpreter_returns_first_existing_file(tmp_path):
-    real = tmp_path / "python.exe"
-    real.write_text("", encoding="utf-8")
-    missing = str(tmp_path / "nope.exe")
-    assert runner.find_interpreter([missing, str(real)]) == str(real)
-    assert runner.find_interpreter([missing]) is None
-    # a directory is not an interpreter
-    assert runner.find_interpreter([str(tmp_path)]) is None
-
-
 def test_output_paths_are_under_the_given_dir():
     paths = runner.output_paths(os.path.join("C:", "run42"))
     assert paths["results"].endswith("results.json")
@@ -190,6 +180,23 @@ def test_settings_round_trip_and_missing_dir_is_empty(tmp_path):
     assert s["last_donor"] == "d.json"
     # no config yet -> empty dict, never a crash
     assert runner.load_settings(str(tmp_path / "does-not-exist")) == {}
+
+
+def test_highlight_state_round_trips_in_its_own_file(tmp_path):
+    # The bulky highlighted-id list lives in steelreuse_highlight.json, NOT the settings config, so
+    # every other button's load_settings() stays cheap.
+    runner.save_highlight(str(tmp_path), ["1", "2", "3"])
+    assert runner.load_highlight(str(tmp_path)) == ["1", "2", "3"]
+    assert os.path.isfile(os.path.join(str(tmp_path), "steelreuse_highlight.json"))
+    # The settings config is untouched by highlight writes.
+    assert "highlighted_ids" not in runner.load_settings(str(tmp_path))
+
+
+def test_load_highlight_is_empty_when_absent_or_corrupt(tmp_path):
+    assert runner.load_highlight(str(tmp_path)) == []          # no file yet
+    with open(os.path.join(str(tmp_path), "steelreuse_highlight.json"), "w") as fh:
+        fh.write("{ not json")
+    assert runner.load_highlight(str(tmp_path)) == []          # corrupt -> nothing to clear, no crash
 
 
 def test_run_match_end_to_end_is_terminal_free(tmp_path):
@@ -240,3 +247,29 @@ def test_build_review_command_has_all_artifacts():
 def test_build_review_command_passes_pda_when_present():
     cmd = runner.build_review_command("py.exe", {"donor": "d.json", "pda": "a.csv"}, "/out")
     assert "--pda" in cmd and "a.csv" in cmd
+
+
+def test_open_html_report_writes_standalone_doc_and_opens_it(tmp_path, monkeypatch):
+    # The report buttons bypass the blank Revit-2026 output window by writing a self-contained HTML
+    # file and opening it in the browser. Stub the launcher so the test never spawns a browser.
+    opened = []
+    monkeypatch.setattr(runner.os, "startfile", lambda p: opened.append(p), raising=False)
+    out = os.path.join(str(tmp_path), "reports", "results_view.html")  # nested dir is created
+    returned = runner.open_html_report(out, "My <Title>", "<h2>Body</h2><table></table>")
+    assert returned == out and opened == [out]
+    with open(out, encoding="utf-8") as fh:
+        doc = fh.read()
+    assert doc.startswith("<!doctype html>")              # a full document, not a bare fragment
+    assert "<title>My <Title></title>" in doc and "<h2>Body</h2>" in doc
+    assert "<style>" in doc                                # default table CSS for the bare fragments
+
+
+def test_open_html_report_survives_a_launch_failure(tmp_path, monkeypatch):
+    # If neither os.startfile nor webbrowser can launch, the file is still written (caller prints it).
+    def _boom(*a, **k):
+        raise OSError("no association")
+    monkeypatch.setattr(runner.os, "startfile", _boom, raising=False)
+    monkeypatch.setattr(runner.webbrowser, "open", _boom)
+    out = os.path.join(str(tmp_path), "pda_report.html")
+    assert runner.open_html_report(out, "t", "<p>x</p>") == out
+    assert os.path.isfile(out)

@@ -8,12 +8,11 @@ declared in the XAML -- WPF cannot auto-generate columns from Python dicts (it w
 dict's ``Count``), so the rows must expose real attributes.
 """
 
-import json
 import os
 
 import steelreuse_apply as apply
 import steelreuse_audit_grid as gridmodel
-import steelreuse_runner as runner
+import steelreuse_buttons as buttons
 from pyrevit import forms, revit, script
 
 _EXT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -43,21 +42,16 @@ class GridRow:
 
 
 def _load_review():
-    interp = runner.discover_interpreter(runner.load_settings(_EXT_ROOT).get("interpreter"), _EXT_ROOT)
-    donor = runner.load_settings(_EXT_ROOT).get("last_donor")
-    if not (donor and os.path.isfile(donor)):
-        donor = forms.pick_file(file_ext="json", title="Select the extracted donor.json")
+    interp, donor = buttons.interpreter_and_donor(_EXT_ROOT)
     if not interp or not donor:
         return None
-    out_dir = os.path.join(_EXT_ROOT, "steelreuse_reports")
-    res = runner.run_review(interp, {"donor": donor}, out_dir)
-    if not res["ok"]:
-        detail = (res["stderr"] or res["stdout"] or "").strip()
-        forms.alert("Review failed (exit %s):\n\n%s" % (res["returncode"], detail[-1500:]),
+    review, err = buttons.review_or_reuse(_EXT_ROOT, interp, donor)
+    if err is not None:
+        detail = (err["stderr"] or err["stdout"] or "").strip()
+        forms.alert("Review failed (exit %s):\n\n%s" % (err["returncode"], detail[-1500:]),
                     title="SteelReuse")
         return None
-    with open(res["paths"]["review_json"], encoding="utf-8") as handle:
-        return json.load(handle)
+    return review
 
 
 class AuditGridWindow(forms.WPFWindow):

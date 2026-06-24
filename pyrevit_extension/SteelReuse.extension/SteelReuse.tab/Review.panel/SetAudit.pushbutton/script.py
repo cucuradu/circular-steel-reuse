@@ -1,38 +1,49 @@
 # -*- coding: utf-8 -*-
-"""Write PDA shared parameters onto the current Revit selection from a small form.
+"""Write PDA audit parameters onto the current Revit selection from a single form.
 
-Default IronPython 3 engine, stdlib + Revit/pyRevit only, no f-strings. Bulk-edits every selected
-framing/column at once; blank fields are left untouched on the elements.
+Default IronPython 3 engine, stdlib + Revit/pyRevit only, no f-strings. One WPF form replaces the old
+five sequential popups (condition / verification / knockdown / recoverable length / defects). Blank
+fields are left untouched on the elements. Bulk-edits every selected framing/column at once.
 """
 
+import os
+
 import steelreuse_apply as apply  # noqa: E402
+import steelreuse_buttons as buttons  # noqa: E402
 import steelreuse_pda_params as pdaparams  # noqa: E402
 from pyrevit import forms, revit, script
 
 output = script.get_output()
+_XAML = os.path.join(buttons.EXT_ROOT, "lib", "steelreuse_set_audit.xaml")
 
 _CONDITIONS = ["", "A", "B", "C", "D"]
 _VERIFICATIONS = ["", "mill_cert", "coupon_tested", "documented", "visual_only", "unverified"]
 
 
-def _ask():
-    """Collect field -> raw string from the user (a simple sequence of prompts)."""
-    cond = forms.ask_for_one_item(_CONDITIONS, default="", prompt="Condition grade (A-D)",
-                                  title="Set Audit 1/5")
-    if cond is None:
-        return None
-    ver = forms.ask_for_one_item(_VERIFICATIONS, default="", prompt="Verification basis",
-                                 title="Set Audit 2/5")
-    if ver is None:
-        return None
-    kd = forms.ask_for_string(default="", prompt="Explicit knockdown (blank = derive)",
-                              title="Set Audit 3/5")
-    rl = forms.ask_for_string(default="", prompt="Recoverable length mm (blank = full length)",
-                              title="Set Audit 4/5")
-    defects = forms.ask_for_string(default="", prompt="Defects (free text)", title="Set Audit 5/5")
-    raw = {"condition_grade": cond, "verification_status": ver, "knockdown": kd,
-           "recoverable_length_mm": rl, "defects": defects}
-    return dict((f, pdaparams.coerce_field(f, v)) for f, v in raw.items())
+class SetAuditWindow(forms.WPFWindow):
+    """One form for all audit fields; OK coerces them via steelreuse_pda_params.coerce_field."""
+
+    def __init__(self):
+        forms.WPFWindow.__init__(self, _XAML)
+        self.condition.ItemsSource = _CONDITIONS
+        self.verification.ItemsSource = _VERIFICATIONS
+        self.condition.SelectedIndex = 0
+        self.verification.SelectedIndex = 0
+        self.values = None
+        self.okBtn.Click += self.on_ok
+        self.cancelBtn.Click += self.on_cancel
+
+    def on_ok(self, sender, args):
+        raw = {"condition_grade": self.condition.SelectedItem or "",
+               "verification_status": self.verification.SelectedItem or "",
+               "knockdown": self.knockdown.Text,
+               "recoverable_length_mm": self.recoverable.Text,
+               "defects": self.defects.Text}
+        self.values = dict((f, pdaparams.coerce_field(f, v)) for f, v in raw.items())
+        self.Close()
+
+    def on_cancel(self, sender, args):
+        self.Close()
 
 
 def main():
@@ -41,9 +52,11 @@ def main():
     if not sel.element_ids:
         forms.alert("Select one or more framing/column elements first.", title="SteelReuse")
         return
-    values = _ask()
+    win = SetAuditWindow()
+    win.ShowDialog()
+    values = win.values
     if values is None:
-        return
+        return  # cancelled
     if all(v is None for v in values.values()):
         forms.alert("Nothing entered.", title="SteelReuse")
         return

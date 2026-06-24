@@ -1,30 +1,91 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SteelReuse - Compare runs" Height="620" Width="860"
+        Title="SteelReuse - Compare runs" Height="660" Width="900"
         WindowStartupLocation="CenterScreen" Background="#FAFAFA">
+  <Window.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="Margin" Value="4,0,0,0"/>
+    </Style>
+    <Style TargetType="Label">
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+  </Window.Resources>
+
   <Grid Margin="14">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
-      <RowDefinition Height="170"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="160"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" Margin="0,0,0,6"
-               Text="Saved runs - select two or more (Ctrl/Shift-click), then Compare."/>
+    <!-- Run A / Run B pickers -->
+    <Grid Grid.Row="0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <Label Grid.Column="0" Content="A (baseline)" Foreground="#0A6EBD" FontWeight="Bold"/>
+      <ComboBox Grid.Column="1" x:Name="run_a_combo" Margin="6,0" VerticalAlignment="Center"/>
+      <Button Grid.Column="2" x:Name="delete_a_button" Content="Delete A"/>
+      <Label Grid.Column="3" Content="B (current)" Margin="14,0,0,0" Foreground="#C0392B"
+             FontWeight="Bold"/>
+      <ComboBox Grid.Column="4" x:Name="run_b_combo" Margin="6,0" VerticalAlignment="Center"/>
+      <Button Grid.Column="5" x:Name="delete_b_button" Content="Delete B"/>
+    </Grid>
 
-    <ListBox Grid.Row="1" x:Name="runs_list" SelectionMode="Extended" FontFamily="Consolas"
-             HorizontalContentAlignment="Stretch"/>
-
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8">
-      <Button x:Name="compare_button" Content="Compare selected" Background="#00A651"
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8">
+      <Button x:Name="compare_button" Content="Compare A -> B" Background="#00A651"
               Foreground="White" FontWeight="Bold" Padding="14,5"/>
-      <Button x:Name="delete_button" Content="Delete selected" Padding="14,5" Margin="8,0,0,0"/>
-      <Button x:Name="refresh_button" Content="Refresh" Padding="14,5" Margin="8,0,0,0"/>
+      <Button x:Name="refresh_button" Content="Refresh" Padding="14,5"/>
+      <Button x:Name="holder_button" Content="Change holder..." Padding="14,5"/>
+      <TextBlock x:Name="legend_text" VerticalAlignment="Center" Margin="16,0,0,0"
+                 Text="Pick two saved runs, then Compare."/>
     </StackPanel>
 
-    <TextBox Grid.Row="3" x:Name="compare_output" IsReadOnly="True" FontFamily="Consolas"
-             TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
-             HorizontalScrollBarVisibility="Auto"/>
+    <Label Grid.Row="2" Content="KPI comparison" FontWeight="Bold"/>
+    <DataGrid Grid.Row="3" x:Name="kpi_grid" AutoGenerateColumns="False" IsReadOnly="True"
+              HeadersVisibility="Column" GridLinesVisibility="All">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="KPI" Binding="{Binding label}" Width="200"/>
+        <DataGridTextColumn Header="A (baseline)" Binding="{Binding a}" Width="*"/>
+        <DataGridTextColumn Header="B (current)" Binding="{Binding b}" Width="*"/>
+        <DataGridTextColumn Header="Change (B - A)" Binding="{Binding delta}" Width="*"/>
+      </DataGrid.Columns>
+    </DataGrid>
+
+    <!-- Per-slot changes: filter + drill-down -->
+    <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,10,0,4">
+      <Label Content="Per-slot changes" FontWeight="Bold"/>
+      <Label Content="Show" Margin="12,0,0,0"/>
+      <ComboBox x:Name="change_filter" Width="110" VerticalAlignment="Center" SelectedIndex="0">
+        <ComboBoxItem Content="all"/>
+        <ComboBoxItem Content="lost"/>
+        <ComboBoxItem Content="gained"/>
+        <ComboBoxItem Content="donor"/>
+      </ComboBox>
+      <Button x:Name="zoom_button" Content="Zoom to selected" Background="#0A6EBD"
+              Foreground="White" FontWeight="Bold" Margin="16,0,0,0"/>
+      <Button x:Name="trace_button" Content="Trace to partner model"/>
+    </StackPanel>
+
+    <DataGrid Grid.Row="5" x:Name="diff_grid" AutoGenerateColumns="False" IsReadOnly="True"
+              HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="True">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Slot" Binding="{Binding slot_id}" Width="130"/>
+        <DataGridTextColumn Header="Change" Binding="{Binding change}" Width="80"/>
+        <DataGridTextColumn Header="Demand id" Binding="{Binding demand_id}" Width="90"/>
+        <DataGridTextColumn Header="Donor in A" Binding="{Binding frm}" Width="110"/>
+        <DataGridTextColumn Header="Donor in B" Binding="{Binding to}" Width="110"/>
+        <DataGridTextColumn Header="Detail" Binding="{Binding detail}" Width="*"/>
+      </DataGrid.Columns>
+    </DataGrid>
   </Grid>
 </Window>

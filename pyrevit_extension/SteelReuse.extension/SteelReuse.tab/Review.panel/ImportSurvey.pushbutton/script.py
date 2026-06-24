@@ -11,7 +11,7 @@ import os
 import subprocess
 
 import steelreuse_apply as apply
-import steelreuse_runner as runner
+import steelreuse_buttons as buttons
 from pyrevit import forms, revit, script
 
 output = script.get_output()
@@ -34,21 +34,23 @@ def _parse_survey(interp, survey_path):
 
 def _resolve(doc, key):
     """Element for a survey key: UniqueId string first, then integer ElementId."""
-    elem = doc.GetElement(key)            # works for a UniqueId string
+    try:
+        elem = doc.GetElement(key)        # works for a UniqueId string (raises on a malformed one)
+    except Exception:  # noqa: BLE001 -- not a valid UniqueId; fall through to the integer-id path
+        elem = None
     if elem is not None:
         return elem.Id
     try:
         return revit.DB.ElementId(int(key))
-    except Exception:
+    except Exception:  # noqa: BLE001 -- not an integer id either -> unresolved
         return None
 
 
 def main():
     doc = revit.doc
-    interp = runner.discover_interpreter(runner.load_settings(_EXT_ROOT).get("interpreter"), _EXT_ROOT)
+    interp = buttons.resolve_interpreter(_EXT_ROOT)
     if not interp:
-        forms.alert("No working Python interpreter found (set one in Run Match).", title="SteelReuse")
-        return
+        return  # resolve_interpreter already alerted
     path = forms.pick_file(file_ext="csv|xlsx|json", title="Pick a filled survey file")
     if not path:
         return
