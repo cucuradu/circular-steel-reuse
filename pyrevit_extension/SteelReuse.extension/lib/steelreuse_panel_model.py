@@ -51,6 +51,21 @@ class Row:
         self.condition = a.get("condition", "")
 
 
+class MismatchRow:
+    """One donor-row provenance entry, flattened for a WPF DataGrid (plain attributes, not dict keys
+    -- WPF binds to properties). Mirrors the mismatch log embedded in results.json (Roadmap §1.2)."""
+
+    __slots__ = ("donor_id", "raw_section", "section", "classification", "outcome", "reason")
+
+    def __init__(self, r):
+        self.donor_id = r.get("id", "")
+        self.raw_section = r.get("raw_section", "")
+        self.section = r.get("canonical") or ""
+        self.classification = r.get("classification", "")
+        self.outcome = r.get("outcome", "")
+        self.reason = r.get("reason", "")
+
+
 class ResultsView:
     """Parsed results.json v2: KPI/diagnosis/warnings blocks, assignment rows, and the optional
     portfolio/pareto/disposition/audit blocks (present only when that analysis ran)."""
@@ -72,6 +87,8 @@ class ResultsView:
         self.rules = data.get("rules", {})
         self.mismatch = data.get("mismatch", {})
         self.rows = [Row(a) for a in data.get("assignments", [])]
+        # Donor-provenance rows as bindable objects for the Results window's Provenance grid.
+        self.mismatch_rows = [MismatchRow(r) for r in self.mismatch.get("rows", [])]
 
     @property
     def has_portfolio(self):

@@ -55,21 +55,47 @@
       <TextBox x:Name="minutil_filter" Width="60" VerticalAlignment="Center" Padding="3"/>
     </StackPanel>
 
-    <DataGrid Grid.Row="3" x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True"
-              HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-              CanUserSortColumns="True">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Slot" Binding="{Binding slot_id}" Width="90"/>
-        <DataGridTextColumn Header="Demand id" Binding="{Binding demand_id}" Width="80"/>
-        <DataGridTextColumn Header="Demand sec." Binding="{Binding demand_section}" Width="95"/>
-        <DataGridTextColumn Header="Donor id" Binding="{Binding donor_id}" Width="80"/>
-        <DataGridTextColumn Header="Donor sec." Binding="{Binding donor_section}" Width="95"/>
-        <DataGridTextColumn Header="Util" Binding="{Binding utilization, StringFormat=N2}" Width="55"/>
-        <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="65"/>
-        <DataGridTextColumn Header="Gov. case" Binding="{Binding governing}" Width="120"/>
-        <DataGridTextColumn Header="CO2 (kg)" Binding="{Binding co2_saved_kg, StringFormat=N0}" Width="75"/>
-      </DataGrid.Columns>
-    </DataGrid>
+    <TabControl Grid.Row="3">
+      <TabItem Header="Assignments">
+        <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  CanUserSortColumns="True">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Slot" Binding="{Binding slot_id}" Width="90"/>
+            <DataGridTextColumn Header="Demand id" Binding="{Binding demand_id}" Width="80"/>
+            <DataGridTextColumn Header="Demand sec." Binding="{Binding demand_section}" Width="95"/>
+            <DataGridTextColumn Header="Donor id" Binding="{Binding donor_id}" Width="80"/>
+            <DataGridTextColumn Header="Donor sec." Binding="{Binding donor_section}" Width="95"/>
+            <DataGridTextColumn Header="Util" Binding="{Binding utilization, StringFormat=N2}" Width="55"/>
+            <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="65"/>
+            <DataGridTextColumn Header="Gov. case" Binding="{Binding governing}" Width="120"/>
+            <DataGridTextColumn Header="CO2 (kg)" Binding="{Binding co2_saved_kg, StringFormat=N0}" Width="75"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+      <TabItem Header="Donor provenance">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" x:Name="provenance_summary_text" Margin="0,4,0,6"
+                     TextWrapping="Wrap" FontSize="12"
+                     Text="Run a fresh match to populate the donor-provenance log."/>
+          <DataGrid Grid.Row="1" x:Name="mismatch_grid" AutoGenerateColumns="False" IsReadOnly="True"
+                    HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="True">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Donor id" Binding="{Binding donor_id}" Width="90"/>
+              <DataGridTextColumn Header="Raw name" Binding="{Binding raw_section}" Width="160"/>
+              <DataGridTextColumn Header="Section" Binding="{Binding section}" Width="90"/>
+              <DataGridTextColumn Header="Class" Binding="{Binding classification}" Width="95"/>
+              <DataGridTextColumn Header="Outcome" Binding="{Binding outcome}" Width="70"/>
+              <DataGridTextColumn Header="Reason" Binding="{Binding reason}" Width="*"/>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </TabItem>
+    </TabControl>
 
     <!-- Footer: drill-down + report actions -->
     <DockPanel Grid.Row="4" Margin="0,10,0,0">

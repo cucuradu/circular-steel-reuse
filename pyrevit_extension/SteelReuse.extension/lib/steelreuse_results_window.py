@@ -153,7 +153,27 @@ class ResultsWindow(forms.WPFWindow):
                      % (ms.get("mapped", 0), ms.get("fuzzy", 0),
                         ms.get("unknown", 0), ms.get("quarantined", 0)))
         self.kpi_text.Text = line
+        self._bind_provenance(rules, ms)
         self._apply_filters(None, None)
+
+    def _bind_provenance(self, rules, summary):
+        """Fill the native 'Donor provenance' tab: the rule-data versions + the per-donor mismatch
+        grid (Roadmap §1.2). Older runs without the block show a hint and an empty grid."""
+        self.mismatch_grid.ItemsSource = self._view.mismatch_rows
+        if summary:
+            cover = "100%" if summary.get("accounts_for_all") else "INCOMPLETE"
+            self.provenance_summary_text.Text = (
+                "Rule data: ruleset v%s.    Donor provenance: %s of %s donor row(s) accounted for "
+                "(%s) -- %s mapped / %s fuzzy / %s unknown / %s quarantined. "
+                "Every donor is classified with a reason; the signable evidence.json + mismatch.csv "
+                "are in this run's folder (Open folder)."
+                % (rules.get("ruleset_version", "?"), summary.get("n_donor_rows", "?"),
+                   summary.get("n_donor_rows", "?"), cover, summary.get("mapped", 0),
+                   summary.get("fuzzy", 0), summary.get("unknown", 0), summary.get("quarantined", 0)))
+        else:
+            self.provenance_summary_text.Text = (
+                "This run has no provenance log (it predates the feature). Re-run it in Run Match to "
+                "populate the donor mismatch log + rule versions.")
 
     # -- display filters (never re-run a match) ---------------------------------------------------
     def _apply_filters(self, sender, args):

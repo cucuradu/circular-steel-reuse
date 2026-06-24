@@ -102,6 +102,12 @@ def test_panel_model_parses_rules_and_mismatch():
     assert v.rules["ruleset_version"] == "1.0.0"
     assert v.has_mismatch
     assert v.mismatch["summary"]["accounts_for_all"]
+    # Bindable rows for the Results window's native "Donor provenance" grid (attributes, not dict keys).
+    assert len(v.mismatch_rows) == 2
+    row = v.mismatch_rows[0]
+    assert row.donor_id == "D1" and row.classification == "mapped" and row.reason == "exact"
+    quar = v.mismatch_rows[1]
+    assert quar.donor_id == "D2" and quar.classification == "quarantined"
 
 
 def test_panel_model_tolerates_old_runs_without_blocks():
