@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-
 from ..core.sections import SectionProps
+
+# numpy/scikit-learn (the ``ml`` extra) are imported lazily inside ``cluster_similar`` only, so
+# ``group_by_section`` — a pure-stdlib helper relied on by the always-available ``reuse_score``
+# heuristic — keeps working on a base, zero-dependency install (pyproject: dependencies = []).
 
 
 def group_by_section(members) -> dict[str, list]:
@@ -33,7 +33,13 @@ def cluster_similar(
     """KMeans cluster mapped members by (h, b, A). Returns ``{member_id: cluster_index}``.
 
     ``n_clusters`` is clamped to the number of distinct mapped members so tiny models don't error.
+    Requires the ``ml`` extra (numpy + scikit-learn), imported here so the module stays importable
+    without them.
     """
+    import numpy as np
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+
     mapped = [m for m in members if m.section and m.section in catalog]
     if not mapped:
         return {}

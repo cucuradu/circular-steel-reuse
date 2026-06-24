@@ -164,6 +164,24 @@ def test_column_axial_accumulates_through_storeys():
     assert lower > 0                                          # compression-positive (EN sign)
 
 
+def test_self_weight_adds_permanent_load_down_the_path():
+    pytest.importorskip("Pynite")
+    cat = load_default_catalog()
+    loads = AreaLoadModel()
+    members = [_col("c1", 0, 0, 0, 3000), _col("c2", 6000, 0, 0, 3000), _beam("b1", 0, 6000, 3000)]
+
+    off = analyze_frame(members, loads, cat)
+    on = analyze_frame(members, loads, cat, options=FrameOptions(self_weight=True))
+
+    # Self-weight is a downward permanent UDL: it raises the beam moment (gamma_G * its own wL^2/8)
+    # and the column axial it sheds — and the default stays at the pure floor-load idealisation.
+    w_self = cat["IPE300"].mass_kgm * 9.81 / 1000.0          # N/mm
+    dm = loads.gamma_g * w_self * 6000.0**2 / 8.0            # extra factored beam moment
+    assert on.demands_by_member["b1"][0][1].My_Ed == pytest.approx(
+        off.demands_by_member["b1"][0][1].My_Ed + dm, rel=1e-2)
+    assert on.demands_by_member["c1"][0][1].N_Ed > off.demands_by_member["c1"][0][1].N_Ed
+
+
 def test_solve_failure_falls_back_gracefully():
     # no connectable geometry (members without coordinates) -> ok=False, everything skipped, no raise.
     loads = AreaLoadModel()
@@ -214,6 +232,36 @@ def test_run_pipeline_with_frame_analysis(tmp_path):
     # ...and an explicit legacy flat LoadModel is refused (it has no floor pressure to distribute).
     with pytest.raises(ValueError, match="AreaLoadModel"):
         run_pipeline(str(dp), str(mp), loads=LoadModel(), frame_analysis=True)
+
+
+def test_reuse_self_weight_resolve_runs_and_verifies(tmp_path):
+    pytest.importorskip("Pynite")
+    demand = ExtractedModel(kind="demand", members=[
+        _col("N_c1", 0, 0, 0, 3000), _col("N_c2", 6000, 0, 0, 3000), _beam("N_b1", 0, 6000, 3000),
+    ])
+    donor = ExtractedModel(kind="donor", members=[
+        ExtractedMember(id="D_b", role="beam", section="IPE330", material_grade="S275",
+                        raw_section="IPE330", length_mm=6500),
+        ExtractedMember(id="D_c1", role="column", section="IPE300", material_grade="S275",
+                        raw_section="IPE300", length_mm=3300),
+        ExtractedMember(id="D_c2", role="column", section="IPE300", material_grade="S275",
+                        raw_section="IPE300", length_mm=3300),
+    ])
+    dp, mp = tmp_path / "donor.json", tmp_path / "demand.json"
+    donor.save(dp)
+    demand.save(mp)
+
+    # Without --self-weight the re-solve is skipped (determinate gravity demand is section-independent).
+    off = run_pipeline(str(dp), str(mp), loads=AreaLoadModel(), frame_analysis=True)
+    assert off.reuse_recheck is None
+
+    # With it, the frame is re-solved on the matched sections and every reused member is re-checked.
+    on = run_pipeline(str(dp), str(mp), loads=AreaLoadModel(), frame_analysis=True, self_weight=True)
+    assert on.reuse_recheck is not None
+    assert on.reuse_recheck["ok"] is True
+    assert on.reuse_recheck["n_checked"] == on.match.n_reused
+    # Ample, sensibly-sized stock carries its own modest self-weight — no member flips to overstressed.
+    assert on.reuse_recheck["failures"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -497,7 +545,10 @@ def test_run_pipeline_frame_analysis_falls_back_without_geometry(tmp_path):
     donor.save(dp)
     demand.save(mp)
 
-    res = run_pipeline(str(dp), str(mp), loads=AreaLoadModel(), frame_analysis=True)
+    # flange_restrained: this test exercises the geometry fallback + reuse, not LTB; keep the donor
+    # clear of the (now load-height-aware) unrestrained LTB borderline.
+    res = run_pipeline(str(dp), str(mp), loads=AreaLoadModel(flange_restrained=True),
+                       frame_analysis=True)
     assert res.frame is not None and res.frame.ok is False     # nothing connectable
     assert res.slot_count == 1                                 # analytic per-span slot still made
     assert res.match.n_reused == 1

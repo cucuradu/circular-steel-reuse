@@ -1,7 +1,11 @@
 """Tests for the deconstruction recovery model (connection type -> recovery treatment + degree)."""
 
-from steelreuse.core.deconstruction import (DeconstructionPolicy, deconstruction_treatment,
-                                            effective_recoverable_length, member_degrees)
+from steelreuse.core.deconstruction import (
+    DeconstructionPolicy,
+    deconstruction_treatment,
+    effective_recoverable_length,
+    member_degrees,
+)
 from steelreuse.schema import ExtractedMember, ExtractedModel
 
 

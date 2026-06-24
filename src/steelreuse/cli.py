@@ -203,6 +203,10 @@ def build_parser() -> argparse.ArgumentParser:
     # --solver sap2000 is EXPERIMENTAL (gravity only; Windows + SAP2000 + the [sap2000] extra; falls
     # back to analytic when unavailable): hidden from --help and gated behind --lab. pynite is default.
     ap.add_argument("--solver", choices=["pynite", "sap2000"], default="pynite", help=argparse.SUPPRESS)
+    ap.add_argument("--self-weight", action="store_true",
+                    help="add each member's own (design-section) weight as a permanent load in the "
+                         "frame solve, so it flows down the load path (only with --frame-analysis); "
+                         "off by default to keep the simply-supported wL^2/8 idealisation")
     ap.add_argument("--pdelta", action="store_true",
                     help="force a 2nd-order (P-Delta) frame solve even without --phi "
                          "(only with --frame-analysis)")
@@ -308,6 +312,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
         min_util=args.min_util, max_distinct_sections=args.max_distinct_sections,
         reserve_w=args.reserve, moment_shape=args.moment_shape,
+        self_weight=args.self_weight,
         solver=args.solver,
     )
 

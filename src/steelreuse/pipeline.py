@@ -12,7 +12,7 @@ from pathlib import Path
 from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
 from .core.carbon import Passport, build_passport
 from .core.connections import ConnectionPolicy
-from .core.ec3_checks import MemberDemand, c1_moment_gradient
+from .core.ec3_checks import MemberDemand, c1_moment_gradient, check_member
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
 from .core.frame import FrameOptions, FrameResult, analyze_frame
 from .core.loads import AreaLoadModel, assign_zones, estimate_column_loads, estimate_tributary_widths
@@ -329,6 +329,13 @@ class PipelineResult:
     # slots + the lever to improve it — see :func:`steelreuse.match.optimize.diagnose_match`. Drives
     # the analytical narrative so it diagnoses the result instead of reciting the counts.
     diagnosis: dict | None = None
+    # Reuse self-weight re-solve (only when --self-weight + --frame-analysis): the demand frame is
+    # re-solved with the MATCHED (heavier reclaimed) sections in place, so their extra self-weight
+    # flows down the load path, and every matched member is re-checked against the new demand. Set to
+    # ``{"ok", "n_checked", "failures": [...]}`` — ``failures`` lists any assignment that now exceeds
+    # 1.0 utilisation under its own reused steel. Advisory: the match is NOT re-run, so a non-empty
+    # ``failures`` means the engineer should upsize those slots (or rerun) — see run_pipeline.
+    reuse_recheck: dict | None = None
 
 
 def _project_tags(paths: list[str]) -> list[str]:
@@ -342,6 +349,73 @@ def _project_tags(paths: list[str]) -> list[str]:
         seen[stem] = n
         tags.append(stem if n == 1 else f"{stem}-{n}")
     return tags
+
+
+def _recheck_reuse_self_weight(
+    demand: ExtractedModel,
+    loads,
+    catalog: dict[str, SectionProps],
+    opts: FrameOptions,
+    result: MatchResult,
+    slots: list[DemandSlot],
+    supply: list[SupplyItem],
+    steel_only: bool,
+    moment_shape: bool,
+) -> dict | None:
+    """Re-solve the demand frame with the MATCHED sections and re-check each reused member.
+
+    Closes the self-weight loop: the first solve sized the demand on the *design* sections, but the
+    members actually installed are the reclaimed (typically heavier) ones, so their own weight loads the
+    columns below a little more than the match was verified against. Here each demand member is swapped
+    for the section the match assigned to it (the heaviest, where a member spans several slots — a
+    conservative self-weight), the frame is re-solved (self-weight on, via ``opts``), and every
+    assignment is re-checked against the new demand envelope. Returns ``None`` when nothing was matched;
+    otherwise ``{"ok", "n_checked", "failures": [...]}`` where each failure is a member whose governing
+    utilisation now exceeds 1.0. Advisory only — the match is not re-run (a heavier re-pick would shift
+    self-weight again; one pass catches the effect the user cares about without a fixed-point iteration).
+    """
+    slot_member = {s.id: s.member_id for s in slots}
+    reused_by_member: dict[str, str] = {}
+    for a in result.assignments:
+        mid = slot_member.get(a.slot_id)
+        sec = catalog.get(a.section)
+        if mid is None or sec is None:
+            continue
+        cur = reused_by_member.get(mid)
+        if cur is None or sec.mass_kgm > catalog[cur].mass_kgm:
+            reused_by_member[mid] = a.section
+    if not reused_by_member:
+        return None
+
+    members2 = [replace(m, section=reused_by_member.get(m.id, m.section)) for m in demand.members]
+    demand2 = replace(demand, members=members2)
+    fr2 = analyze_frame(members2, loads, catalog, options=opts)
+    if not fr2.ok:
+        return {"ok": False, "n_checked": 0, "failures": [],
+                "note": "re-solve fell back to analytic — reuse self-weight not verified"}
+
+    slots2 = {s.id: s for s in build_slots(demand2, loads, steel_only=steel_only,
+                                           frame_slots=fr2.slots_by_member, moment_shape=moment_shape)}
+    supply_by_id = {s.id: s for s in supply}
+    failures: list[dict] = []
+    for a in result.assignments:
+        slot2 = slots2.get(a.slot_id)
+        sup = supply_by_id.get(a.supply_id)
+        sec = catalog.get(a.section)
+        if slot2 is None or sup is None or sec is None:
+            continue
+        worst_name, worst_util, worst_status = "ULS gravity", 0.0, "OK"
+        for name, dem in slot2.combinations:
+            r = check_member(sec, sup.grade or "S235", dem, sup.knockdown)
+            if r.utilization > worst_util:
+                worst_name, worst_util, worst_status = name, r.utilization, r.status
+        if worst_status == "FAIL" or worst_util > 1.0:
+            failures.append({
+                "slot_id": a.slot_id, "member_id": slot2.member_id, "section": a.section,
+                "design_utilization": a.utilization, "resolved_utilization": round(worst_util, 3),
+                "governing_combination": worst_name,
+            })
+    return {"ok": True, "n_checked": len(result.assignments), "failures": failures}
 
 
 def run_pipeline(
@@ -372,6 +446,7 @@ def run_pipeline(
     max_distinct_sections: int | None = None,
     reserve_w: float = 0.0,
     moment_shape: bool = False,
+    self_weight: bool = False,
     solver: str = "pynite",
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
@@ -407,6 +482,7 @@ def run_pipeline(
     supply, report, audit = build_supply(donor, catalog, knockdown, include_unverified)
 
     frame_result: FrameResult | None = None
+    frame_opts: FrameOptions | None = None   # captured (single-demand) for the reuse self-weight re-solve
     slots: list[DemandSlot] = []
     demand_models: list[ExtractedModel] = []
     project_rows: list[dict] | None = [] if portfolio else None
@@ -443,7 +519,9 @@ def run_pipeline(
             # Route the sway imperfection (--phi) to the frame-level EHF treatment (not the
             # member-level notional moment); P-Delta is auto-enabled there whenever phi > 0.
             opts = FrameOptions(notional_phi=loads.notional_phi, second_order=second_order,
-                                wind_kpa=wind_kpa, seismic_cs=seismic_cs, moment_shape=moment_shape)
+                                wind_kpa=wind_kpa, seismic_cs=seismic_cs, moment_shape=moment_shape,
+                                self_weight=self_weight)
+            frame_opts = opts
             if solver == "sap2000":
                 # Experimental OAPI backend (gravity only); falls back to analytic per member when
                 # SAP2000 is unavailable or an out-of-scope case is requested — same FrameResult shape.
@@ -527,9 +605,23 @@ def run_pipeline(
     # computed, cheap, advisory, never changes the result.
     diagnosis = diagnose_match(supply, slots, catalog, result)
 
+    # Reuse self-weight re-solve: close the loop by re-solving the frame with the MATCHED (heavier)
+    # sections so their self-weight loads the columns below, then re-check each reused member. Only
+    # meaningful when self-weight is modelled (otherwise the determinate gravity demand is independent
+    # of the section) and the frame solved; single-demand only (a portfolio shares one stock across
+    # several frames — out of scope for this advisory pass).
+    reuse_recheck: dict | None = None
+    if (self_weight and frame_analysis and not portfolio
+            and frame_result is not None and frame_result.ok and frame_opts is not None
+            and result.assignments):
+        reuse_recheck = _recheck_reuse_self_weight(
+            demand, loads, catalog, frame_opts, result, slots, supply,
+            steel_only=steel_only_demand, moment_shape=moment_shape)
+
     return PipelineResult(
         supply_count=len(supply), slot_count=len(slots),
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
         donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
         disposition=disposition_rows, projects=project_rows, diagnosis=diagnosis,
+        reuse_recheck=reuse_recheck,
     )

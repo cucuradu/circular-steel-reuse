@@ -248,6 +248,65 @@ def status_from_results(results: dict) -> dict:
     }
 
 
+VALUE_CASE_COLORS: dict[str, tuple[int, int, int] | None] = {
+    "reuse": (0, 166, 81),       # green: reuse-ready
+    "review": (255, 191, 0),     # amber: reusable, needs verification/inspection
+    "scrap": (160, 160, 160),    # grey: recycle only
+}
+
+
+def build_value_case_writeback(result) -> dict:
+    """Return an apply-matches-style dict from a :class:`~steelreuse.core.value_case.ValueCaseResult`.
+
+    The ``members`` block is keyed by member id so the pyRevit "Apply" button can colour
+    donor elements by reuse / review / scrap using the same mechanism as reuse matches.
+    """
+    members = {}
+    for row in result.rows:
+        status = row.verdict.lower()  # "reuse" | "review" | "scrap"
+        members[row.id] = {
+            "status": status,
+            "color": list(VALUE_CASE_COLORS.get(status, (160, 160, 160))),
+            "verdict": row.verdict,
+            "note": row.note,
+            "section": row.section or "",
+            "grade": row.grade or "",
+            "length_mm": row.length_mm,
+            "mass_kg": row.mass_kg,
+            "scrap_value_gbp": row.scrap_value_gbp,
+            "reclaimed_value_gbp": row.reclaimed_value_gbp,
+            "reuse_premium_gbp": row.reuse_premium_gbp,
+            "co2_saved_kg": row.co2_saved_kg,
+            "reuse_score": row.reuse_score,
+            "verification_status": row.verification_status,
+            "condition_grade": row.condition_grade,
+            "audit_reason": row.audit_reason,
+        }
+    p = result.params
+    return {
+        "schema_version": 1,
+        "kind": "value_case",
+        "members": members,
+        "kpis": {
+            "reuse_count": result.reuse_count,
+            "review_count": result.review_count,
+            "scrap_count": result.scrap_count,
+            "reusable_mass_kg": result.reusable_mass_kg,
+            "scrap_mass_kg": result.scrap_mass_kg,
+            "total_reclaimed_value_gbp": result.total_reclaimed_value_gbp,
+            "total_reuse_premium_gbp": result.total_reuse_premium_gbp,
+            "total_co2_saved_kg": result.total_co2_saved_kg,
+            "skipped_total": result.skipped_total,
+            "skipped_breakdown": result.skipped_breakdown or {},
+        },
+        "params": {
+            "scrap_price_per_tonne": p.scrap_price_per_tonne,
+            "reclaimed_price_per_tonne": p.reclaimed_price_per_tonne,
+            "co2_price_per_tonne": p.co2_price_per_tonne,
+        },
+    }
+
+
 def _mass_reused_kg(result: PipelineResult) -> float:
     """Reclaimed steel mass put back to work = each reused donor's catalog mass over its used length.
 

@@ -70,6 +70,7 @@ class FrameOptions:
     seismic_cs: float = 0.0        # EN 1998-1 base-shear coefficient Sd(T1)*lambda/g (0 = off)
     psi2_imposed: float = 0.3      # EN 1990 quasi-permanent factor (seismic mass + seismic combination)
     moment_shape: bool = False     # derive C1 (LTB) + Cmy/Cmz (6.3.3) from the solved moment diagram
+    self_weight: bool = False      # add each member's own weight (design section) to the DL case
 
 
 @dataclass
@@ -766,6 +767,21 @@ def analyze_frame(
         w_live = loads.live_kpa * width
         fm.add_member_dist_load(mid, "FZ", -w_dead, -w_dead, case="DL")
         fm.add_member_dist_load(mid, "FZ", -w_live, -w_live, case="LL")
+
+    # Self-weight (opt-in): each placed member's own weight as a downward (global -Z) permanent UDL in
+    # the DL case, so it flows through the same load path as the floor pressure — beams bend under it,
+    # columns accumulate it down the stack (the "heavy steel on top loads the columns below" effect).
+    # Off by default so the simply-supported wL^2/8 / pure-axial idealisation (and the SAP parity) is
+    # preserved. Uses the DESIGN section mass; the reuse delta (a heavier reclaimed section weighs more
+    # than what was designed) would need a re-solve with the matched sections and is left to the
+    # per-member check — self-weight is a few % of the floor load. g = 9.81 m/s^2.
+    if options.self_weight:
+        for mid in topo.member_nodes:
+            sec = catalog.get(members_by_id[mid].section) if members_by_id[mid].section else None
+            if sec is None or not sec.mass_kgm:
+                continue
+            w_self = sec.mass_kgm * 9.81 / 1000.0     # kg/m * m/s^2 -> N/m -> N/mm
+            fm.add_member_dist_load(mid, "FZ", -w_self, -w_self, case="DL")
 
     def _fallback(msg: str) -> FrameResult:
         return FrameResult({}, len(topo.nodes), len(topo.member_nodes), topo.base_node_ids,

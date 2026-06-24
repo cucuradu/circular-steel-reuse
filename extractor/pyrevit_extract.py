@@ -350,11 +350,17 @@ def extract(kind):
     }
 
 
-def main():
-    kind = forms.CommandSwitchWindow.show(
-        ["donor", "demand"],
-        message="Is this model the DONOR (reclaimed supply) or the new DEMAND design?",
-    )
+def main(kind=None):
+    """Extract the active model as ``kind`` ('donor' or 'demand').
+
+    The ribbon split-button passes the kind directly (no popup). When called with no kind (e.g. a
+    legacy single Extract button), it falls back to asking.
+    """
+    if kind is None:
+        kind = forms.CommandSwitchWindow.show(
+            ["donor", "demand"],
+            message="Is this model the DONOR (reclaimed supply) or the new DEMAND design?",
+        )
     if not kind:
         return
     payload = extract(kind)
