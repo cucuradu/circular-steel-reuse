@@ -106,6 +106,7 @@
               Margin="16,0,0,0"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button x:Name="open_report_button" Content="Open report"/>
+        <Button x:Name="open_evidence_button" Content="Open evidence"/>
         <Button x:Name="open_folder_button" Content="Open folder"/>
         <Button x:Name="export_button" Content="Export CSV"/>
       </StackPanel>

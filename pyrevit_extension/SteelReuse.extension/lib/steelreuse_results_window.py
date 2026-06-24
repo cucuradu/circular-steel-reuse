@@ -62,6 +62,7 @@ class ResultsWindow(forms.WPFWindow):
         self.grid.MouseDoubleClick += self._on_zoom
         self.apply_button.Click += self._on_apply
         self.open_report_button.Click += self._open_report
+        self.open_evidence_button.Click += self._open_evidence
         self.open_folder_button.Click += self._open_folder
         self.export_button.Click += self._export_csv
 
@@ -165,8 +166,8 @@ class ResultsWindow(forms.WPFWindow):
             self.provenance_summary_text.Text = (
                 "Rule data: ruleset v%s.    Donor provenance: %s of %s donor row(s) accounted for "
                 "(%s) -- %s mapped / %s fuzzy / %s unknown / %s quarantined. "
-                "Every donor is classified with a reason; the signable evidence.json + mismatch.csv "
-                "are in this run's folder (Open folder)."
+                "Every donor is classified with a reason below; the signable evidence package is one "
+                "click away (Open evidence)."
                 % (rules.get("ruleset_version", "?"), summary.get("n_donor_rows", "?"),
                    summary.get("n_donor_rows", "?"), cover, summary.get("mapped", 0),
                    summary.get("fuzzy", 0), summary.get("unknown", 0), summary.get("quarantined", 0)))
@@ -255,6 +256,30 @@ class ResultsWindow(forms.WPFWindow):
             runner.open_html_report(out_path, "SteelReuse match results", html)
         except Exception as ex:  # noqa: BLE001
             forms.alert("Could not open the report:\n" + str(ex), title="SteelReuse")
+
+    def _open_evidence(self, sender, args):
+        """Open the signable per-run evidence package (Roadmap §1.1) directly -- no folder hunting.
+
+        Prefers the copy archived with the saved run (``evidence_<id>.json`` in the holder); falls back
+        to the path stamped in results.json or a sibling ``evidence.json`` for an arbitrary opened file.
+        """
+        path = None
+        if self._run_id and self._history:
+            path = runhist.run_artifact_path(self._history, self._run_id, "evidence_file")
+        if not path:
+            stamped = (self._view.paths or {}).get("evidence") if self._view else None
+            if stamped and os.path.isfile(stamped):
+                path = stamped
+            elif self._source_path:
+                sibling = os.path.join(os.path.dirname(self._source_path), "evidence.json")
+                if os.path.isfile(sibling):
+                    path = sibling
+        if path and os.path.isfile(path):
+            os.startfile(path)
+        else:
+            forms.alert("No evidence package is archived for this run.\n\nIt is generated for runs done "
+                        "after this feature was added -- re-run the match in Run Match to produce the "
+                        "signable evidence.json (and the donor mismatch log).", title="SteelReuse")
 
     def _open_folder(self, sender, args):
         target = self._history if (self._history and os.path.isdir(self._history)) \

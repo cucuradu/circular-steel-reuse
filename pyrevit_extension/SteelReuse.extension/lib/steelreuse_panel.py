@@ -533,8 +533,14 @@ class SteelReusePanel(forms.WPFWindow):
         history_dir = os.path.join(
             os.path.dirname(os.path.dirname(results_path)), "steelreuse_runs")
         name = self.run_name_box.Text.strip()
-        status_path = os.path.join(os.path.dirname(results_path), "status.json")
+        out_dir = os.path.dirname(results_path)
+        status_path = os.path.join(out_dir, "status.json")
+        # Archive the evidence package + mismatch log with the run too, so a saved run is reviewable
+        # from the Results window (they are written to the live run folder by the engine).
+        evidence_path = os.path.join(out_dir, "evidence.json")
+        mismatch_path = os.path.join(out_dir, "mismatch.csv")
         runhist.record_run(history_dir, name, self._params_label(opts), results_path,
-                           status_path=status_path)
+                           status_path=status_path, evidence_path=evidence_path,
+                           mismatch_path=mismatch_path)
         self._settings["history_dir"] = history_dir
         runner.save_settings(self._ext_root, self._settings)

@@ -77,6 +77,24 @@ def test_outcome_marks_reused_vs_unused():
             assert r["outcome"] == ""
 
 
+def test_reused_and_unused_reasons_explain_the_outcome():
+    """A mapped donor's reason must say WHAT HAPPENED (reused vs not used), not merely how its name
+    resolved -- reused and unused rows must not read identically."""
+    donor, demand = str(sample_path("donor.json")), str(sample_path("demand.json"))
+    res = run_pipeline(donor, demand)
+    reused_ids = {a.supply_id for a in res.match.assignments}
+    unused_mapped = [r for r in res.mismatch_log
+                     if r["classification"] == "mapped" and r["id"] not in reused_ids]
+    reused = [r for r in res.mismatch_log if r["id"] in reused_ids]
+    assert reused and unused_mapped, "demo run should have both reused and unused mapped donors"
+    for r in reused:
+        assert r["reason"].startswith("reused by the match")
+    for r in unused_mapped:
+        assert "not used" in r["reason"]
+    # The two outcomes must produce visibly different reasons (the user's complaint).
+    assert reused[0]["reason"] != unused_mapped[0]["reason"]
+
+
 def test_evidence_package_carries_rules_and_mismatch():
     donor, demand = str(sample_path("donor.json")), str(sample_path("demand.json"))
     res = run_pipeline(donor, demand)

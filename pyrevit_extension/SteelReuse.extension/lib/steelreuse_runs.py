@@ -39,13 +39,20 @@ def load_runs(history_dir):
     return list(reversed(out))
 
 
-def record_run(history_dir, name, params_label, results_path, run_id=None, status_path=None):
+def record_run(history_dir, name, params_label, results_path, run_id=None, status_path=None,
+               evidence_path=None, mismatch_path=None):
     """Copy ``results_path`` into the history under a fresh id, append to the manifest, return entry.
 
     When ``status_path`` (the run's apply-matches JSON, donor/demand per-element status) is given and
     exists, it is archived too as ``status_<id>.json`` and recorded under ``status_file`` so the run
     can be re-applied to the model later (see :func:`load_run_status`). Runs recorded before this was
     added simply have no ``status_file`` and are not re-applicable.
+
+    Likewise, when given and present, the signable per-run **evidence package** (Roadmap §1.1) and the
+    donor **mismatch log** (§1.2) are archived as ``evidence_<id>.json`` / ``mismatch_<id>.csv`` and
+    recorded under ``evidence_file`` / ``mismatch_file`` -- so a saved run carries them too and the
+    Results window's "Open folder" / "Open evidence" can reach them (they live in the live run output
+    folder otherwise, not the history holder).
     """
     if not os.path.isdir(history_dir):
         os.makedirs(history_dir)
@@ -63,10 +70,34 @@ def record_run(history_dir, name, params_label, results_path, run_id=None, statu
         status_fname = "status_" + rid + ".json"
         shutil.copyfile(status_path, os.path.join(history_dir, status_fname))
         entry["status_file"] = status_fname
+    # Archive the evidence package + mismatch log alongside, keyed by id, when the engine wrote them.
+    for src, prefix, ext, key in (
+            (evidence_path, "evidence_", ".json", "evidence_file"),
+            (mismatch_path, "mismatch_", ".csv", "mismatch_file")):
+        if src and os.path.isfile(src):
+            dest = prefix + rid + ext
+            shutil.copyfile(src, os.path.join(history_dir, dest))
+            entry[key] = dest
     manifest = _read_raw(history_dir)
     manifest.append(entry)
     _save_manifest(history_dir, manifest)
     return entry
+
+
+def run_artifact_path(history_dir, run_id, key):
+    """Absolute path to an archived artifact for a run id, or None.
+
+    ``key`` is a manifest field naming a file: ``file`` (results.json), ``status_file``,
+    ``evidence_file`` or ``mismatch_file``. Returns None when the run or that artifact is absent.
+    """
+    for r in _read_raw(history_dir):
+        if r.get("id") == run_id:
+            fname = r.get(key)
+            if not fname:
+                return None
+            path = os.path.join(history_dir, fname)
+            return path if os.path.isfile(path) else None
+    return None
 
 
 def delete_run(history_dir, run_id):

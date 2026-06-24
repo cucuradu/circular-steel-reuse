@@ -27,6 +27,32 @@ def _status(tmp_path, tag):
     return str(p)
 
 
+def test_record_archives_evidence_and_mismatch(tmp_path):
+    """The evidence package + mismatch log are copied into the holder and reachable by id, so the
+    Results window can open them without hunting in the live run folder."""
+    hist = str(tmp_path / "hold")
+    ev = tmp_path / "evidence.json"
+    ev.write_text(json.dumps({"schema": "steelreuse-evidence/1"}), encoding="utf-8")
+    mm = tmp_path / "mismatch.csv"
+    mm.write_text("id,classification,reason\nD1,mapped,reused\n", encoding="utf-8")
+    runs.record_run(hist, "a", "", _results(tmp_path, "a"), run_id="r1",
+                    evidence_path=str(ev), mismatch_path=str(mm))
+    entry = runs.load_runs(hist)[0]
+    assert entry["evidence_file"] == "evidence_r1.json"
+    assert entry["mismatch_file"] == "mismatch_r1.csv"
+    ev_path = runs.run_artifact_path(hist, "r1", "evidence_file")
+    assert ev_path and os.path.isfile(ev_path)
+    with open(ev_path) as fh:
+        assert json.load(fh)["schema"] == "steelreuse-evidence/1"
+
+
+def test_run_artifact_path_none_when_absent(tmp_path):
+    hist = str(tmp_path / "hold")
+    runs.record_run(hist, "a", "", _results(tmp_path, "a"), run_id="r1")  # no evidence/mismatch
+    assert runs.run_artifact_path(hist, "r1", "evidence_file") is None
+    assert runs.run_artifact_path(hist, "missing", "evidence_file") is None
+
+
 def test_record_archives_status_and_load_run_status_round_trips(tmp_path):
     hist = str(tmp_path / "h")
     runs.record_run(hist, "a", "", _results(tmp_path, "a"),

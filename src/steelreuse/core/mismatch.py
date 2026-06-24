@@ -22,10 +22,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 _METHOD_PHRASE = {
-    "exact": "exact name match",
-    "normalized": "normalized name match",
-    "override": "user override",
-    "geometry": "identified by measured dimensions",
+    "exact": "an exact name match",
+    "normalized": "a normalised name match",
+    "override": "a user override",
+    "geometry": "measured dimensions",
 }
 
 
@@ -84,12 +84,18 @@ def build_mismatch_log(donor_members, validation, audit=None, result=None) -> li
                       f"{decision.reason}")
         else:
             classification = "mapped"
-            phrase = _METHOD_PHRASE.get(method, f"{method} match")
-            reason = f"{phrase} to {canonical}"
+            phrase = _METHOD_PHRASE.get(method, f"a {method} match")
+            ident = f"section identified by {phrase} to {canonical}"
             if decision is not None and decision.audited:
                 knockdown = round(decision.knockdown, 3)
-                reason += f" (audit f_y knockdown {knockdown:g})"
-            outcome = "reused" if mid in reused else "unused"
+                ident += f", audit f_y knockdown {knockdown:g}"
+            if mid in reused:
+                outcome = "reused"
+                reason = f"reused by the match — {ident}"
+            else:
+                outcome = "unused"
+                reason = ("admitted to supply but not used — either no demand slot suited it, or "
+                          f"other donors were chosen for the slots it could fill; {ident}")
 
         rows.append(MismatchRow(id=mid, raw_section=raw, canonical=canonical, method=method,
                                 classification=classification, reason=reason,
