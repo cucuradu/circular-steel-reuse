@@ -24,8 +24,10 @@ import csv
 import difflib
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from . import rules
 
 # ---------------------------------------------------------------------------
 # Catalog
@@ -43,38 +45,15 @@ DEFAULT_EU_CHS_CATALOG = _DATA / "eu_chs.csv"      # EN 10210 hot-finished CHS (
 DEFAULT_CHANNELS_CATALOG = _DATA / "channels.csv"  # EU UPN channels (metric source units)
 DEFAULT_ANGLES_CATALOG = _DATA / "angles.csv"      # EN 10056 equal-leg angles (metric source units)
 
-# Nominal yield strength f_y (N/mm^2) by grade.
-#   * EN 1993-1-1 Table 3.1 (t <= 40 mm) for European grades;
-#   * ASTM specified minimum F_y for US grades (1 ksi = 6.894757 N/mm^2), e.g. 50 ksi -> 344.7.
-# A992 (wide-flange), A500 Gr.C (HSS), and A36 (plate/angle/channel) are the common US construction
-# defaults; see :func:`default_grade_for_section` for the shape -> grade policy.
-FY_BY_GRADE = {
-    # European (EN 1993-1-1)
-    "S235": 235.0, "S275": 275.0, "S355": 355.0, "S420": 420.0, "S460": 460.0,
-    # US (ASTM specified minimum yield)
-    "A36": 248.0,        # 36 ksi  -- plates, angles, channels
-    "A992": 345.0,       # 50 ksi  -- the standard for hot-rolled W-shapes
-    "A572-50": 345.0,    # 50 ksi  -- HP and general structural
-    "A529-50": 345.0,    # 50 ksi
-    "A913-50": 345.0,    # 50 ksi
-    "A500": 345.0,       # Gr.C rectangular HSS (round HSS is 46 ksi; rectangular governs here)
-    "A1085": 345.0,      # 50 ksi  -- HSS
-    "A53": 240.0,        # 35 ksi  -- pipe
-}
-
-# Nominal yield strength ReH (N/mm^2) by element-thickness band, EN 10025-2 (S235/S275/S355) and
-# EN 10025-3 N/NL (S420/S460) Table 7 — the *product-standard* banding (finer than EN 1993-1-1
-# Table 3.1's two bands). EN 1993-1-1 3.2.1(1) permits using the product values, and the UK National
-# Annex requires them. Each entry is (upper thickness bound mm, f_y); the first band a thickness fits
-# into governs. ASTM grades carry a single specified minimum F_y and are intentionally absent (handled
-# via ``FY_BY_GRADE``). The governing element thickness for a rolled I/H section is the flange ``t_f``.
-_FY_BANDS = {
-    "S235": [(16, 235.0), (40, 225.0), (63, 215.0), (80, 215.0), (100, 215.0), (150, 195.0)],
-    "S275": [(16, 275.0), (40, 265.0), (63, 255.0), (80, 245.0), (100, 235.0), (150, 225.0)],
-    "S355": [(16, 355.0), (40, 345.0), (63, 335.0), (80, 325.0), (100, 315.0), (150, 295.0)],
-    "S420": [(16, 420.0), (40, 400.0), (63, 390.0), (80, 370.0), (100, 360.0), (150, 340.0)],
-    "S460": [(16, 460.0), (40, 440.0), (63, 430.0), (80, 410.0), (100, 400.0), (150, 380.0)],
-}
+# Nominal yield strength f_y (N/mm^2) by grade, and by element-thickness band, loaded from the
+# externalised, version-stamped rule table ``data/rules/material_grades.csv`` (Roadmap §1.2):
+#   * EU grades carry EN 10025-2/-3 Table 7 product banding (``_FY_BANDS``); EN 1993-1-1 3.2.1(1)
+#     permits the product values and the UK National Annex requires them;
+#   * ASTM grades (A992, A36, A500, ...) carry a single specified minimum F_y (1 ksi = 6.894757 MPa)
+#     and so appear only in ``FY_BY_GRADE``.
+# The governing element thickness for a rolled I/H section is the flange ``t_f``. To change/cite a
+# value, edit the CSV (and bump its version) — not this code.
+FY_BY_GRADE, _FY_BANDS = rules.load_material_grades()
 
 
 def nominal_fy(grade: str | None, thickness_mm: float) -> float:
@@ -355,14 +334,9 @@ def load_default_catalog(
 # Revit/IFC US models routinely carry no material grade. Rather than fall back to the EN default
 # (235 N/mm^2, which would understate a 50-ksi W-shape), assign the common US construction grade for
 # the shape family. Always flagged in the report (see pipeline ``_fill_default_grades``), never
-# silently favourable. Checked in order; first matching prefix wins (so WT/HP/HSS beat W/H).
-_US_DEFAULT_GRADE: tuple[tuple[str, str], ...] = (
-    ("HSS", "A500"), ("HP", "A572-50"), ("PIPE", "A53"),
-    ("WT", "A992"), ("MT", "A992"), ("ST", "A992"),
-    ("MC", "A36"),
-    ("W", "A992"), ("M", "A992"), ("S", "A992"),  # rolled I-shapes
-    ("C", "A36"), ("L", "A36"), ("PL", "A36"),
-)
+# silently favourable. Checked in order; first matching prefix wins (so WT/HP/HSS beat W/H). The
+# priority table is externalised + version-stamped in ``data/rules/grade_defaults.csv`` (Roadmap §1.2).
+_US_DEFAULT_GRADE: tuple[tuple[str, str], ...] = rules.load_grade_defaults()
 
 
 def default_grade_for_section(name: str | None) -> str | None:
@@ -533,6 +507,10 @@ class ValidationReport:
     mapped: list[MappingResult]      # exact/override/normalized (confidence 1.0)
     fuzzy: list[MappingResult]       # matched but needs human confirmation
     unknown: list[MappingResult]     # no catalog match -> excluded from analysis
+    # The per-member final mapping result keyed by the member's id (when it has one), so a downstream
+    # provenance/mismatch log can account for every row by id without re-deriving the mapping. Captures
+    # the FINAL method, including a geometry upgrade of a fuzzy/unknown name.
+    by_member_id: dict[str, MappingResult] = field(default_factory=dict)
 
     @property
     def n_total(self) -> int:
@@ -650,6 +628,7 @@ def resolve_members(
     mapped: list[MappingResult] = []
     fuzzy: list[MappingResult] = []
     unknown: list[MappingResult] = []
+    by_member_id: dict[str, MappingResult] = {}
     for m in members:
         res = map_section(m.raw_section, catalog, overrides, fuzzy_cutoff)
         if res.method == "fuzzy":
@@ -673,4 +652,7 @@ def resolve_members(
         else:
             mapped.append(res)
             m.section = res.canonical
-    return ValidationReport(mapped=mapped, fuzzy=fuzzy, unknown=unknown)
+        mid = getattr(m, "id", None)
+        if mid is not None:
+            by_member_id[mid] = res
+    return ValidationReport(mapped=mapped, fuzzy=fuzzy, unknown=unknown, by_member_id=by_member_id)

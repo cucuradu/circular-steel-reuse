@@ -16,6 +16,7 @@ from .core.ec3_checks import MemberDemand, c1_moment_gradient, check_member
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
 from .core.frame import FrameOptions, FrameResult, analyze_frame
 from .core.loads import AreaLoadModel, assign_zones, estimate_column_loads, estimate_tributary_widths
+from .core.mismatch import build_mismatch_log
 from .core.sections import (
     SectionProps,
     ValidationReport,
@@ -329,6 +330,11 @@ class PipelineResult:
     # slots + the lever to improve it — see :func:`steelreuse.match.optimize.diagnose_match`. Drives
     # the analytical narrative so it diagnoses the result instead of reciting the counts.
     diagnosis: dict | None = None
+    # Donor-row mismatch log (Roadmap §1.2, always computed): one entry per DONOR member classified
+    # mapped / fuzzy / unknown / quarantined with a reason — see
+    # :func:`steelreuse.core.mismatch.build_mismatch_log`. Accounts for 100% of donor rows so nothing
+    # is silently dropped; surfaced in the evidence package.
+    mismatch_log: list[dict] | None = None
     # Reuse self-weight re-solve (only when --self-weight + --frame-analysis): the demand frame is
     # re-solved with the MATCHED (heavier reclaimed) sections in place, so their extra self-weight
     # flows down the load path, and every matched member is re-checked against the new demand. Set to
@@ -605,6 +611,11 @@ def run_pipeline(
     # computed, cheap, advisory, never changes the result.
     diagnosis = diagnose_match(supply, slots, catalog, result)
 
+    # Donor-row mismatch log (Roadmap §1.2): classify every donor member (mapped / fuzzy / unknown /
+    # quarantined) with a reason from the section mapping + the audit, cross-referenced with the match
+    # for reused/unused. Always computed; surfaced in the evidence package.
+    mismatch_log = build_mismatch_log(donor.members, report, audit, result)
+
     # Reuse self-weight re-solve: close the loop by re-solving the frame with the MATCHED (heavier)
     # sections so their self-weight loads the columns below, then re-check each reused member. Only
     # meaningful when self-weight is modelled (otherwise the determinate gravity demand is independent
@@ -623,5 +634,5 @@ def run_pipeline(
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
         donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
         disposition=disposition_rows, projects=project_rows, diagnosis=diagnosis,
-        reuse_recheck=reuse_recheck,
+        mismatch_log=mismatch_log, reuse_recheck=reuse_recheck,
     )

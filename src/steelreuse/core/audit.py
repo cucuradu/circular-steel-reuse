@@ -31,32 +31,25 @@ import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import rules
+
 # --- Verification basis -> how far the declared grade can be trusted ------------------------------
 # Knockdown applied to f_y purely for *grade* uncertainty (independent of physical condition). A full
 # mill certificate or a coupon test is the only basis on which the nominal f_y is taken at face value;
 # weaker bases attract a small reduction, and an unverified member is quarantined rather than derated.
-VERIFICATION_KNOCKDOWN = {
-    "mill_cert": 1.00,      # original mill certificate / full traceability
-    "coupon_tested": 1.00,  # sampled and tensile-tested -> grade established by test
-    "documented": 0.95,     # design drawings / records state the grade, but no cert or test
-    "visual_only": 0.90,    # grade only assumed from era/appearance; conservative reduction
-    "unverified": 0.00,     # no basis at all -> quarantined (factor unused; see assess_member)
-}
-# Verification bases that are sufficient for a member to enter the certified supply.
-ACCEPTED_VERIFICATION = {"mill_cert", "coupon_tested", "documented", "visual_only"}
+# The factor table + which bases are accepted are externalised + version-stamped in
+# ``data/rules/verification_knockdown.csv`` (Roadmap §1.2) — edit the CSV to change/cite a value.
+VERIFICATION_KNOCKDOWN, ACCEPTED_VERIFICATION = rules.load_verification_knockdown()
 
 # --- Surveyed physical condition -> knockdown ----------------------------------------------------
 # A coarse A-D condition scale (common in reuse surveys). Grades A-C apply a knockdown reflecting
 # corrosion / section loss / minor deformation; grade D is structurally unsuitable and is excluded.
-CONDITION_KNOCKDOWN = {
-    "A": 1.00,   # as-new: negligible corrosion, no deformation or damage
-    "B": 0.95,   # minor: light surface corrosion, cosmetic only
-    "C": 0.85,   # significant: measurable section loss / minor deformation -> design knockdown
-    "D": 0.00,   # unsuitable: heavy corrosion, distortion, or damage -> not reusable (quarantined)
-}
-REJECT_CONDITION = {"D"}
+# Externalised + version-stamped in ``data/rules/condition_knockdown.csv`` (Roadmap §1.2).
+CONDITION_KNOCKDOWN, REJECT_CONDITION = rules.load_condition_knockdown()
 
-MIN_KNOCKDOWN = 0.30  # floor so a typo can never zero-out f_y silently; below this -> quarantine
+# Internal safety floor (NOT a citable rule — implementation guard): a knockdown below this is treated
+# as a typo/garbage and quarantined rather than silently zeroing f_y. Logged via the audit reason.
+MIN_KNOCKDOWN = 0.30
 
 
 def _norm(value: str | None) -> str:

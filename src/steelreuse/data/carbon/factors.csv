@@ -1,2 +1,6 @@
+# steelreuse rule table: embodied-carbon factors for structural steel (kgCO2e per kg)
+# version: 1.0.0
+# source: see the per-row source column; ICE v3 (2019) for A1-A3, SCI P427 / worldsteel / EN 15804
+# source: module-D conventions for the end-of-life credits. Swap for Okobaudat/Climatiq if localising.
 material,a1a3_kgco2e_per_kg,reuse_process_kgco2e_per_kg,recycle_credit_kgco2e_per_kg,reroll_credit_kgco2e_per_kg,source
 steel,1.55,0.10,0.55,1.00,"ICE v3 (2019) UK structural steel section, typical recycled content; reuse process = clean/test/refab estimate. recycle_credit: EAF scrap-recycling counterfactual, mid value of the 0.4-0.7 kgCO2e/kg literature range (worldsteel LCI module-D scrap credit; SCI P427; EN 15804/15978 module D avoided-burden convention). reroll_credit: direct re-rolling without re-melting, PILOT-SCALE research-grade (Cambridge/Allwood, Sustainable Materials: with both eyes open), conservative pick from the ~0.9-1.4 range."

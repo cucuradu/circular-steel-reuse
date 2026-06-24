@@ -1,0 +1,21 @@
+# steelreuse rule table: default ASTM grade for an ungraded AISC designation, by name prefix
+# version: 1.0.0
+# source: common US construction defaults — A992 for hot-rolled W/M/S/WT/MT/ST shapes, A500 Gr.C for
+# source: rectangular HSS, A572-50 for HP bearing piles, A53 for pipe, A36 for channels/angles/plate.
+# source: Applied only to AISC-named members that carry no grade (EN members are left untouched and
+# source: always flagged in the report). Order is PRIORITY — the first matching prefix wins, so the
+# source: multi-letter prefixes (HSS/WT/MT/ST/MC/HP) must precede the single-letter ones.
+prefix,grade,source
+HSS,A500,A500 Gr.C (rectangular HSS)
+HP,A572-50,A572 Gr.50 (bearing pile)
+PIPE,A53,A53 (pipe)
+WT,A992,A992 (tee from W)
+MT,A992,A992 (tee from M)
+ST,A992,A992 (tee from S)
+MC,A36,A36 (miscellaneous channel)
+W,A992,A992 (wide flange)
+M,A992,A992 (miscellaneous I)
+S,A992,A992 (standard I)
+C,A36,A36 (channel)
+L,A36,A36 (angle)
+PL,A36,A36 (plate)

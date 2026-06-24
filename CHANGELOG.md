@@ -7,6 +7,34 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Externalised, versioned rule data + donor mismatch log** (`core/rules.py`, `core/mismatch.py`,
+  `data/rules/`; Roadmap §1.2). The judgement / standards-derived values a reviewer must trust or cite
+  now live in version-stamped CSV files with `# version:` + `# source:` provenance headers, not buried
+  in code: nominal f_y by grade + EN thickness band (`material_grades.csv`), the ASTM grade-default
+  priority table (`grade_defaults.csv`), and the condition / verification → f_y knockdowns
+  (`condition_knockdown.csv`, `verification_knockdown.csv`); the carbon factors gained the same header.
+  `core.rules` loads them (reproducing the previous hardcoded values exactly — no number drift) and
+  exposes a manifest (versions, sources, SHA-256) stamped into the evidence package. Internal solver
+  tuning (off-cut weight, cut tolerance, over-spec ratio, knockdown floor, fuzzy cutoff) is left in
+  code — it is implementation, already logged via `MatchResult.weights`, not a citable rule.
+  - **Mismatch log**: every donor row is classified `mapped` / `fuzzy` / `unknown` / `quarantined`
+    with a reason — 100% of donor rows accounted for, so nothing is silently dropped. Built from the
+    section mapping (`ValidationReport.by_member_id`, new) + the pre-demolition audit, cross-referenced
+    with the match for the reused/unused outcome. Surfaced in the evidence package and via console
+    summary; CLI `--mismatch-csv` exports the per-row table.
+- **Per-run evidence package** (`evidence.py`, `cli.py`; Roadmap §1.1). One signable JSON per
+  matching run that bundles everything a reviewer needs to re-check the result without redoing the
+  maths: every input model (donor + demand, with SHA-256 hashes) and the *resolved* supply/slots;
+  the tool version, section-catalogue + carbon-factor hashes/values, the objective and every economic
+  weight; per-assignment **EN 1993 pass-evidence** (governing clause, utilisation, χ_LT, governing
+  load combination, section class, f_y) plus a carbon breakdown; the **`verify_match` certificate**
+  (feasible + no improving single move), computed at build time; and a **carbon reconciliation**
+  proving the per-assignment savings sum to `MatchResult.total_co2_saved_kg`.
+  - Round-trippable: `rebuild_run` + `verify_from_package` re-run the independent audit from the
+    package alone and return the same verdict. CLI `--evidence-out PATH`; auto-written for `--demo`
+    (`reports/demo_evidence.json`). Every figure is re-derived from the same kernels the solve used
+    (`check_member`, `verify_match`, `baseline_new_mass_kg`) — assembly + a stable schema, not new
+    science.
 - **Zone-based loads** (`core/loads.py`, `pipeline.py`, `cli.py`, panel). Each member is assigned a
   load zone (roof vs floor, auto by elevation via `assign_zones`, with per-member overrides) and each
   zone carries EN 1991-1-1 occupancy pressures, replacing the single hardcoded office pressure that

@@ -17,8 +17,11 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .core import rules
 from .core.carbon import passport_rows
 from .core.loads import NATIONAL_ANNEXES, OCCUPANCY_PRESETS, AreaLoadModel, ZoneSpec, presets_for_na
+from .core.mismatch import mismatch_summary
+from .evidence import build_evidence_package, write_evidence_package
 from .llm.providers import select_provider
 from .llm.report import build_report_context, generate_narrative, render_html
 from .pipeline import LoadModel, run_pipeline
@@ -187,6 +190,17 @@ def build_parser() -> argparse.ArgumentParser:
                     help="write the material passport to this path as CSV (every mapped donor member: "
                          "mass, audit provenance, avoided-new carbon, and the EN 1993 reuse verdict for "
                          "the matched ones), plus a JSON sibling with stock totals")
+    ap.add_argument("--evidence-out",
+                    help="write the per-run EVIDENCE PACKAGE (JSON): every input (with hashes), the "
+                         "catalogue/carbon-factor versions and run weights, each assignment's EN 1993 "
+                         "pass-evidence (governing clause, utilisation, chi_LT, governing combination) "
+                         "and carbon breakdown, the rule-data versions + mismatch log, and the "
+                         "verify_match certificate — one file a reviewer re-checks instead of "
+                         "re-deriving (auto-written for --demo)")
+    ap.add_argument("--mismatch-csv",
+                    help="write the donor-row mismatch log to this CSV: every donor member classified "
+                         "(mapped/fuzzy/unknown/quarantined) with a reason — 100%% of donor rows "
+                         "accounted for (also embedded in the evidence package)")
     ap.add_argument("--uncertainty", type=int, default=0, metavar="N",
                     help="run N Monte Carlo samples to show a P5–P95 CO2-saved confidence band next to "
                          "the headline (default 0 = off): varies knockdown, loads and the EN 1990 "
@@ -240,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
         donor, demand = str(sample_path("donor.json")), str(sample_path("demand.json"))
         if args.out == "reports/report.html":
             args.out = "reports/demo_report.html"
+        if not args.evidence_out:
+            args.evidence_out = "reports/demo_evidence.json"
     elif args.donor and args.demand:
         donor = args.donor
         demand = args.demand[0] if len(args.demand) == 1 else args.demand
@@ -394,6 +410,15 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
               f"avg knockdown {res.audit.avg_knockdown:g}"
               f"{' (--include-unverified)' if args.include_unverified else ''}")
     print(f"Mapping: {res.validation.summary()}")
+    print(f"Rule data: ruleset v{rules.RULESET_VERSION} "
+          f"(grades, grade defaults, condition/verification knockdowns, carbon factors — "
+          f"externalised + version-stamped in the evidence package)")
+    if res.mismatch_log is not None:
+        ms = mismatch_summary(res.mismatch_log)
+        cover = "100%" if ms["accounts_for_all"] else "INCOMPLETE"
+        print(f"Donor provenance: {ms['mapped']} mapped / {ms['fuzzy']} fuzzy / "
+              f"{ms['unknown']} unknown / {ms['quarantined']} quarantined of "
+              f"{ms['n_donor_rows']} donor row(s) ({cover} accounted)")
     print(f"Supply {res.supply_count} | demand slots {res.slot_count} | reused {res.match.n_reused}"
           f"{' (cutting-stock)' if args.cut else ' (whole-member only)'}")
     n_distinct = len({a.section for a in res.match.assignments})
@@ -486,6 +511,36 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         }
         jpath.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Material passport written -> {ppath} (+ {jpath.name})")
+    if args.mismatch_csv and res.mismatch_log is not None:
+        mpath = Path(args.mismatch_csv)
+        mpath.parent.mkdir(parents=True, exist_ok=True)
+        with mpath.open("w", newline="", encoding="utf-8") as fh:
+            if res.mismatch_log:
+                w = csv.DictWriter(fh, fieldnames=list(res.mismatch_log[0]))
+                w.writeheader()
+                w.writerows(res.mismatch_log)
+        print(f"Mismatch log written -> {mpath}")
+    if args.evidence_out:
+        run_context = {
+            "command": " ".join(sys.argv[1:]),
+            "objective": args.objective,
+            "cutting_stock": args.cut,
+            "national_annex": args.national_annex,
+            "connection_screen": args.connections,
+            "counterfactual": args.counterfactual,
+            "frame_analysis": args.frame_analysis,
+        }
+        package = build_evidence_package(
+            res, donor_path=donor,
+            demand_paths=demand if isinstance(demand, list) else [demand],
+            run_context=run_context)
+        epath = write_evidence_package(package, args.evidence_out)
+        cert = package["certificate"]
+        recon = package["carbon_reconciliation"]
+        verdict = "verified" if cert["verified"] else f"{len(cert['verify_match_issues'])} issue(s)"
+        recon_ok = "reconciles" if recon["reconciles"] else "MISMATCH"
+        print(f"Evidence package written -> {epath} (certificate: {verdict}; "
+              f"CO2 {recon_ok})")
     if res.match.unmatched_slots:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
     print(f"Narrative source: {source}")

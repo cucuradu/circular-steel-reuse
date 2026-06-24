@@ -42,8 +42,8 @@ push changes down into the detail.
 
 | Step | In plain words | Why it matters |
 |------|----------------|----------------|
-| **1.1 Evidence package** 🔴 | One button → one file showing every input, every code check, and the proof the answer is sound. | An engineer can review the whole job without redoing the maths. This *is* "certifiable". |
-| **1.2 Open rules + reject log** 🔴 | Move the hidden rules (which steel name = which section, which carbon number) into a plain table anyone can open and challenge. Keep a list of every donor it couldn't use, and why. | Turns "trust the code" into "see and question the rule." Nothing is silently dropped. |
+| ~~**1.1 Evidence package**~~ ✅ | ~~One button → one file showing every input, every code check, and the proof the answer is sound.~~ **Shipped** — see CHANGELOG (`evidence.py`, `--evidence-out`). | An engineer can review the whole job without redoing the maths. This *is* "certifiable". |
+| ~~**1.2 Open rules + reject log**~~ ✅ | ~~Move the hidden rules into a plain table anyone can open and challenge; keep a list of every donor it couldn't use, and why.~~ **Shipped** — see CHANGELOG (`core/rules.py`, `data/rules/`, `core/mismatch.py`, `--mismatch-csv`). | Turns "trust the code" into "see and question the rule." Nothing is silently dropped. |
 | **2.1 Coverage number** 🟠 | Show two honest %: how many demand spots got filled, how many donor pieces the tool understood. | One honest number is what made the reference paper believable. Don't hide misses. |
 | **2.2 Speed number** 🟠 | Measure seconds from file-in to report-out, vs how long a human would take by hand. | "1000 members in N seconds" is a strong, repeatable, publishable claim. |
 | **2.3 One full case study** 🟠 | Walk one real building start-to-finish with every number shown. | People believe a worked example, not claims. Anchors the thesis + the demo. |
@@ -62,31 +62,39 @@ claim), then 2.x measures and proves it, 3.x connects it to the market, 4.x poli
 
 The minimum that lets the tool honestly claim "certifiable-ready evidence" (POSITIONING §3).
 
-### 1.1 🔴 Per-run evidence package export
-A single signable artifact (HTML/PDF + machine-readable JSON sidecar) bundling, per run:
-- every input (donor + demand + loads + National Annex), with hashes;
-- the chosen weights/objective and catalogue + carbon-factor **versions**;
-- per-assignment **EN 1993 pass-evidence** — governing clause, utilisation, χ_LT, governing combination;
-- the **`verify_match` certificate** result (feasible + no improving single move).
+### 1.1 ✅ Per-run evidence package export — **SHIPPED** (see CHANGELOG)
+Implemented in [`evidence.py`](../src/steelreuse/evidence.py), wired via CLI `--evidence-out`
+(auto-written for `--demo`). A single machine-readable JSON bundling, per run:
+- every input (donor + demand model files with SHA-256 hashes) and the *resolved* supply/slots;
+- the chosen weights/objective, tool version, and catalogue + carbon-factor **hashes/values**;
+- per-assignment **EN 1993 pass-evidence** — governing clause, utilisation, χ_LT, governing combination,
+  section class, f_y — plus a carbon breakdown;
+- the **`verify_match` certificate** result (feasible + no improving single move), computed at build time;
+- a **carbon reconciliation** proving the per-assignment savings sum to `total_co2_saved_kg`.
 
-*Justification:* this is what an engineer/notified body reviews instead of re-deriving (POSITIONING §3,
-third-party path). Most pieces already exist in [`match/optimize.py`](../src/steelreuse/match/optimize.py)
-and [`llm/report.py`](../src/steelreuse/llm/report.py) — this is assembly + a stable schema, not new science.
+It is round-trippable: `rebuild_run` + `verify_from_package` re-run the independent audit from the package
+alone and return the same verdict. Tests in [`tests/test_evidence.py`](../tests/test_evidence.py).
 
-**Acceptance:** given a demo run, the package alone lets a reviewer re-check any assignment by hand and
-reproduce the headline CO₂ number to the rounding stated.
+**Acceptance (met):** given a demo run, the package alone lets a reviewer re-check any assignment by hand
+and reproduce the headline CO₂ number to the rounding stated.
 
-### 1.2 🔴 Externalised, versioned rule-mapping + mismatch log
-- Move section-name mapping and carbon-factor/grade selection out of implicit code into a
-  **user-inspectable, version-stamped** rule table (Paper #1's configurable rule tables).
-- Emit a **mismatch log**: every unmapped section, quarantined donor, infeasible pair — *with the
-  reason* (extends `diagnose_match`).
+*Remaining polish (not blocking the certifiable claim):* a human-readable HTML/PDF rendering of the same
+package, and aligning its headings to SCI P427 / BS 8001 (Phase 4.1).
 
-*Justification:* POSITIONING §2. Turns "trust the code" into "see and challenge the rule." Mapping logic
-exists in [`core/sections.py`](../src/steelreuse/core/sections.py); the work is externalising + stamping.
+### 1.2 ✅ Externalised, versioned rule-mapping + mismatch log — **SHIPPED** (see CHANGELOG)
+- The citable rule values (nominal f_y by grade + EN thickness band, ASTM grade defaults, condition /
+  verification → f_y knockdowns, carbon factors) are externalised into version-stamped CSV files under
+  [`data/rules/`](../src/steelreuse/data/rules/) with `# version:` + `# source:` headers, loaded by
+  [`core/rules.py`](../src/steelreuse/core/rules.py) (reproducing the old hardcoded values exactly).
+  A `rules_manifest()` stamps the versions/sources/hashes into the evidence package; internal solver
+  tuning is deliberately left in code (logged via `MatchResult.weights`).
+- The **mismatch log** ([`core/mismatch.py`](../src/steelreuse/core/mismatch.py)) classifies every
+  donor row mapped / fuzzy / unknown / quarantined *with a reason*, accounting for 100% of donor rows;
+  surfaced in the evidence package and via CLI `--mismatch-csv`. It is the donor-side companion to
+  `diagnose_match` (which diagnoses the demand/match side).
 
-**Acceptance:** a reviewer can open the rule set, see its version, and a mismatch log accounts for 100%
-of donor rows (mapped / fuzzy / unknown / quarantined) with a reason each.
+**Acceptance (met):** a reviewer can open the rule set, see its version, and a mismatch log accounts for
+100% of donor rows (mapped / fuzzy / unknown / quarantined) with a reason each.
 
 ---
 

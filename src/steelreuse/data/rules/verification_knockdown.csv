@@ -1,0 +1,14 @@
+# steelreuse rule table: grade-verification basis -> f_y knockdown
+# version: 1.0.0
+# source: how far the declared grade can be trusted, independent of physical condition (SCI P427: a
+# source: reclaimed grade may be relied on with a mill certificate or coupon test; weaker bases attract
+# source: a small reduction, and an unverified member is quarantined rather than derated). accepted=true
+# source: means the basis is sufficient to enter the certified supply; accepted=false members are
+# source: quarantined unless --include-unverified is passed (then admitted at a conservative cap, in
+# source: code). These are judgement values a reviewer should confirm against project requirements.
+verification_status,knockdown,accepted,note
+mill_cert,1.00,true,original mill certificate / full traceability
+coupon_tested,1.00,true,sampled and tensile-tested -> grade established by test
+documented,0.95,true,design drawings / records state the grade, no cert or test
+visual_only,0.90,true,grade assumed from era/appearance; conservative reduction
+unverified,0.00,false,no basis at all -> quarantined (factor unused)

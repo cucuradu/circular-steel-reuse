@@ -1,0 +1,12 @@
+# steelreuse rule table: surveyed physical condition grade -> f_y knockdown
+# version: 1.0.0
+# source: a coarse A-D condition scale common in pre-demolition reuse surveys; the knockdown reflects
+# source: corrosion / section loss / minor deformation judgement consistent with SCI P427 (reclaimed
+# source: steel may only be relied on when sound). reject=true marks a condition structurally
+# source: unsuitable for reuse (quarantined regardless of verification). These are judgement values a
+# source: reviewer should confirm against the project's own survey protocol.
+condition_grade,knockdown,reject,note
+A,1.00,false,as-new: negligible corrosion, no deformation or damage
+B,0.95,false,minor: light surface corrosion, cosmetic only
+C,0.85,false,significant: measurable section loss / minor deformation
+D,0.00,true,unsuitable: heavy corrosion, distortion or damage -> not reusable

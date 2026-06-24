@@ -1,0 +1,49 @@
+# steelreuse rule table: nominal yield strength f_y by grade and element-thickness band
+# version: 1.0.0
+# source: EU grades use EN 10025-2 (S235/S275/S355) and EN 10025-3 N/NL (S420/S460) Table 7 product
+# source: banding, permitted by EN 1993-1-1 3.2.1(1) and required by the UK National Annex. Each EU
+# source: grade lists ascending thickness bands (upper bound mm, f_y); the first band a thickness fits
+# source: into governs and the base (<=16 mm) value is the grade's headline f_y. ASTM grades carry a
+# source: single specified minimum F_y with no EN banding (blank thickness_upper): A992=50 ksi, A36=36
+# source: ksi, A500 Gr.C / A1085 / A572-50 / A529-50 / A913-50 = 50 ksi, A53=35 ksi (1 ksi = 6.894757
+# source: MPa; tabulated to the rounded values long used by this tool). The governing element
+# source: thickness for a rolled I/H section is the flange t_f.
+grade,thickness_upper_mm,fy_Nmm2,standard,source
+S235,16,235,EN10025-2,EN 10025-2 Table 7
+S235,40,225,EN10025-2,EN 10025-2 Table 7
+S235,63,215,EN10025-2,EN 10025-2 Table 7
+S235,80,215,EN10025-2,EN 10025-2 Table 7
+S235,100,215,EN10025-2,EN 10025-2 Table 7
+S235,150,195,EN10025-2,EN 10025-2 Table 7
+S275,16,275,EN10025-2,EN 10025-2 Table 7
+S275,40,265,EN10025-2,EN 10025-2 Table 7
+S275,63,255,EN10025-2,EN 10025-2 Table 7
+S275,80,245,EN10025-2,EN 10025-2 Table 7
+S275,100,235,EN10025-2,EN 10025-2 Table 7
+S275,150,225,EN10025-2,EN 10025-2 Table 7
+S355,16,355,EN10025-2,EN 10025-2 Table 7
+S355,40,345,EN10025-2,EN 10025-2 Table 7
+S355,63,335,EN10025-2,EN 10025-2 Table 7
+S355,80,325,EN10025-2,EN 10025-2 Table 7
+S355,100,315,EN10025-2,EN 10025-2 Table 7
+S355,150,295,EN10025-2,EN 10025-2 Table 7
+S420,16,420,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S420,40,400,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S420,63,390,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S420,80,370,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S420,100,360,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S420,150,340,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S460,16,460,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S460,40,440,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S460,63,430,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S460,80,410,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S460,100,400,EN10025-3,EN 10025-3 Table 7 (N/NL)
+S460,150,380,EN10025-3,EN 10025-3 Table 7 (N/NL)
+A36,,248,ASTM,ASTM A36 (36 ksi) — plates/angles/channels
+A992,,345,ASTM,ASTM A992 (50 ksi) — hot-rolled W-shapes
+A572-50,,345,ASTM,ASTM A572 Gr.50 — HP and general structural
+A529-50,,345,ASTM,ASTM A529 Gr.50
+A913-50,,345,ASTM,ASTM A913 Gr.50
+A500,,345,ASTM,ASTM A500 Gr.C rectangular HSS (50 ksi)
+A1085,,345,ASTM,ASTM A1085 HSS (50 ksi)
+A53,,240,ASTM,ASTM A53 pipe (35 ksi)

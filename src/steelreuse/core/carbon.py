@@ -62,8 +62,11 @@ def _opt_float(row: dict, key: str) -> float:
 
 def load_factors(path: str | Path = DEFAULT_FACTORS) -> dict[str, CarbonFactor]:
     out: dict[str, CarbonFactor] = {}
+    # The factor file carries version/source provenance as leading ``#`` comment lines (Roadmap §1.2,
+    # parsed for the evidence package by core.rules); skip them so the CSV reader sees only data.
     with Path(path).open(newline="", encoding="utf-8") as fh:
-        for row in csv.DictReader(fh):
+        data_lines = [ln for ln in fh if not ln.lstrip().startswith("#")]
+        for row in csv.DictReader(data_lines):
             out[row["material"].strip().lower()] = CarbonFactor(
                 a1a3=float(row["a1a3_kgco2e_per_kg"]),
                 reuse_process=float(row["reuse_process_kgco2e_per_kg"]),
