@@ -22,8 +22,11 @@ import os
 import subprocess
 import webbrowser
 
-# Output artifact filenames written by a run, all under one per-run folder.
-_OUTPUT_NAMES = {"status": "status.json", "report": "report.html", "results": "results.json"}
+# Output artifact filenames written by a run, all under one per-run folder. ``evidence`` is the
+# signable per-run evidence package (Roadmap §1.1) and ``mismatch`` the donor-row mismatch log
+# (Roadmap §1.2); both are always written so a run is self-contained and reviewable.
+_OUTPUT_NAMES = {"status": "status.json", "report": "report.html", "results": "results.json",
+                 "evidence": "evidence.json", "mismatch": "mismatch.csv"}
 
 _SETTINGS_FILE = "steelreuse_runner_config.json"
 # Transient view state (the element ids Highlight Problems coloured) lives in its OWN file, not the
@@ -89,6 +92,10 @@ def build_command(interpreter, opts, out_dir):
            "--apply-matches-out", paths["status"],
            "--out", paths["report"],
            "--results-out", paths["results"],
+           # Always emit the signable evidence package + donor mismatch log, so every run is
+           # self-contained and reviewable (the Results window surfaces both).
+           "--evidence-out", paths["evidence"],
+           "--mismatch-csv", paths["mismatch"],
            "--objective", opts.get("objective", "co2")]
 
     # Boolean toggles (default off; cutting-stock is the one default-on policy -> --no-cut to disable).

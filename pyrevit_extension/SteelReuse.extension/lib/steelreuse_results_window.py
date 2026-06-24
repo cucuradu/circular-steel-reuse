@@ -137,11 +137,22 @@ class ResultsWindow(forms.WPFWindow):
         self._view = panelmodel.parse(data)
         k = self._view.kpis
         warn = "" if self._view.schema_ok else "[unexpected schema] "
-        self.kpi_text.Text = (
+        line = (
             "%s%s / %s slots reused    |    %s kg CO2e saved    |    %s kg reused    |    %s"
             % (warn, k.get("reused", "?"), k.get("slots", "?"), k.get("co2_saved_kg", "?"),
                k.get("mass_reused_kg", "?"),
                "proven optimal" if k.get("proven_optimal") else "heuristic (not proven)"))
+        # Roadmap §1.2: name the rule-data version + the donor-provenance coverage on the header, so a
+        # reviewer sees "which rules, and that nothing was dropped" without opening the report.
+        rules = self._view.rules or {}
+        if rules.get("ruleset_version"):
+            line += "    |    rules v%s" % rules.get("ruleset_version")
+        ms = (self._view.mismatch or {}).get("summary") or {}
+        if ms:
+            line += ("    |    donors: %s mapped / %s fuzzy / %s unknown / %s quarantined"
+                     % (ms.get("mapped", 0), ms.get("fuzzy", 0),
+                        ms.get("unknown", 0), ms.get("quarantined", 0)))
+        self.kpi_text.Text = line
         self._apply_filters(None, None)
 
     # -- display filters (never re-run a match) ---------------------------------------------------

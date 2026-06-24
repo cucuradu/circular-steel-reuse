@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Revit surfacing of the evidence package + mismatch log (Run Match / Results buttons)**. The Run
+  Match runner now always emits `evidence.json` (Roadmap §1.1) and `mismatch.csv` (§1.2) alongside the
+  report/status/results in each run folder, so every run is self-contained — no new button. The
+  results.json contract carries the rule-data **versions** + the full **donor mismatch log** (summary +
+  per-row), and the per-run `paths` block points at the evidence/mismatch files. The existing
+  **Results** window surfaces them: the header names the ruleset version + donor-provenance counts,
+  and *Open report* renders the rule stamp + a per-donor "classified-with-a-reason" provenance table
+  (*Open folder* reveals the signable `evidence.json`). All wiring is in the pure, IronPython-safe
+  view-model / HTML view / runner, so it is unit-tested without Revit (`test_results_provenance.py`).
 - **Externalised, versioned rule data + donor mismatch log** (`core/rules.py`, `core/mismatch.py`,
   `data/rules/`; Roadmap §1.2). The judgement / standards-derived values a reviewer must trust or cite
   now live in version-stamped CSV files with `# version:` + `# source:` provenance headers, not buried

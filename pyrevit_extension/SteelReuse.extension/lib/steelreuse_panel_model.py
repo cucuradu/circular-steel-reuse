@@ -67,6 +67,10 @@ class ResultsView:
         self.disposition = data.get("disposition", {})
         self.audit = data.get("audit", {})
         self.paths = data.get("paths", {})
+        # Roadmap §1.2: the externalised rule-data versions + the donor-row mismatch log
+        # (classification + reason per donor). Both optional (older runs predate them).
+        self.rules = data.get("rules", {})
+        self.mismatch = data.get("mismatch", {})
         self.rows = [Row(a) for a in data.get("assignments", [])]
 
     @property
@@ -84,6 +88,10 @@ class ResultsView:
     @property
     def has_audit(self):
         return bool(self.audit)
+
+    @property
+    def has_mismatch(self):
+        return bool(self.mismatch.get("rows"))
 
 
 def parse(data):

@@ -373,6 +373,8 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             "report": str(out),
             "status": str(wb_path) if wb_path is not None else "",
             "results": str(rp),
+            "evidence": str(Path(args.evidence_out)) if args.evidence_out else "",
+            "mismatch": str(Path(args.mismatch_csv)) if args.mismatch_csv else "",
         }
         rp.write_text(json.dumps(results_payload, indent=2), encoding="utf-8")
 

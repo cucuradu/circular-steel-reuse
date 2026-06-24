@@ -37,6 +37,8 @@ _STYLE = """<style>
 .srx th, .srx td { border:1px solid #ccc; padding:3px 6px; text-align:left; }
 .srx th { background:#eee; }
 .srx .review { color:#c33; font-weight:bold; }
+.srx .rules { font-size:0.88em; color:#444; background:#f7f7f7; padding:4px 8px; border-radius:5px; }
+.srx .note { font-size:0.9em; color:#333; }
 </style>"""
 
 _FILTER_JS = """<script>
@@ -123,8 +125,9 @@ def _assignments_table(rows):
 def _simple_table(title, headers, rows_html):
     if not rows_html:
         return ""
-    head = "<h3>%s</h3><table><thead><tr>%s</tr></thead><tbody>" % (
-        _esc(title), "".join("<th>%s</th>" % _esc(h) for h in headers))
+    heading = ("<h3>%s</h3>" % _esc(title)) if title else ""
+    head = "%s<table><thead><tr>%s</tr></thead><tbody>" % (
+        heading, "".join("<th>%s</th>" % _esc(h) for h in headers))
     return head + "".join(rows_html) + "</tbody></table>"
 
 
@@ -143,12 +146,52 @@ def _quarantine_section(quarantined):
                          ["Donor id", "Section", "Reason"], rows)
 
 
+def _rules_line(rules):
+    """One-line stamp of the rule-data versions the run used (Roadmap §1.2), or '' if absent."""
+    if not rules:
+        return ""
+    tables = ", ".join("%s v%s" % (_esc(t.get("name", "")), _esc(t.get("version", "")))
+                       for t in rules.get("tables", []))
+    return ('<p class="rules"><b>Rule data:</b> ruleset v%s &nbsp;|&nbsp; %s &nbsp;|&nbsp; '
+            'carbon factors v%s</p>') % (
+        _esc(rules.get("ruleset_version", "?")), tables,
+        _esc(rules.get("carbon_factors_version", "?")))
+
+
+def _mismatch_section(mismatch):
+    """Donor-row provenance: a 100%-coverage summary + the per-donor classified-with-a-reason table."""
+    if not mismatch:
+        return ""
+    summary = mismatch.get("summary", {})
+    rows = mismatch.get("rows", [])
+    cover = "100%" if summary.get("accounts_for_all") else "INCOMPLETE"
+    head = (
+        '<h3>Donor provenance (mismatch log)</h3>'
+        '<p class="note"><b>%s</b> donor row(s) accounted for (%s): '
+        '<b>%s</b> mapped / <b>%s</b> fuzzy / <b>%s</b> unknown / <b>%s</b> quarantined. '
+        'Every donor is classified with a reason, so nothing is silently dropped.</p>'
+    ) % (summary.get("n_donor_rows", "?"), cover, summary.get("mapped", 0),
+         summary.get("fuzzy", 0), summary.get("unknown", 0), summary.get("quarantined", 0))
+    body = []
+    for r in rows:
+        cls = _esc(r.get("classification", ""))
+        css = ' class="review"' if cls in ("fuzzy", "unknown", "quarantined") else ""
+        body.append(
+            "<tr><td>%s</td><td>%s</td><td>%s</td><td%s>%s</td><td>%s</td><td>%s</td></tr>"
+            % (_esc(r.get("id", "")), _esc(r.get("raw_section", "")), _esc(r.get("canonical", "") or ""),
+               css, cls, _esc(r.get("outcome", "")), _esc(r.get("reason", ""))))
+    table = _simple_table("", ["Donor id", "Raw name", "Section", "Class", "Outcome", "Reason"], body)
+    return head + table
+
+
 def render_results_html(data):
     """results.json dict -> a self-contained HTML string for ``output.print_html``."""
     kpis = data.get("kpis", {})
-    parts = [_STYLE, '<div class="srx">', _kpi_header(kpis), _filters(),
+    parts = [_STYLE, '<div class="srx">', _kpi_header(kpis),
+             _rules_line(data.get("rules")), _filters(),
              _assignments_table(data.get("assignments", [])),
              _unfilled_section(data.get("unfilled", [])),
              _quarantine_section(data.get("quarantined_donors", [])),
+             _mismatch_section(data.get("mismatch")),
              '</div>', _FILTER_JS]
     return "\n".join(parts)

@@ -337,8 +337,11 @@ def build_results(result: PipelineResult) -> dict:
     computed (docs/DESIGN_PRINCIPLES.md hard rule 1 -- no new arithmetic). Readers branch on
     ``schema_version``.
     """
+    from .core import rules  # lazy: keeps writeback import-light, no cycle
+    from .core.mismatch import mismatch_summary
     from .llm.report import build_report_context  # lazy: keeps writeback import-light, no cycle
     ctx = build_report_context(result)
+    manifest = rules.rules_manifest()
     m = result.match
     slots_by_id = {s.id: s for s in (result.slots or [])}
     donor_by_id = {d.id: d for d in result.donor.members} if result.donor else {}
@@ -416,6 +419,20 @@ def build_results(result: PipelineResult) -> dict:
             "unknown": ctx["unknown"],
             "unknown_breakdown": ctx["unknown_breakdown"],
             "connection_review": ctx["connection_review"],
+        },
+        # Externalised rule-data versions the run used (Roadmap §1.2) — the full manifest with
+        # sources + hashes lives in the evidence package; here we carry just the versions for display.
+        "rules": {
+            "ruleset_version": manifest["ruleset_version"],
+            "tables": [{"name": t["name"], "version": t["version"]}
+                       for t in manifest["tables"]],
+            "carbon_factors_version": manifest["carbon_factors"]["version"],
+        },
+        # Donor-row mismatch log (Roadmap §1.2): 100% of donor rows classified with a reason, so the
+        # Results panel can show "nothing was silently dropped" without opening the evidence package.
+        "mismatch": {
+            "summary": mismatch_summary(result.mismatch_log or []),
+            "rows": result.mismatch_log or [],
         },
         "paths": {},  # stamped by the CLI/runner that knows the output folder; panel tolerates absence
     }
