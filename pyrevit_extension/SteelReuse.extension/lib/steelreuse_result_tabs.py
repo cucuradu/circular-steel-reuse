@@ -62,17 +62,51 @@ def warnings(view):
     return "\n".join(out)
 
 
+_PARETO_METRICS = (("n_reused", 0), ("co2_saved_kg", 1), ("mass_reused_kg", 1))
+
+
+def _pareto_cell(row, base, key, decimals, best):
+    """One trade-off cell: the value, its change vs the shipped objective (in parens), and a ``#``
+    when it is the best in its column. Deltas turn the table into the A/B answer in place -- what
+    switching goal costs or gains in each currency."""
+    val = float(row.get(key) or 0)
+    eps = 0.5 if decimals == 0 else 0.05
+    fmt = (lambda x: "%d" % int(round(x))) if decimals == 0 else (lambda x: "%.*f" % (decimals, x))
+    txt = fmt(val)
+    if base is not None and row is not base:
+        d = val - float(base.get(key) or 0)
+        if abs(d) >= eps:
+            txt += " (%s%s)" % ("+" if d > 0 else "-", fmt(abs(d)))
+    if abs(val - best) < eps:
+        txt += " #"
+    return txt
+
+
 def pareto(view):
-    """Objective trade-off: the same stock solved for co2 / members / mass, one row per goal."""
-    out = ["%-10s %8s %14s %14s  %s"
+    """Objective trade-off: the same stock solved for co2 / members / mass, one row per goal.
+
+    Beyond the raw numbers, each alternative goal shows -- in parentheses -- what choosing it would
+    change in every currency relative to the objective this run actually shipped (marked ``*``), and
+    ``#`` flags the best value in each column. This is the A/B question answered in place: optimising
+    for members instead of CO2 buys you how many more members, and at what CO2 / mass cost?
+    """
+    rows = list(view.pareto)
+    if not rows:
+        return "No objective trade-off was computed for this run (re-run with the Pareto option)."
+    base = next((r for r in rows if r.get("selected")), None)
+    best = dict((key, max(float(r.get(key) or 0) for r in rows)) for key, _ in _PARETO_METRICS)
+    out = ["%-10s %-20s %-22s %-22s  %s"
            % ("objective", "reused", "CO2e (kg)", "mass (kg)", "optimal"), ""]
-    for p in view.pareto:
-        mark = "*" if p.get("selected") else " "
-        out.append("%s%-9s %8s %14.1f %14.1f  %s"
-                   % (mark, p.get("label") or p.get("objective", ""), p.get("n_reused", ""),
-                      float(p.get("co2_saved_kg") or 0), float(p.get("mass_reused_kg") or 0),
-                      "yes" if p.get("proven_optimal") else "no"))
-    out += ["", "* = the objective this run's assignments follow."]
+    for r in rows:
+        out.append("%s%-9s %-20s %-22s %-22s  %s"
+                   % ("*" if r.get("selected") else " ",
+                      r.get("label") or r.get("objective", ""),
+                      _pareto_cell(r, base, "n_reused", 0, best["n_reused"]),
+                      _pareto_cell(r, base, "co2_saved_kg", 1, best["co2_saved_kg"]),
+                      _pareto_cell(r, base, "mass_reused_kg", 1, best["mass_reused_kg"]),
+                      "yes" if r.get("proven_optimal") else "no"))
+    out += ["", "* = the objective this run shipped (the baseline for the changes shown in parens).",
+            "# = best value in that column.  Change = alternative - shipped."]
     return "\n".join(out)
 
 

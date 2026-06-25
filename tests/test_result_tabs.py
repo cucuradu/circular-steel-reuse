@@ -93,3 +93,24 @@ def test_optional_tabs_render_when_present():
     assert v.has_pareto and "co2" in tabs.pareto(v)
     assert v.has_portfolio and "blockA" in tabs.portfolio(v)
     assert v.has_audit and "unverified" in tabs.audit(v)
+
+
+def test_pareto_shows_deltas_vs_shipped_objective_and_column_winners():
+    # co2 is the shipped objective (baseline); members gains a slot but costs CO2; mass wins on mass.
+    v = _view({"pareto": [
+        {"objective": "co2", "label": "co2", "n_reused": 2, "co2_saved_kg": 300.0,
+         "mass_reused_kg": 500.0, "proven_optimal": True, "selected": True},
+        {"objective": "members", "label": "members", "n_reused": 3, "co2_saved_kg": 280.0,
+         "mass_reused_kg": 460.0, "proven_optimal": True, "selected": False},
+        {"objective": "mass", "label": "mass", "n_reused": 2, "co2_saved_kg": 295.0,
+         "mass_reused_kg": 520.0, "proven_optimal": False, "selected": False},
+    ]})
+    out = tabs.pareto(v)
+    # The shipped row is the baseline: no parenthetical change on its own values.
+    assert "*co2" in out
+    # Switching to members buys +1 slot at a -20.0 kg CO2 cost; mass costs -40.0 kg of reused steel.
+    assert "(+1)" in out and "(-20.0)" in out and "(-40.0)" in out
+    # Column winners flagged with '#' (after any delta): members on reused, co2 on CO2e, mass on mass.
+    assert "3 (+1) #" in out and "300.0 #" in out and "520.0 (+20.0) #" in out
+    # 'mass' was not proven optimal in this fixture.
+    assert "no" in out

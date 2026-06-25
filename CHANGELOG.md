@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The Pareto tab now reads as a trade-off, not just three rows of numbers**
+  (`steelreuse_result_tabs.pareto`). Each alternative goal shows, in parentheses, what choosing it
+  would change in every currency relative to the objective the run actually shipped (marked `*`), and
+  `#` flags the best value in each column — so "optimise for members instead of CO2" reads directly as
+  "+1 member, −20.0 kg CO2e, −40.0 kg reused mass" instead of leaving the engineer to subtract the
+  rows by eye. This is the cheapest slice of the A/B story: the data was already computed by the
+  `--pareto` solve; only the presentation changed. Tested in `test_result_tabs.py`.
 - **The Results window now shows the full set of review tabs** (`steelreuse_results_window`, new
   shared `steelreuse_result_tabs`). The saved-runs Results window — the main place to review a run —
   previously had only Assignments / By section / Donor provenance; it now also has **Unfilled +
