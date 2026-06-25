@@ -74,7 +74,7 @@ class SweepPlanner(forms.WPFWindow):
     def _update_count(self, sender=None, args=None):
         n = sweep.grid_size(self._axes())
         warn = "   (large -- you'll be asked to confirm)" if n > _CONFIRM_ABOVE else ""
-        self.count_text.Text = "%d run(s)%s" % (n, warn)
+        self.count_text.Content = "%d run(s)%s" % (n, warn)
 
     def _pick_donor(self, sender, args):
         path = buttons.pick_model_file("Donor (supply) model or inventory", owner=self)
