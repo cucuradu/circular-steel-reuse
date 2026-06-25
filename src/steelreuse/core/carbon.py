@@ -17,7 +17,35 @@ from pathlib import Path
 from .sections import SectionProps
 
 # Ships inside the package (see sections.py) so the factor table is found in an installed wheel too.
-DEFAULT_FACTORS = Path(__file__).resolve().parent.parent / "data" / "carbon" / "factors.csv"
+_CARBON_DIR = Path(__file__).resolve().parent.parent / "data" / "carbon"
+
+# Selectable embodied-carbon datasets (Scenario Sweep §4 "carbon-factor dataset axis"). Each is a
+# self-contained, provenance-stamped factors CSV; they differ in the A1-A3 *production* figure — the
+# number the EPD databases actually disagree on — while the reuse-process and end-of-life credits are
+# held at common reference values (those are process/credit estimates from SCI P427 / worldsteel
+# module-D / Cambridge-Allwood, orthogonal to the production database). Swapping the active set answers
+# the standard LCA critique "how much does my saving depend on which database I trust?".
+CARBON_DATASETS: dict[str, Path] = {
+    "ice_v3": _CARBON_DIR / "factors.csv",                 # Circular Ecology ICE v3 (2019) — default
+    "ice_v4": _CARBON_DIR / "factors_ice_v4.csv",          # ICE v4 (2024) = Climatiq "Steel - Section"
+    "oekobaudat": _CARBON_DIR / "factors_oekobaudat.csv",  # German EPD via Oekobaudat (bauforumstahl/IBU)
+}
+DEFAULT_CARBON_DATASET = "ice_v3"
+# Back-compat alias: the historical default path. Existing callers (and the validated case study)
+# keep loading the ICE v3 table byte-identically.
+DEFAULT_FACTORS = CARBON_DATASETS[DEFAULT_CARBON_DATASET]
+
+
+def factors_path(dataset: str | None = None) -> Path:
+    """Path to a named carbon-factor dataset (``None`` -> the default ICE v3 set)."""
+    if dataset is None:
+        return DEFAULT_FACTORS
+    try:
+        return CARBON_DATASETS[dataset]
+    except KeyError:
+        raise ValueError(
+            f"unknown carbon dataset {dataset!r}; expected one of {tuple(CARBON_DATASETS)}"
+        ) from None
 
 
 @dataclass(frozen=True)
@@ -60,7 +88,14 @@ def _opt_float(row: dict, key: str) -> float:
     return float(v) if v not in (None, "") else 0.0
 
 
-def load_factors(path: str | Path = DEFAULT_FACTORS) -> dict[str, CarbonFactor]:
+def load_factors(path: str | Path | None = None, *,
+                 dataset: str | None = None) -> dict[str, CarbonFactor]:
+    """Load the carbon-factor table.
+
+    Pass ``dataset`` to pick a named bundled set (see :data:`CARBON_DATASETS`); pass ``path`` to load
+    an arbitrary CSV. With neither, the default ICE v3 set is used (historical behaviour)."""
+    if path is None:
+        path = factors_path(dataset)
     out: dict[str, CarbonFactor] = {}
     # The factor file carries version/source provenance as leading ``#`` comment lines (Roadmap §1.2,
     # parsed for the evidence package by core.rules); skip them so the CSV reader sees only data.

@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 
 from steelreuse.core.carbon import (
+    CARBON_DATASETS,
+    DEFAULT_CARBON_DATASET,
     build_passport,
+    factors_path,
     load_factors,
     member_mass_kg,
     member_volume_m3,
@@ -66,6 +69,28 @@ def test_old_factor_csv_without_credit_columns_still_loads(tmp_path):
     )
     f = load_factors(empty)["steel"]
     assert f.recycle_credit == 0.0 and f.reroll_credit == 0.0
+
+
+def test_selectable_carbon_datasets():
+    # Sweep §4 carbon-factor dataset axis: each named set loads, the default stays ICE v3 (byte-
+    # identical to the historical factors.csv), and the alternatives differ ONLY in the A1-A3
+    # production figure (the number EPD databases disagree on) — the credits/process are held common.
+    assert DEFAULT_CARBON_DATASET == "ice_v3"
+    assert load_factors(dataset="ice_v3")["steel"] == load_factors()["steel"]
+
+    a1a3 = {name: load_factors(dataset=name)["steel"].a1a3 for name in CARBON_DATASETS}
+    assert a1a3 == {"ice_v3": pytest.approx(1.55), "ice_v4": pytest.approx(1.61),
+                    "oekobaudat": pytest.approx(1.74)}
+    for name in CARBON_DATASETS:
+        f = load_factors(dataset=name)["steel"]
+        assert (f.reuse_process, f.recycle_credit, f.reroll_credit) == (0.10, 0.55, 1.00)
+
+
+def test_unknown_carbon_dataset_raises():
+    with pytest.raises(ValueError, match="unknown carbon dataset"):
+        load_factors(dataset="not_a_dataset")
+    with pytest.raises(ValueError):
+        factors_path("nope")
 
 
 def test_welded_member_has_higher_reuse_process_carbon():

@@ -129,6 +129,7 @@ def build_command(interpreter, opts, out_dir):
 
     # Choice options (emit the value only when set).
     for key, flag in (("counterfactual", "--counterfactual"), ("solver", "--solver"),
+                      ("carbon_dataset", "--carbon-dataset"),
                       ("occupancy", "--occupancy"), ("roof_occupancy", "--roof-occupancy")):
         val = opts.get(key)
         if val:

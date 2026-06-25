@@ -10,7 +10,13 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .core.audit import AuditSummary, apply_audit, assess_supply, load_audit_csv, recoverable_length
-from .core.carbon import Passport, build_passport
+from .core.carbon import (
+    DEFAULT_CARBON_DATASET,
+    CarbonFactor,
+    Passport,
+    build_passport,
+    load_factors,
+)
 from .core.connections import ConnectionPolicy
 from .core.ec3_checks import MemberDemand, c1_moment_gradient, check_member
 from .core.forces import AnalyticBackend, ForceBackend, Load, member_demands
@@ -355,6 +361,11 @@ class PipelineResult:
     # 1.0 utilisation under its own reused steel. Advisory: the match is NOT re-run, so a non-empty
     # ``failures`` means the engineer should upsize those slots (or rerun) — see run_pipeline.
     reuse_recheck: dict | None = None
+    # The embodied-carbon factor set this run booked against (Scenario Sweep §4): the dataset name
+    # (one of carbon.CARBON_DATASETS) and the loaded factors, so the evidence package records the
+    # set actually used rather than the default.
+    carbon_dataset: str = DEFAULT_CARBON_DATASET
+    carbon_factors: dict[str, CarbonFactor] | None = None
 
 
 def _project_tags(paths: list[str]) -> list[str]:
@@ -468,8 +479,13 @@ def run_pipeline(
     moment_shape: bool = False,
     self_weight: bool = False,
     solver: str = "pynite",
+    carbon_dataset: str = DEFAULT_CARBON_DATASET,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
+    # Embodied-carbon factor set the whole run books against (Scenario Sweep §4). Loaded once and
+    # passed to every carbon consumer (passport, match, disposition, marginal value, diagnosis,
+    # alternatives) so the chosen dataset — not the default — drives every figure consistently.
+    factors = load_factors(dataset=carbon_dataset)
     # Frame analysis needs the area-based load model (the floor pressure on the beams is what the
     # solved load path distributes). Default it like the CLI does; an explicit legacy flat
     # LoadModel cannot drive a frame solve, and silently falling back to analytic forces gave a
@@ -565,9 +581,9 @@ def run_pipeline(
             frame_result = fr
     demand = demand_models[0]
 
-    passport = build_passport(donor.members, catalog)
+    passport = build_passport(donor.members, catalog, factors=factors)
     policy = ConnectionPolicy() if connection_screen else None
-    result = match(supply, slots, catalog, allow_cutting=allow_cutting,
+    result = match(supply, slots, catalog, factors=factors, allow_cutting=allow_cutting,
                    connection_policy=policy, objective=objective,
                    counterfactual=counterfactual, w_overspec=w_overspec, min_util=min_util,
                    max_distinct_sections=max_distinct_sections, reserve_w=reserve_w)
@@ -588,7 +604,7 @@ def run_pipeline(
         pareto_rows = []
         for obj in OBJECTIVES:
             r = result if obj == objective else match(
-                supply, slots, catalog, allow_cutting=allow_cutting,
+                supply, slots, catalog, factors=factors, allow_cutting=allow_cutting,
                 connection_policy=policy, objective=obj,
                 counterfactual=counterfactual,  # same carbon basis as the shipped result
                 w_overspec=w_overspec,          # and the same stewardship economics
@@ -608,13 +624,13 @@ def run_pipeline(
     # the (unused x unfilled) feasibility cells with the run's own economics (result.weights).
     disposition_rows: list[dict] | None = None
     if disposition:
-        disposition_rows = stock_disposition(supply, slots, catalog, result)
+        disposition_rows = stock_disposition(supply, slots, catalog, result, factors=factors)
 
     # Per-donor what-if value (Tier 4, opt-in): re-solve the match with each reused donor removed to
     # measure its true global marginal CO2. One MILP solve per donor, so only when explicitly asked.
     marginal_value_rows: list[dict] | None = None
     if donor_value:
-        marginal_value_rows = donor_marginal_value(supply, slots, catalog, result)
+        marginal_value_rows = donor_marginal_value(supply, slots, catalog, result, factors=factors)
 
     # Portfolio: per-project outcome of the combined allocation (slot ids carry "tag::" prefixes).
     if project_rows is not None:
@@ -629,11 +645,11 @@ def run_pipeline(
 
     # Diagnose WHY the match came out this way (binding constraint + lever) for the narrative — always
     # computed, cheap, advisory, never changes the result.
-    diagnosis = diagnose_match(supply, slots, catalog, result)
+    diagnosis = diagnose_match(supply, slots, catalog, result, factors=factors)
 
     # Per-assignment next-best alternative (always computed; cheap — only the filled slots are
     # re-derived). Explains WHY each slot's donor won it over the runner-up; advisory only.
-    alternatives = assignment_alternatives(supply, slots, catalog, result)
+    alternatives = assignment_alternatives(supply, slots, catalog, result, factors=factors)
 
     # Donor-row mismatch log (Roadmap §1.2): classify every donor member (mapped / fuzzy / unknown /
     # quarantined) with a reason from the section mapping + the audit, cross-referenced with the match
@@ -660,4 +676,5 @@ def run_pipeline(
         disposition=disposition_rows, projects=project_rows, diagnosis=diagnosis,
         mismatch_log=mismatch_log, alternatives=alternatives,
         marginal_value=marginal_value_rows, reuse_recheck=reuse_recheck,
+        carbon_dataset=carbon_dataset, carbon_factors=factors,
     )

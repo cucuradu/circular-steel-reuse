@@ -31,7 +31,8 @@ _CONFIRM_ABOVE = 60
 _AXIS_CONTROLS = (("obj_check", "obj_box", "objective"),
                   ("minutil_check", "minutil_box", "min_util"),
                   ("maxsec_check", "maxsec_box", "max_distinct_sections"),
-                  ("knock_check", "knock_box", "knockdown"))
+                  ("knock_check", "knock_box", "knockdown"),
+                  ("carbon_check", "carbon_box", "carbon_dataset"))
 
 
 class SweepPlanner(forms.WPFWindow):
@@ -53,10 +54,12 @@ class SweepPlanner(forms.WPFWindow):
         self.donor_browse.Click += self._pick_donor
         self.demand_browse.Click += self._pick_demand
         self.run_button.Click += self._on_run
-        for check in (self.obj_check, self.minutil_check, self.maxsec_check, self.knock_check):
+        for check in (self.obj_check, self.minutil_check, self.maxsec_check, self.knock_check,
+                      self.carbon_check):
             check.Checked += self._update_count
             check.Unchecked += self._update_count
-        for box in (self.obj_box, self.minutil_box, self.maxsec_box, self.knock_box):
+        for box in (self.obj_box, self.minutil_box, self.maxsec_box, self.knock_box,
+                    self.carbon_box):
             box.TextChanged += self._update_count
         self._update_count()
 

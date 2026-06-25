@@ -18,7 +18,7 @@ from pathlib import Path
 
 from . import __version__
 from .core import rules
-from .core.carbon import passport_rows
+from .core.carbon import CARBON_DATASETS, DEFAULT_CARBON_DATASET, passport_rows
 from .core.loads import NATIONAL_ANNEXES, OCCUPANCY_PRESETS, AreaLoadModel, ZoneSpec, presets_for_na
 from .core.mismatch import mismatch_summary
 from .evidence import build_evidence_package, write_evidence_package
@@ -155,6 +155,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "'recycling' subtracts the EAF scrap credit, 'rerolling' the pilot-scale "
                          "direct re-rolling credit (research-grade), per kg of donor steel "
                          "consumed. Default 'none' books plain avoided-new (results unchanged)")
+    ap.add_argument("--carbon-dataset", choices=sorted(CARBON_DATASETS), default=DEFAULT_CARBON_DATASET,
+                    help="embodied-carbon factor set every saving is booked against: 'ice_v3' "
+                         "(Circular Ecology ICE v3 2019, default), 'ice_v4' (ICE v4 2024 = Climatiq "
+                         "'Steel - Section') or 'oekobaudat' (German EPD via Oekobaudat). The sets "
+                         "differ in the A1-A3 production figure; the dataset used is recorded in the "
+                         "evidence package")
     ap.add_argument("--w-overspec", type=float, default=0.0,
                     help="over-spec stewardship penalty weight (default 0 = off): softly penalize "
                          "a donor's excess mass-per-metre over the slot's avoided-new baseline so "
@@ -361,6 +367,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         reserve_w=args.reserve, moment_shape=args.moment_shape,
         self_weight=args.self_weight,
         solver=args.solver,
+        carbon_dataset=args.carbon_dataset,
     )
 
     uncertainty = None
@@ -507,6 +514,10 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         print(f"Carbon basis: savings booked NET of the foregone {args.counterfactual} credit "
               f"({credit:g} kg CO2e per kg of donor steel consumed)"
               + (" [pilot-scale research-grade factor]" if args.counterfactual == "rerolling" else ""))
+    if args.carbon_dataset != DEFAULT_CARBON_DATASET:
+        a1a3 = (res.carbon_factors or {}).get("steel")
+        print(f"Carbon dataset: {args.carbon_dataset}"
+              + (f" (A1-A3 {a1a3.a1a3:g} kgCO2e/kg)" if a1a3 else ""))
     print(f"CO2e saved by matches: {res.match.total_co2_saved_kg:.1f} kg "
           f"(full donor stock potential: {res.passport.total_saved_kgco2e:.1f} kg)")
     if uncertainty is not None:
@@ -571,6 +582,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             "national_annex": args.national_annex,
             "connection_screen": args.connections,
             "counterfactual": args.counterfactual,
+            "carbon_dataset": args.carbon_dataset,
             "frame_analysis": args.frame_analysis,
         }
         package = build_evidence_package(

@@ -67,7 +67,7 @@ Computed once per sweep and shared by every point:
 
 | Feature | What it answers | Build size | Notes |
 |---|---|---|---|
-| **Carbon-factor dataset axis** | how much does the carbon result depend on which EPD database I trust? | small | factor set is already versioned (`data/carbon/factors.csv`, ICE v3); add Ökobaudat/Climatiq sets and make the active set selectable |
+| ~~**Carbon-factor dataset axis**~~ ✅ **shipped** | how much does the carbon result depend on which EPD database I trust? | small | **Done.** Three provenance-stamped sets in `data/carbon/` selectable via `--carbon-dataset` / planner row: `ice_v3` (default, 1.55), `ice_v4` (= Climatiq "Steel - Section", 1.61), `oekobaudat` (German EPD-BFS, 1.74). Sets differ in the A1-A3 production figure (the number databases disagree on); credits/process held common. Dataset is recorded in the evidence package. |
 | **Utilisation policy** | even out donor utilisation instead of some at 100% / some at 50% | small–med | see §5 — largely served by `w_overspec`; the principled addition is a max-min-utilisation objective |
 | **Splicing** | join two short donors end-to-end to fill a long slot | medium | feasible & code-covered (AISC 360 J1.4, EC3); needs combine-donors feasibility + a splice carbon/cost penalty (see §6) |
 

@@ -187,6 +187,46 @@ axial-only). Live notes on what is still open:
 - **Passport ID / QR per member** in the report — deconstruction → fabrication → new-frame traceability.
 - **Prior-use class** field (crane girder / dynamic history → fatigue-screening flag).
 
+## Connection data — fixity extraction + donor survey capture
+
+Full design + staged plan: **[docs/CONNECTION_DATA_PLAN.md](docs/CONNECTION_DATA_PLAN.md)**. Two
+separate tracks with different data sources — keep them distinct. Extends the existing "Semi-rigid
+connection sensitivity" / "Real frame moments" items above (Track A) and the pre-demolition section
+above (Track B); those bullets are the *symptom*, this is the *data-capture fix*. Grounded in the
+deconstruction-sequence + SCI P427 + existing-PDA-platform research recorded in the plan.
+
+- 🔴 **Track A — extract demand-side fixity (the lateral fix).** The all-pinned/fixed-base global
+  idealisation (`frame.py:62-63`) makes an unbraced moment frame read as `alpha_cr ≈ 0` (see a real
+  storage-frame run at `alpha_cr = 0.1`). Read the **Revit analytical end-releases + base boundary
+  conditions** the engineer already authored, carry them as optional per-member schema fields, and
+  have the frame builder honour them per-member (falling back to the global flag where absent). Turns
+  a hard-coded assumption into the model's real fixity, so the sway check reflects the actual frame.
+- 🟠 **Track B — donor connection capture for the pre-demolition check.** `deconstruction.py` already
+  turns `connection_type` (welded/bolted/riveted) into cut-allowance + carbon multiplier, but the data
+  only ever arrives by hand. Source it from (i) a **survey import** (extend `survey.py` / Import Survey,
+  keyed on a *physically-traceable* id — Mark/grid/level, **never** the Revit element id, which is
+  untraceable on site) interoperating with existing PDA platforms (Material Index, BRE SmartWaste,
+  UKGBC tool); (ii) Revit **Structural Connection** elements when a modern donor model has them. For
+  genuine old-building donors the data is *surveyed/tested* (SCI P427: NDT hardness+spectrometer + DT),
+  never extractable — honest-by-default (unknown → no penalty) stays.
+- 🟠 **Match uses recovery effort as a soft term, not a gate.** Real deconstruction is reverse-
+  construction bay-by-bay, so in **full** deconstruction every member is recovered regardless of
+  joint type. Connection difficulty must therefore only (a) shrink `effective_recoverable_length`
+  (cuts — already wired) and (b) add a **soft recovery-carbon objective term** (prefer clean stock as
+  a tiebreaker). It must **not** exclude members. A full/selective mode toggle would let *selective*
+  jobs gate availability. (No "easy→hard recovery sequence" feature — the order is structural, not
+  connection-driven; explicitly out of scope.)
+- 🟠 **Stability-implied lateral-system check (the one prediction worth building).** No method reliably
+  *predicts* joint fixity from geometry (EN 1993-1-8 / SCI P427 reasons — see the plan's method ranking);
+  the reliable signal is *absence of a lateral system*. Detect whether the model has any bracing /
+  brace-angle diagonals / core proxy; if none and the frame is sway-sensitive, the all-pinned default is
+  provably wrong → flag "moment frame or laterally deficient" and surface a global moment-frame toggle
+  (`pin_beams=False`), showing `alpha_cr` for both assumptions. Never a silent flip. (The
+  `demand_test_1` diagonals were 2.3° roof rafters, not braces — exactly the case this catches.)
+- 🟡 **Persistent donor / connection library ("the server remembers").** A durable store of surveyed
+  grades + connections per donor so re-runs and future projects reuse the captured data — overlaps the
+  multi-donor stock / Material Bank items under *New directions* and CirCoFin below.
+
 ## App & report UX — open
 
 - ★ **Fuzzy-match review queue** in Streamlit: list quarantined names + candidates with approve/reject

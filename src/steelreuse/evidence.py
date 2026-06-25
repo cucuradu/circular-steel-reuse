@@ -32,7 +32,7 @@ from pathlib import Path
 
 from . import __version__
 from .core import ec3_checks, rules
-from .core.carbon import DEFAULT_FACTORS, CarbonFactor, load_factors
+from .core.carbon import CarbonFactor, factors_path, load_factors
 from .core.ec3_checks import MemberDemand, check_member
 from .core.mismatch import mismatch_summary
 from .core.sections import (
@@ -296,8 +296,11 @@ def build_evidence_package(
     default to the same tables the pipeline used, so the re-derived evidence matches the solve.
     """
     catalog = catalog or load_default_catalog()
-    factors = factors or load_factors()
+    # Use the factor set the run actually booked against (carried on the result), so the evidence
+    # re-derivation matches the solve when a non-default carbon dataset was selected (Sweep §4).
+    factors = factors or getattr(res, "carbon_factors", None) or load_factors()
     factor = factors["steel"]
+    cf_path = factors_path(getattr(res, "carbon_dataset", None))
     m = res.match
     weights = dict(m.weights or {})
 
@@ -355,7 +358,7 @@ def build_evidence_package(
         },
         # Externalised, version-stamped rule data the run used (grades, grade defaults, condition /
         # verification knockdowns, carbon factors, section catalogue): versions, sources, hashes.
-        "rules": rules.rules_manifest(),
+        "rules": rules.rules_manifest(carbon_factors_path=cf_path),
         "inputs": {
             "donor": {
                 "path": str(donor_path) if donor_path else None,
@@ -375,8 +378,9 @@ def build_evidence_package(
                 ],
             },
             "carbon_factors": {
-                "path": Path(DEFAULT_FACTORS).name,
-                "sha256": _sha256(DEFAULT_FACTORS),
+                "dataset": getattr(res, "carbon_dataset", None),
+                "path": cf_path.name,
+                "sha256": _sha256(cf_path),
                 "steel": _factor_dict(factor),
             },
         },

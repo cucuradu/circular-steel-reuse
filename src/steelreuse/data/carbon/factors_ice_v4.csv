@@ -1,0 +1,9 @@
+# steelreuse rule table: embodied-carbon factors for structural steel (kgCO2e per kg) — ICE v4 dataset
+# version: 1.0.0
+# source: A1-A3 from Circular Ecology ICE database v4 (2024), "Steel - Section" (the same figure
+# source: surfaced by Climatiq as activity metals-type_steel_section). End-of-life credits and the
+# source: reuse-process estimate are held at the ICE v3 reference values (SCI P427 / worldsteel
+# source: module-D / Cambridge-Allwood) — those are process/credit estimates orthogonal to the
+# source: production database, so only the A1-A3 production figure is dataset-specific here.
+material,a1a3_kgco2e_per_kg,reuse_process_kgco2e_per_kg,recycle_credit_kgco2e_per_kg,reroll_credit_kgco2e_per_kg,source
+steel,1.61,0.10,0.55,1.00,"ICE v4 (2024) structural steel section, A1-A3 1.61 kgCO2e/kg (Circular Ecology; surfaced as Climatiq 'Steel - Section', activity metals-type_steel_section). recycle_credit / reroll_credit / reuse_process unchanged from the ICE v3 set (worldsteel LCI module-D scrap credit; SCI P427; Cambridge/Allwood pilot re-rolling) — those are orthogonal to the production database."

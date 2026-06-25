@@ -155,9 +155,9 @@ def load_verification_knockdown() -> tuple[dict[str, float], set[str]]:
     return factors, accepted
 
 
-def _carbon_factor_provenance() -> tuple[str, str]:
+def _carbon_factor_provenance(path: str | Path | None = None) -> tuple[str, str]:
     """``(provenance, version)`` for the carbon-factor table (header comments + steel-row source)."""
-    rows, prov, ver = read_rule_csv(_FACTORS)
+    rows, prov, ver = read_rule_csv(path or _FACTORS)
     steel = next((r for r in rows if (r.get("material") or "").strip().lower() == "steel"), None)
     if steel and steel.get("source"):
         prov = (prov + " " + steel["source"]).strip()
@@ -180,13 +180,15 @@ def _table_entry(name: str, path: Path) -> dict:
     }
 
 
-def rules_manifest() -> dict:
+def rules_manifest(carbon_factors_path: str | Path | None = None) -> dict:
     """Versions, sources and content hashes of every externalised rule table, for the evidence package.
 
     A reviewer reads this block to know *which* rule data produced the run — the ruleset version, each
-    table's citation, and a SHA-256 they can recompute against the shipped file.
+    table's citation, and a SHA-256 they can recompute against the shipped file. ``carbon_factors_path``
+    names the carbon dataset the run actually used (defaults to the bundled ICE v3 set).
     """
-    cf_prov, cf_ver = _carbon_factor_provenance()
+    cf_path = Path(carbon_factors_path) if carbon_factors_path else _FACTORS
+    cf_prov, cf_ver = _carbon_factor_provenance(cf_path)
     return {
         "ruleset_version": RULESET_VERSION,
         "tables": [
@@ -196,10 +198,10 @@ def rules_manifest() -> dict:
             _table_entry("verification_knockdown", VERIFICATION_KNOCKDOWN),
         ],
         "carbon_factors": {
-            "file": _FACTORS.name,
+            "file": cf_path.name,
             "version": cf_ver or RULESET_VERSION,
             "source": cf_prov,
-            "sha256": _sha256(_FACTORS),
+            "sha256": _sha256(cf_path),
         },
         "section_catalog": {
             "version": RULESET_VERSION,

@@ -14,6 +14,18 @@ All notable changes to this project are documented here. The format is based on
   study still reproduces byte-identically; this only changes the UI defaults.
 
 ### Added
+- **Selectable carbon-factor dataset + sweep axis** (`--carbon-dataset`, Scenario Sweep §4). The
+  embodied-carbon factor set every saving is booked against is now a choice of three
+  provenance-stamped, self-contained CSVs in `data/carbon/`: `ice_v3` (Circular Ecology ICE v3 2019,
+  A1-A3 1.55 — the default, byte-identical to before), `ice_v4` (ICE v4 2024, 1.61 — the figure
+  Climatiq surfaces as "Steel - Section") and `oekobaudat` (German structural-steel EPD via
+  Ökobaudat / bauforumstahl-IBU, 1.74). The sets differ only in the A1-A3 *production* figure — the
+  number EPD databases actually disagree on — while the reuse-process and end-of-life credits are
+  held at common reference values (SCI P427 / worldsteel module-D / Cambridge-Allwood, orthogonal to
+  the production database). The dataset threads through the whole pipeline (passport, match,
+  disposition, marginal-value, diagnosis, alternatives), is exposed as a planner row + sweep axis
+  (`carbon_dataset`), and is recorded — name, file, SHA-256, factor values — in the signed evidence
+  package, so a result names the database it trusted.
 - **`docs/SCENARIO_SWEEP_PLAN.md`** — the living plan for the sweep feature: the realism principle,
   the full set of engineer-selectable axes (built + to-build), the omitted dials, the utilisation
   question, the staged "funnel" sweep, the performance model, and domain notes (construction case,
