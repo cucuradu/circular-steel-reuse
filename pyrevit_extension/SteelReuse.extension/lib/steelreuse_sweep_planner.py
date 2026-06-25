@@ -124,7 +124,10 @@ class SweepPlanner(forms.WPFWindow):
         workers = sweep.clamp_workers(requested)
         out_root = os.path.join(runner.reports_dir(self._ext_root),
                                 "sweep_" + time.strftime("%Y%m%d-%H%M%S"))
-        plan_rows = sweep.plan({"donor": donor, "demand": demand}, axes, out_root)
+        # Realistic base shared by every point: moment-shape on (sharper, valid EN check) mirrors the
+        # Run Match default. Donor/demand + the swept axes complete each point.
+        fixed = {"donor": donor, "demand": demand, "moment_shape": True}
+        plan_rows = sweep.plan(fixed, axes, out_root)
 
         self.run_button.IsEnabled = False
         note = ""

@@ -6,7 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Moment-shape (C1/Cm) is now ON by default in the Run Match panel and the sweep base**
+  (`steelreuse_panel.xaml`, `steelreuse_sweep_planner`). Real Revit runs now use the sharper, valid EN
+  check (LTB moment-gradient C1 and 6.3.3 Cm from the actual moment diagram) instead of the
+  conservative uniform-moment assumption. The **engine/CLI default stays off** so the validated case
+  study still reproduces byte-identically; this only changes the UI defaults.
+
 ### Added
+- **`docs/SCENARIO_SWEEP_PLAN.md`** — the living plan for the sweep feature: the realism principle,
+  the full set of engineer-selectable axes (built + to-build), the omitted dials, the utilisation
+  question, the staged "funnel" sweep, the performance model, and domain notes (construction case,
+  load take-down, carbon-factor source, splicing feasibility) gathered from the design discussions.
 - **Scenario Sweep — the planner + trade-off board** (new `Match.panel/Sweep.pushbutton`,
   `steelreuse_sweep_planner`, `steelreuse_sweep_board`). A new Match-panel button opens a planner:
   lock the donor + demand, tick which dials to vary (objective, min-util, max distinct sections,

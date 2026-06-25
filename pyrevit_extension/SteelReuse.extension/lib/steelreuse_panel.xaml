@@ -269,7 +269,7 @@
                            ToolTip="Default reclaimed yield-strength knockdown (&lt;= 1.0) applied to donor members that carry no audit data. 1.0 = no reduction (use full nominal f_y)."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                 <CheckBox x:Name="include_unverified_check" Content="Admit unverified" Margin="0,0,16,0"/>
-                <CheckBox x:Name="moment_shape_check" Content="Moment-shape C1/Cm"/>
+                <CheckBox x:Name="moment_shape_check" Content="Moment-shape C1/Cm" IsChecked="True"/>
                 <TextBlock Style="{StaticResource InfoIcon}"
                            ToolTip="Admit unverified: admit donor members the audit could not verify (at a conservative knockdown) instead of quarantining them. Off by default.   Moment-shape C1/Cm: use the real moment diagram for sharper, less-conservative lateral-torsional-buckling (C1) and 6.3.3 (Cm) factors instead of the conservative uniform-moment assumption."/></StackPanel>
             </StackPanel>
