@@ -381,7 +381,8 @@
       <Button x:Name="apply_button" Content="Apply Matches to model" DockPanel.Dock="Left"
               Background="#00A651" Foreground="White" FontWeight="Bold" Padding="14,5" Margin="8,0,0,0"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-        <Button x:Name="open_report_button" Content="Open report"/>
+        <Button x:Name="open_report_button" Content="Open report (HTML)"
+                ToolTip="Render the results to a standalone HTML report and open it in your browser. Built on demand from this run's results.json -- no HTML file is written unless you click here."/>
         <Button x:Name="open_folder_button" Content="Open folder"/>
         <Button x:Name="export_button" Content="Export CSV"/>
       </StackPanel>

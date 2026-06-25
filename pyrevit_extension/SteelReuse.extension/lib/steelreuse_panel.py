@@ -17,7 +17,9 @@ import json
 import os
 import threading
 
+import steelreuse_buttons as buttons  # shared, crash-guarded file pickers (extension lib/ on path)
 import steelreuse_panel_model as panelmodel  # extension lib/ is on the engine path
+import steelreuse_results_view as resultsview  # render the printable HTML report on demand
 import steelreuse_revit_events as revit_events  # shared select/zoom/apply ExternalEvent handlers
 import steelreuse_runner as runner
 import steelreuse_runs as runhist  # auto-save each run to the Compare Runs history
@@ -36,6 +38,8 @@ class SteelReusePanel(forms.WPFWindow):
         self._ext_root = ext_root
         self._settings = runner.load_settings(ext_root)
         self._view = None        # parsed ResultsView of the last run
+        self._data = None        # raw results.json dict of the last run (for on-demand HTML report)
+        self._run_dir = None     # folder of the last run's results.json (report/folder actions)
         self._rows = []          # currently-displayed (filtered) rows, for CSV export
 
         self.donor_browse.Click += self._pick_donor
@@ -155,13 +159,14 @@ class SteelReusePanel(forms.WPFWindow):
         }
 
     def _pick_donor(self, sender, args):
-        path = forms.pick_file(file_ext="json|csv|xlsx", title="Donor (supply) model or inventory")
+        path = buttons.pick_model_file("Donor (supply) model or inventory")
         if path:
             self.donor_box.Text = path
 
     def _pick_demand(self, sender, args):
-        picked = forms.pick_file(file_ext="json|csv|xlsx", title="New-design (demand) model or inventory",
-                                 multi_file=True)
+        # multi_file -> the Vista COM dialog; a raw forms.pick_file(file_ext="json|csv|xlsx") here built
+        # a malformed filter that threw an unhandled COMException and crashed Revit (see pick_model_file).
+        picked = buttons.pick_model_file("New-design (demand) model or inventory", multi_file=True)
         if picked:
             self.demand_box.Text = "; ".join(picked) if isinstance(picked, list) else picked
 
@@ -256,6 +261,8 @@ class SteelReusePanel(forms.WPFWindow):
             self._failed("Could not read results:\n" + str(ex))
             return
         self._view = panelmodel.parse(data)
+        self._data = data
+        self._run_dir = os.path.dirname(results_path)
         k = self._view.kpis
         line = (
             "%s / %s slots reused    |    %s kg CO2e saved    |    %s kg reused    |    %s"
@@ -504,20 +511,27 @@ class SteelReusePanel(forms.WPFWindow):
         self._apply_event.Raise()  # the colouring transaction runs in a valid Revit context
 
     # -- footer actions ---------------------------------------------------------------------------
-    def _report_path(self):
-        return self._view.paths.get("report") if self._view else None
-
     def _open_report(self, sender, args):
-        path = self._report_path()
-        if path and os.path.isfile(path):
-            os.startfile(path)
-        else:
+        """Render the loaded run to a standalone HTML report and open it in the browser.
+
+        Built fresh from the run's results.json (no per-run report.html is written any more), so the
+        HTML exists only when asked for -- the same on-demand writer the Results window uses.
+        """
+        if not self._data:
             forms.alert("No report yet -- run a match first.", title="SteelReuse")
+            return
+        out_path = os.path.join(self._run_dir or _DIR, "results_view.html")
+        try:
+            html = resultsview.render_results_html(self._data)
+            runner.open_html_report(out_path, "SteelReuse match results", html)
+        except Exception as ex:  # noqa: BLE001
+            forms.alert("Could not open the report:\n" + str(ex), title="SteelReuse")
 
     def _open_folder(self, sender, args):
-        path = self._report_path()
-        if path:
-            os.startfile(os.path.dirname(path))
+        if self._run_dir and os.path.isdir(self._run_dir):
+            os.startfile(self._run_dir)
+        else:
+            forms.alert("No run folder yet -- run a match first.", title="SteelReuse")
 
     def _export_csv(self, sender, args):
         if not self._rows:

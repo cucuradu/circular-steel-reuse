@@ -51,7 +51,7 @@ def main():
     interp = buttons.resolve_interpreter(_EXT_ROOT)
     if not interp:
         return  # resolve_interpreter already alerted
-    path = forms.pick_file(file_ext="csv|xlsx|json", title="Pick a filled survey file")
+    path = buttons.pick_model_file("Pick a filled survey file", exts=("csv", "xlsx", "json"))
     if not path:
         return
     try:

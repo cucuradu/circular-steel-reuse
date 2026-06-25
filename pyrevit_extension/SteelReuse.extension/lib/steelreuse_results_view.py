@@ -51,6 +51,10 @@ _STYLE = """<style>
             border-radius:9px; margin:0.5em 0; overflow:hidden; }
 .srx .bar-fill { height:100%; background:#0a6; border-radius:9px 0 0 9px; }
 .srx .bar-label { position:absolute; left:8px; top:0; line-height:18px; font-size:0.8em; color:#222; }
+.srx .u-low { color:#888; } .srx .u-ok { color:#0a6; font-weight:bold; }
+.srx .u-high { color:#b8860b; font-weight:bold; } .srx .u-over { color:#c33; font-weight:bold; }
+.srx button.srx-btn { margin-left:1em; padding:2px 9px; cursor:pointer; }
+.srx .copied { color:#0a6; margin-left:0.6em; font-size:0.85em; }
 </style>"""
 
 _FILTER_JS = """<script>
@@ -63,10 +67,38 @@ function srxFilter(){
     var r=rows[i], show=true;
     if(sec && r.getAttribute('data-section').indexOf(sec)<0) show=false;
     if(st==='CONN'){ if(r.getAttribute('data-conn')!=='1') show=false; }
+    else if(st==='ALT'){ if(r.getAttribute('data-alt')!=='1') show=false; }
     else if(st && r.getAttribute('data-status')!==st) show=false;
     if(parseFloat(r.getAttribute('data-util'))<mu) show=false;
     r.style.display=show?'':'none';
   }
+}
+function srxCsv(){
+  var rows=document.getElementsByClassName('srx-row');
+  var head=['Demand id','Demand','Donor id','Donor','Util','Status','chiLT','Conn','CO2e kg','Next best'];
+  var nl=String.fromCharCode(10), q=String.fromCharCode(34);
+  var lines=[head.join(',')], n=0;
+  for(var i=0;i<rows.length;i++){
+    if(rows[i].style.display==='none') continue;
+    var cells=rows[i].children, vals=[];
+    for(var c=0;c<cells.length;c++){
+      var t=(cells[c].textContent||'').trim().split(q).join(q+q);
+      if(t.indexOf(',')>=0||t.indexOf(q)>=0||t.indexOf(nl)>=0){ t=q+t+q; }
+      vals.push(t);
+    }
+    lines.push(vals.join(',')); n++;
+  }
+  var csv=lines.join(nl), note=document.getElementById('srx-csv-note');
+  function done(){ if(note){ note.textContent='copied '+n+' row(s)'; } }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(csv).then(done, function(){ srxCsvFallback(csv,done); });
+  } else { srxCsvFallback(csv,done); }
+}
+function srxCsvFallback(csv,done){
+  var ta=document.createElement('textarea'); ta.value=csv;
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){}
+  document.body.removeChild(ta);
 }
 function srxSort(th){
   var table=th.parentNode.parentNode.parentNode;        // th -> tr -> thead -> table
@@ -129,9 +161,12 @@ def _filters():
         '<label>Status <select id="srx-filter-status" onchange="srxFilter()">'
         '<option value="">all</option><option value="OK">OK</option>'
         '<option value="REVIEW">review</option>'
-        '<option value="CONN">connection review</option></select></label>'
+        '<option value="CONN">connection review</option>'
+        '<option value="ALT">contention (next-best used elsewhere)</option></select></label>'
         '<label>Min utilisation <input id="srx-filter-util" type="number" step="0.05" '
         'min="0" max="1" value="0" oninput="srxFilter()" style="width:5em"></label>'
+        '<button type="button" class="srx-btn" onclick="srxCsv()">Copy table as CSV</button>'
+        '<span id="srx-csv-note" class="copied"></span>'
         '</div>'
     )
 
@@ -144,6 +179,22 @@ def _chi_cell(row):
     if chi == 1.0 and free is not None and free < 0.85:
         cell += ' <span class="review" title="would be %.2f if the flange were unrestrained">&#9888;</span>' % free
     return cell
+
+
+def _util_cell(r):
+    """Utilisation, colour-banded by severity (low / ok / high / over 1.0)."""
+    u = r.get("utilization")
+    if u is None:
+        return "—"
+    if u > 1.0:
+        cls = "u-over"
+    elif u >= 0.85:
+        cls = "u-high"
+    elif u >= 0.5:
+        cls = "u-ok"
+    else:
+        cls = "u-low"
+    return '<span class="%s">%.2f</span>' % (cls, u)
 
 
 def _alt_cell(r):
@@ -172,14 +223,16 @@ def _assignments_table(rows):
         data_section = (_esc(r.get("demand_section", "")) + " " + _esc(r.get("donor_section", ""))).upper()
         conn = "1" if r.get("connection_review") else "0"
         conn_cell = '<span class="review">review</span>' if r.get("connection_review") else ""
+        alt = "1" if r.get("alt_used_elsewhere") else "0"   # contention: runner-up went elsewhere
         body.append(
-            ('<tr class="srx-row" data-section="%s" data-status="%s" data-conn="%s" data-util="%s">'
+            ('<tr class="srx-row" data-section="%s" data-status="%s" data-conn="%s" data-alt="%s" '
+             'data-util="%s">'
              '<td>%s</td><td>%s</td><td>%s</td><td>%s</td>'
              '<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>')
-            % (data_section, _esc(r.get("check_status", "")), conn, r.get("utilization", 0),
+            % (data_section, _esc(r.get("check_status", "")), conn, alt, r.get("utilization", 0),
                _esc(r.get("demand_id", "")), _esc(r.get("demand_section", "")),
                _esc(r.get("donor_id", "")), _esc(r.get("donor_section", "")),
-               _num(r.get("utilization"), "%.2f"), _esc(r.get("check_status", "")),
+               _util_cell(r), _esc(r.get("check_status", "")),
                _chi_cell(r), conn_cell, _num(r.get("co2_saved_kg"), "%.0f"), _alt_cell(r)))
     return head + "".join(body) + "</tbody></table>"
 
@@ -204,6 +257,38 @@ def _unfilled_section(unfilled):
     summary = '<p class="note"><b>%s</b> slot(s) need new steel.</p>' % len(unfilled)
     return summary + _simple_table("Unfilled demand slots (need new steel)",
                                    ["Demand id", "Section", "Why unfilled"], rows)
+
+
+def _rollup_section(assignments):
+    """Reuse rolled up by donor section: count, total CO2e saved, mean utilisation, total off-cut.
+
+    A quick read of where the savings concentrate and how hard each section is worked, without
+    scanning the per-row table."""
+    if not assignments:
+        return ""
+    groups = {}
+    for a in assignments:
+        sec = a.get("donor_section") or "(unmapped)"
+        g = groups.get(sec)
+        if g is None:
+            g = groups[sec] = {"n": 0, "co2": 0.0, "offcut": 0.0, "util_sum": 0.0, "util_n": 0}
+        g["n"] += 1
+        g["co2"] += a.get("co2_saved_kg") or 0.0
+        g["offcut"] += a.get("offcut_mm") or 0.0
+        u = a.get("utilization")
+        if u is not None:
+            g["util_sum"] += u
+            g["util_n"] += 1
+    rows = []
+    for sec in sorted(groups, key=lambda s: -groups[s]["co2"]):
+        g = groups[sec]
+        mean_u = (g["util_sum"] / g["util_n"]) if g["util_n"] else None
+        rows.append('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>'
+                    % (_esc(sec), g["n"], _num(g["co2"], "%.0f"),
+                       _num(mean_u, "%.2f"), _num(g["offcut"] / 1000.0, "%.1f")))
+    return _simple_table("Reuse by donor section",
+                         ["Donor section", "Reuses", "CO2e saved (kg)", "Mean util", "Off-cut (m)"],
+                         rows)
 
 
 def _diagnosis_section(diagnosis):
@@ -391,6 +476,7 @@ def render_results_html(data):
              _rules_line(data.get("rules")),
              _filters(),
              _assignments_table(data.get("assignments", [])),
+             _rollup_section(data.get("assignments", [])),
              _unfilled_section(data.get("unfilled", [])),
              _warnings_section(data.get("warnings")),
              _disposition_section(data.get("disposition")),

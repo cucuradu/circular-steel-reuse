@@ -104,7 +104,9 @@ def build_command(interpreter, opts, out_dir):
            "--donor", opts["donor"],
            "--demand"] + demand_args + [
            "--apply-matches-out", paths["status"],
-           "--out", paths["report"],
+           # No per-run HTML report: the Run Match / Results windows render it on demand from
+           # results.json (steelreuse_results_view), so a file per run is just clutter.
+           "--no-report",
            "--results-out", paths["results"],
            # Always emit the signable evidence package + donor mismatch log, so every run is
            # self-contained and reviewable (the Results window surfaces both).

@@ -31,15 +31,16 @@ def test_command_starts_with_wdac_safe_module_invocation():
     assert "steelreuse.exe" not in " ".join(cmd)
 
 
-def test_command_always_emits_the_three_artifacts_under_out_dir():
+def test_command_always_emits_the_artifacts_under_out_dir_and_skips_the_report():
     cmd = runner.build_command("py", {"donor": "d.json", "demand": "m.json"}, os.path.join("C:", "out"))
     assert _pair(cmd, "--donor") == "d.json"
     assert _pair(cmd, "--demand") == "m.json"
-    # status.json (Apply Matches), report.html, results.json (the panel) -- all under out_dir.
+    # status.json (Apply Matches), results.json (the panel), evidence + mismatch -- all under out_dir.
     assert _pair(cmd, "--apply-matches-out").endswith("status.json")
-    assert _pair(cmd, "--out").endswith("report.html")
     assert _pair(cmd, "--results-out").endswith("results.json")
-    for flag in ("--apply-matches-out", "--out", "--results-out"):
+    # No per-run HTML report: it is rendered on demand from results.json instead.
+    assert "--no-report" in cmd and "--out" not in cmd
+    for flag in ("--apply-matches-out", "--results-out", "--evidence-out", "--mismatch-csv"):
         assert os.path.join("C:", "out") in _pair(cmd, flag)
 
 
@@ -219,7 +220,9 @@ def test_run_match_end_to_end_is_terminal_free(tmp_path):
 
     assert res["ok"], res["stderr"]
     assert os.path.exists(res["paths"]["status"])
-    assert os.path.exists(res["paths"]["report"])
+    # No per-run HTML report any more (it is rendered on demand from results.json).
+    assert not os.path.exists(res["paths"]["report"])
+    assert os.path.exists(res["paths"]["evidence"])
     with open(res["paths"]["results"], encoding="utf-8") as fh:
         data = json.load(fh)
     assert data["schema_version"] == 2

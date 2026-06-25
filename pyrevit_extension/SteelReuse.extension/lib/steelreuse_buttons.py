@@ -20,6 +20,39 @@ from pyrevit import forms
 # (a plain .pushbutton or one inside a .pulldown / .splitbutton).
 EXT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+# The model/inventory inputs every picker accepts: the extractor's .json or a .csv/.xlsx inventory.
+_MODEL_EXTS = ("json", "csv", "xlsx")
+
+
+def _ext_filter(exts):
+    """A VALID WinForms OpenFileDialog filter string for ``exts`` (e.g. ('json','csv','xlsx')).
+
+    pyRevit's ``pick_file`` builds its own filter as ``"|*.{file_ext}"``, so a multi-extension
+    ``file_ext="json|csv|xlsx"`` yields the MALFORMED string ``"|*.json|csv|xlsx"`` -- WinForms reads
+    that as the pairs ("", "*.json") and ("csv", "xlsx"), a filter literally named "csv" matching
+    files named ``xlsx``. A single-select dialog tolerates it, but the multi-select (Vista COM
+    ``IFileOpenDialog``) dialog validates the spec and throws a COMException (0xe0434352) which, left
+    unhandled in the WPF click handler, takes Revit down with a fatal error. Passing a well-formed
+    ``files_filter`` instead both defuses that crash and actually filters for all the extensions.
+    """
+    pats = ";".join("*." + e for e in exts)
+    return "Supported (%s)|%s|All files (*.*)|*.*" % (pats, pats)
+
+
+def pick_model_file(title, multi_file=False, exts=_MODEL_EXTS):
+    """``forms.pick_file`` for a model/inventory input, hardened for the modeless Run Match window.
+
+    Two fixes over a raw ``forms.pick_file(file_ext="json|csv|xlsx")`` call: a well-formed
+    multi-extension filter (see :func:`_ext_filter`), and a guard so a dialog/COM error can NEVER
+    escape the WPF click handler -- an unhandled exception there is a Revit-fatal crash, not a Python
+    traceback. Returns a path, a list of paths (``multi_file``), or None on cancel/error.
+    """
+    try:
+        return forms.pick_file(files_filter=_ext_filter(exts), multi_file=multi_file, title=title)
+    except Exception as ex:  # noqa: BLE001 -- never let a picker exception crash Revit
+        forms.alert("Could not open the file picker:\n\n%s" % ex, title="SteelReuse")
+        return None
+
 
 def resolve_interpreter(ext_root, alert=True):
     """The CPython interpreter to drive the engine, or None (after an alert) if none works."""
@@ -39,7 +72,7 @@ def resolve_donor(ext_root, title="Select the donor model or inventory"):
     donor = runner.load_settings(ext_root).get("last_donor")
     if donor and os.path.isfile(donor):
         return donor
-    return forms.pick_file(file_ext="json|csv|xlsx", title=title)
+    return pick_model_file(title)
 
 
 def interpreter_and_donor(ext_root, title="Select the extracted donor.json"):

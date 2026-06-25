@@ -140,3 +140,45 @@ def test_render_optional_blocks_only_when_present():
                     "Portfolio", "Pre-demolition audit"):
         assert present in rich
     assert "120.5" in rich and "blockA" in rich and "unverified" in rich
+
+
+def test_render_has_contention_filter_and_csv_button():
+    data = dict(_SAMPLE)
+    data["assignments"] = [dict(_SAMPLE["assignments"][0], alt_used_elsewhere=True),
+                           dict(_SAMPLE["assignments"][1], alt_used_elsewhere=False)]
+    html = view.render_results_html(data)
+    # contention filter option + the data-alt flag it reads
+    assert 'value="ALT"' in html and "contention" in html
+    assert 'data-alt="1"' in html and 'data-alt="0"' in html
+    # CSV copy button + its handler
+    assert "Copy table as CSV" in html and "srxCsv" in html
+
+
+def test_render_colours_utilisation_by_severity():
+    data = dict(_SAMPLE)
+    data["assignments"] = [
+        dict(_SAMPLE["assignments"][0], utilization=0.30, chi_lt=None, chi_lt_if_free=None),  # low
+        dict(_SAMPLE["assignments"][0], utilization=0.70, chi_lt=None, chi_lt_if_free=None),  # ok
+        dict(_SAMPLE["assignments"][0], utilization=0.95, chi_lt=None, chi_lt_if_free=None),  # high
+        dict(_SAMPLE["assignments"][0], utilization=1.20, chi_lt=None, chi_lt_if_free=None),  # over
+    ]
+    html = view.render_results_html(data)
+    for cls in ("u-low", "u-ok", "u-high", "u-over"):
+        assert cls in html
+
+
+def test_render_rolls_up_by_donor_section():
+    data = dict(_SAMPLE)
+    data["assignments"] = [
+        {"demand_id": "N1", "donor_id": "D1", "donor_section": "IPE300", "utilization": 0.6,
+         "co2_saved_kg": 100.0, "offcut_mm": 500.0, "check_status": "OK", "demand_section": "X"},
+        {"demand_id": "N2", "donor_id": "D2", "donor_section": "IPE300", "utilization": 0.8,
+         "co2_saved_kg": 200.0, "offcut_mm": 1500.0, "check_status": "OK", "demand_section": "X"},
+        {"demand_id": "N3", "donor_id": "D3", "donor_section": "IPE400", "utilization": 0.5,
+         "co2_saved_kg": 50.0, "offcut_mm": 0.0, "check_status": "OK", "demand_section": "X"},
+    ]
+    html = view.render_results_html(data)
+    assert "Reuse by donor section" in html
+    # IPE300 rolls up two reuses and 300 kg saved; the heavier-saving section is listed first
+    assert "IPE300" in html and "IPE400" in html
+    assert html.index("IPE300") < html.index("IPE400")   # sorted by CO2e saved, descending

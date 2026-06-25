@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "pass SEVERAL paths for portfolio matching (one optimization allocates the "
                          "donor stock across all the projects at once, with a per-project breakdown)")
     ap.add_argument("--out", default="reports/report.html", help="output HTML path")
+    ap.add_argument("--no-report", action="store_true",
+                    help="skip writing the HTML report. The results JSON, evidence package, "
+                         "apply-matches and mismatch outputs are still written; the Revit Run Match / "
+                         "Results windows render the report on demand from results.json, so no HTML "
+                         "file is produced per run.")
     ap.add_argument("--apply-matches-out",
                     help="write a per-element status JSON (donor: reused/available/quarantined/"
                          "unmapped; demand: filled/partially_filled/unfilled/non_steel) for the "
@@ -370,13 +375,18 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         uncertainty = {"p5": round(band.p5, 1), "p50": round(band.p50, 1),
                        "p95": round(band.p95, 1), "n": band.n}
 
-    ctx = build_report_context(res, uncertainty)
-    narrative, source = generate_narrative(ctx, select_provider())
-    html = render_html(ctx, narrative, source)
-
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding="utf-8")
+    # The HTML report is opt-out (--no-report): the Revit windows render it on demand from
+    # results.json, so a per-run file is unnecessary there. results.json / evidence / apply-matches
+    # are written regardless below.
+    out = None
+    source = None
+    if not args.no_report:
+        ctx = build_report_context(res, uncertainty)
+        narrative, source = generate_narrative(ctx, select_provider())
+        html = render_html(ctx, narrative, source)
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(html, encoding="utf-8")
 
     # Write-back maps per-element statuses onto ONE demand model; emitting a file that silently
     # covers only the first project of a portfolio would be misleading — refuse instead.
@@ -396,7 +406,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         results_payload = build_results(res)
         # Stamp the sibling artifact paths so the Revit panel can open the report / folder directly.
         results_payload["paths"] = {
-            "report": str(out),
+            "report": str(out) if out is not None else "",
             "status": str(wb_path) if wb_path is not None else "",
             "results": str(rp),
             "evidence": str(Path(args.evidence_out)) if args.evidence_out else "",
@@ -576,8 +586,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
               f"CO2 {recon_ok})")
     if res.match.unmatched_slots:
         print(f"Slots needing new steel: {', '.join(res.match.unmatched_slots)}")
-    print(f"Narrative source: {source}")
-    print(f"Report written -> {out}")
+    if out is not None:
+        print(f"Narrative source: {source}")
+        print(f"Report written -> {out}")
+    else:
+        print("Report skipped (--no-report); open it on demand from results.json")
     if wb_path is not None:
         print(f"Apply-matches data written -> {wb_path}")
     return 0
