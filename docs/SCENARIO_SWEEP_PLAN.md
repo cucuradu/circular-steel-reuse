@@ -70,10 +70,9 @@ Computed once per sweep and shared by every point:
 | **Carbon-factor dataset axis** | how much does the carbon result depend on which EPD database I trust? | small | factor set is already versioned (`data/carbon/factors.csv`, ICE v3); add Ökobaudat/Climatiq sets and make the active set selectable |
 | **Utilisation policy** | even out donor utilisation instead of some at 100% / some at 50% | small–med | see §5 — largely served by `w_overspec`; the principled addition is a max-min-utilisation objective |
 | **Splicing** | join two short donors end-to-end to fill a long slot | medium | feasible & code-covered (AISC 360 J1.4, EC3); needs combine-donors feasibility + a splice carbon/cost penalty (see §6) |
-| **Transport carbon** | is reuse still a net win after hauling the donor to site? | medium | add a transport-emissions term (distance × mode factor) to the carbon model |
-| **Cost / £ objective** | optimise for money, not only carbon | medium | a `cost` objective; prices already exist in the value-case module |
-| **Inventory subset / availability** | "what if donor family X is already sold?" | medium | a donor-filter input (drop sections/ids), then sweep over subsets |
-| **Phased availability (time)** | donors arrive on different dates vs the demand schedule | large | a temporal layer over supply/demand |
+
+**Out of scope (considered, dropped):** transport carbon, a cost/£ objective, inventory-subset
+sweeps, and phased (time-based) availability. Revisit only if a specific project demands one.
 
 ## 5. Utilisation distribution (the "some at 100%, some at 50%" question)
 
@@ -163,8 +162,7 @@ You prune on the cheap coarse axes first and spend the deeper exploration only o
    labels. *(zero engine work)*
 2. **Staged "Refine selected"** flow (§7) — carry opts on records, re-expand survivors.
 3. **Carbon-dataset axis** (§4) and **balanced-utilisation** objective (§5) — small engine adds.
-4. **Splicing**, then **transport carbon** / **cost objective** / **inventory subset** — larger
-   features, prioritised by demand.
+4. **Splicing** — the one larger feature still in scope.
 5. **Cells-once** core speed-up if big grids become routine.
 
 ## References
