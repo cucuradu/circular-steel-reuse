@@ -27,6 +27,14 @@ from ..core.ec3_checks import MemberDemand, check_member
 from ..core.sections import SectionProps
 
 CUT_TOLERANCE_MM = 50.0   # extra length needed beyond the structural span for cutting/fit-up
+# Extra length the splice joint itself consumes (cover-plate lap / end preparation), on top of the
+# free-end cut tolerance — a representative allowance, override per call.
+SPLICE_TOLERANCE_MM = 50.0
+# Embodied carbon (kgCO2e) of ONE full-strength spliced joint: cover plates + bolts/welds + the
+# fabrication to make two reclaimed pieces act as one prismatic member (AISC 360 §J1.4 / EC3). A
+# representative default on top of the ordinary per-reuse connection penalty — splicing is never free
+# (Sweep §6); override per call. Books against the saving like the connection penalty does.
+SPLICE_PENALTY_KG = 30.0
 
 
 @dataclass
@@ -76,6 +84,10 @@ class Assignment:
     # the screen is enabled, in which case "incompatible" pairs never get this far.
     connection_status: str = "unknown"
     connection_note: str = ""
+    # Splicing: the supply id of the second donor joined end-to-end with ``supply_id`` to reach this
+    # slot (None for an ordinary single-piece reuse). When set, the reuse is two reclaimed pieces of
+    # the same section spliced into one member; the carbon already nets the splice-joint penalty.
+    spliced_with: str | None = None
 
 
 @dataclass
@@ -139,9 +151,20 @@ class _Cell:
     connection_status: str = "unknown"
     connection_note: str = ""
     mass_used_kg: float = 0.0  # donor steel this piece actually consumes (the "mass" objective)
+    # Splice (Sweep §4): when set, this cell joins TWO same-section donors end-to-end to reach a slot
+    # neither alone is long enough for. ``si2`` is the spliced partner's supply index and
+    # ``len2_mm`` its full length (both donors are consumed whole by the splice); ``None`` = an
+    # ordinary single-piece cell. The spliced member behaves identically in the EN check to a single
+    # donor of that section, so feasibility is the section check plus the combined-length reach.
+    si2: int | None = None
+    len2_mm: float = 0.0
     # Solver coefficient for the chosen objective (set by _apply_objective). None = fall back to
     # the net-CO2 score, so directly-constructed cells (tests) behave as before.
     objective_coeff: float | None = None
+
+    @property
+    def is_splice(self) -> bool:
+        return self.si2 is not None
 
 
 # The three "currency" objectives compared on the Pareto trade-off board.
@@ -489,6 +512,133 @@ def _build_cells(
     return cells
 
 
+def _splice_cell(
+    supply_a: SupplyItem,
+    supply_b: SupplyItem,
+    slot: DemandSlot,
+    ia: int,
+    ib: int,
+    sj: int,
+    catalog: dict[str, SectionProps],
+    factor: CarbonFactor,
+    w_offcut: float,
+    connection_penalty_kg: float,
+    splice_penalty_kg: float,
+    baseline_mass_kg: float | None,
+    allow_cutting: bool = False,
+    connection_policy: ConnectionPolicy | None = None,
+    counterfactual_credit: float = 0.0,
+    w_overspec: float = 0.0,
+    min_util: float = 0.0,
+) -> _Cell | None:
+    """A feasible **splice** cell: two same-section donors joined end-to-end to fill one long slot.
+
+    Returns ``None`` unless the pair is a *genuine* splice — same section and grade, the combined
+    length reaches the slot (with a free-end cut + splice-joint allowance), and **neither piece alone**
+    is long enough (a long-enough piece would be matched as a single donor instead). The spliced member
+    is prismatic and of the slot's required length, so its EN 1993 check is identical to a single donor
+    of that section at the more conservative of the two donors' knockdowns; the carbon nets an extra
+    splice-joint penalty on top of the ordinary connection-refabrication penalty.
+    """
+    if supply_a.section != supply_b.section or _degenerate(slot):
+        return None
+    sec = catalog.get(supply_a.section)
+    if sec is None:
+        return None
+    grade = supply_a.grade or "S235"
+    if grade != (supply_b.grade or "S235"):
+        return None  # splice like with like — same section AND grade
+    la, lb = supply_a.length_mm, supply_b.length_mm
+    if la <= 0 or lb <= 0:
+        return None
+    required = slot.required_length_mm
+    if la + lb < required + CUT_TOLERANCE_MM + SPLICE_TOLERANCE_MM:
+        return None  # not long enough even spliced
+    if la >= required + CUT_TOLERANCE_MM or lb >= required + CUT_TOLERANCE_MM:
+        return None  # one piece alone reaches it -> use the single cell, don't waste the partner
+    knockdown = min(supply_a.knockdown, supply_b.knockdown)
+    # Connection screen vs the slot's design section + worst shear (same as a single reuse).
+    design_sec = catalog.get(slot.design_section) if slot.design_section else None
+    v_ed = max((abs(d.Vz_Ed) for _, d in slot.combinations), default=0.0)
+    conn = screen_pair(sec, design_sec, connection_policy, v_ed_n=v_ed)
+    if connection_policy is not None and conn.status == "incompatible":
+        return None
+    res = governing_name = None
+    for name, demand in slot.combinations:
+        r = check_member(sec, grade, demand, knockdown)
+        if r.status == "FAIL" or r.utilization > 1.0:
+            return None
+        if res is None or r.utilization > res.utilization:
+            res, governing_name = r, name
+    if res.utilization < min_util:
+        return None
+
+    used_len = required
+    mass_used = sec.mass_kgm * used_len / 1000.0
+    # A splice consumes both donor pieces in full (the small free-end remainder is treated as
+    # consumed, not returned to stock — the honest, conservative book for joining two short members).
+    offcut_mm = (la + lb) - used_len
+    offcut_mass = sec.mass_kgm * offcut_mm / 1000.0
+    avoided_new = (baseline_mass_kg if baseline_mass_kg is not None else mass_used) * factor.a1a3
+    co2_saved = (avoided_new - mass_used * factor.reuse_process
+                 - connection_penalty_kg - splice_penalty_kg)
+    co2_saved -= mass_used * counterfactual_credit
+    if allow_cutting:
+        cell_offcut, score = 0.0, co2_saved
+    else:
+        cell_offcut = offcut_mm
+        score = co2_saved - w_offcut * offcut_mass * factor.saved_per_kg
+    if w_overspec > 0 and baseline_mass_kg is not None and required > 0:
+        baseline_kgm = baseline_mass_kg / (required / 1000.0)
+        over_kgm = max(0.0, sec.mass_kgm - baseline_kgm)
+        score -= w_overspec * over_kgm * (used_len / 1000.0) * factor.saved_per_kg
+    bending = next((c for c in res.checks if c.name == "bending_y"), None)
+    chi_lt = bending.detail.get("chi_LT") if bending else None
+    chi_lt_if_free = bending.detail.get("chi_LT_if_unrestrained", chi_lt) if bending else None
+    return _Cell(ia, sj, res.utilization, res.status, cell_offcut, co2_saved, score,
+                 chi_lt, chi_lt_if_free, governing_name or "ULS gravity",
+                 used_len_mm=la, connection_status=conn.status, connection_note=conn.note,
+                 mass_used_kg=mass_used, si2=ib, len2_mm=lb)
+
+
+def _build_splices(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    factor: CarbonFactor,
+    w_offcut: float,
+    connection_penalty_kg: float,
+    splice_penalty_kg: float,
+    baselines: list[float | None],
+    allow_cutting: bool,
+    connection_policy: ConnectionPolicy | None,
+    counterfactual_credit: float = 0.0,
+    w_overspec: float = 0.0,
+    min_util: float = 0.0,
+) -> list[_Cell]:
+    """All feasible same-section splice cells (two short donors → one long slot). Empty unless there
+    are slots no single in-stock donor of a section reaches but a pair of that section does."""
+    # Index donors by (section, grade) so we only ever pair like with like.
+    groups: dict[tuple[str, str], list[int]] = {}
+    for i, s in enumerate(supply):
+        if s.section and s.length_mm > 0:
+            groups.setdefault((s.section, s.grade or "S235"), []).append(i)
+    splices: list[_Cell] = []
+    for j, slot in enumerate(slots):
+        for members in groups.values():
+            for a in range(len(members)):
+                for b in range(a + 1, len(members)):
+                    ia, ib = members[a], members[b]
+                    cell = _splice_cell(
+                        supply[ia], supply[ib], slot, ia, ib, j, catalog, factor, w_offcut,
+                        connection_penalty_kg, splice_penalty_kg, baselines[j], allow_cutting,
+                        connection_policy, counterfactual_credit=counterfactual_credit,
+                        w_overspec=w_overspec, min_util=min_util)
+                    if cell is not None:
+                        splices.append(cell)
+    return splices
+
+
 def match(
     supply: list[SupplyItem],
     slots: list[DemandSlot],
@@ -506,8 +656,18 @@ def match(
     min_util: float = 0.0,
     max_distinct_sections: int | None = None,
     reserve_w: float = 0.0,
+    allow_splicing: bool = False,
+    splice_penalty_kg: float = SPLICE_PENALTY_KG,
 ) -> MatchResult:
     """Optimal supply->slot assignment for the chosen ``objective`` (with greedy fallback).
+
+    ``allow_splicing`` (default off) lets a long slot that **no single in-stock donor reaches** be
+    filled by **two same-section, same-grade donors joined end-to-end** (one splice, two pieces;
+    AISC 360 §J1.4 / EC3). Each splice consumes both donor pieces in full and books an extra
+    ``splice_penalty_kg`` of joint carbon on top of the per-reuse connection penalty. The spliced
+    member's EN check is that of a single donor of the shared section at the conservative knockdown,
+    so feasibility is the section check plus the combined-length reach. With splicing off the result
+    is byte-identical to before (no splice cells are generated).
 
     ``objective`` selects what "best" means (see :func:`_apply_objective`): ``"co2"`` (default)
     maximizes net CO2 saved; ``"members"`` maximizes the number of slots filled; ``"mass"``
@@ -575,16 +735,26 @@ def match(
                "counterfactual": counterfactual, "counterfactual_credit": cf_credit,
                "w_overspec": w_overspec, "min_util": min_util,
                "max_distinct_sections": max_distinct_sections,
-               "reserve_w": reserve_w}
+               "reserve_w": reserve_w,
+               "allow_splicing": allow_splicing, "splice_penalty_kg": splice_penalty_kg}
 
     cells = _build_cells(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
                          new_build_grade, allow_cutting, connection_policy,
                          counterfactual_credit=cf_credit, w_overspec=w_overspec,
                          min_util=min_util)
+    splices: list[_Cell] = []
+    if allow_splicing:
+        baselines = [baseline_new_mass_kg(slot, catalog, new_build_grade) for slot in slots]
+        splices = _build_splices(supply, slots, catalog, factor, w_offcut, connection_penalty_kg,
+                                 splice_penalty_kg, baselines, allow_cutting, connection_policy,
+                                 counterfactual_credit=cf_credit, w_overspec=w_overspec,
+                                 min_util=min_util)
+    # Reserve (C2) shapes competition between single-donor candidates; splices are a length lever, not
+    # subject to the scarcity proxy, so the term is applied to singles only.
     _apply_reserve(cells, supply, reserve_w, factor)
-    _apply_objective(cells, objective)
+    _apply_objective(cells + splices, objective)
 
-    if not cells:
+    if not cells and not splices:
         return MatchResult([], [s.id for s in slots], [s.id for s in supply], "no_feasible_pairs",
                            weights)
 
@@ -595,15 +765,17 @@ def match(
     try:
         chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s, caps,
                                      families=fams, max_families=max_distinct_sections,
-                                     balanced=balanced)
+                                     balanced=balanced, splices=splices)
         if not _is_optimal(status):  # timeout / "Not Solved" -> don't trust a partial MILP result
             chosen, status = _solve_greedy(cells, len(supply), len(slots), caps,
                                            families=fams,
-                                           max_families=max_distinct_sections), \
+                                           max_families=max_distinct_sections,
+                                           splices=splices), \
                 f"greedy_fallback ({status})"
     except Exception:  # pragma: no cover - solver edge cases -> graceful fallback
         chosen, status = _solve_greedy(cells, len(supply), len(slots), caps,
-                                       families=fams, max_families=max_distinct_sections), \
+                                       families=fams, max_families=max_distinct_sections,
+                                       splices=splices), \
             "greedy_fallback (solver error)"
 
     assignments = [
@@ -615,17 +787,25 @@ def match(
             chi_lt=c.chi_lt, chi_lt_if_free=c.chi_lt_if_free,
             governing_combination=c.governing_combination,
             connection_status=c.connection_status, connection_note=c.connection_note,
+            spliced_with=supply[c.si2].id if c.is_splice else None,
         )
         for c in chosen
     ]
-    used_supply = {a.supply_id for a in assignments}
+    used_supply: set[str] = set()
+    for c in chosen:
+        used_supply.add(supply[c.si].id)
+        if c.is_splice:
+            used_supply.add(supply[c.si2].id)
     filled_slots = {a.slot_id for a in assignments}
     # Cutting-stock: report each cut donor's leftover length (its length minus the pieces taken, each
-    # piece consuming required_len + the cut tolerance).
+    # piece consuming required_len + the cut tolerance). Spliced donors are consumed in full, so they
+    # contribute no leftover and are excluded from the tally.
     leftover: dict[str, float] = {}
     if allow_cutting:
         consumed: dict[int, float] = {}
         for c in chosen:
+            if c.is_splice:
+                continue
             consumed[c.si] = consumed.get(c.si, 0.0) + c.used_len_mm + CUT_TOLERANCE_MM
         for i, used in consumed.items():
             leftover[supply[i].id] = round(max(supply[i].length_mm - used, 0.0), 1)
@@ -649,10 +829,16 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s,
                 caps: list[float] | None = None,
                 families: list[str] | None = None,
                 max_families: int | None = None,
-                balanced: bool = False) -> tuple[list[_Cell], str]:
+                balanced: bool = False,
+                splices: list[_Cell] | None = None) -> tuple[list[_Cell], str]:
+    splices = splices or []
     prob = pulp.LpProblem("reuse_matching", pulp.LpMaximize)
     x = {(c.si, c.sj): pulp.LpVariable(f"x_{c.si}_{c.sj}", cat="Binary") for c in cells}
-    objective = pulp.lpSum(_coeff(c) * x[(c.si, c.sj)] for c in cells)
+    # Splice variables are keyed by list index (a single donor can splice with several partners, so
+    # (si, sj) is not unique for splices the way it is for single cells).
+    z = {k: pulp.LpVariable(f"z_{k}", cat="Binary") for k in range(len(splices))}
+    objective = (pulp.lpSum(_coeff(c) * x[(c.si, c.sj)] for c in cells)
+                 + pulp.lpSum(_coeff(s) * z[k] for k, s in enumerate(splices)))
     if balanced:
         # Max-min utilisation (Sweep §5): one continuous variable bounded below every SELECTED pair's
         # utilisation. ``t <= u_ij + (1 - x_ij)`` is slack when x_ij = 0 (RHS >= 1 >= t) and binds to
@@ -663,41 +849,52 @@ def _solve_milp(cells, n_supply, n_slots, time_limit_s,
         objective = objective + t
         for c in cells:
             prob += t <= c.utilization + (1.0 - x[(c.si, c.sj)])
+        for k, s in enumerate(splices):
+            prob += t <= s.utilization + (1.0 - z[k])
     prob += objective
 
-    for j in range(n_slots):  # each slot gets at most one supply
+    for j in range(n_slots):  # each slot gets at most one supply (single OR splice)
         terms = [x[(c.si, c.sj)] for c in cells if c.sj == j]
+        terms += [z[k] for k, s in enumerate(splices) if s.sj == j]
         if terms:
             prob += pulp.lpSum(terms) <= 1
     for i in range(n_supply):
         cells_i = [c for c in cells if c.si == i]
-        if not cells_i:
+        splices_i = [k for k, s in enumerate(splices) if i in (s.si, s.si2)]
+        if not cells_i and not splices_i:
             continue
-        if caps is None:  # default: each supply used at most once
-            prob += pulp.lpSum(x[(c.si, c.sj)] for c in cells_i) <= 1
-        else:  # cutting-stock: total length cut from this donor must fit its length
+        if caps is None:  # default: each supply used at most once (single or as a splice piece)
+            prob += pulp.lpSum([x[(c.si, c.sj)] for c in cells_i]
+                               + [z[k] for k in splices_i]) <= 1
+        else:  # cutting-stock: a splice consumes donor i in full (caps[i]); singles consume their cut
             prob += pulp.lpSum(
-                (c.used_len_mm + CUT_TOLERANCE_MM) * x[(c.si, c.sj)] for c in cells_i
+                [(c.used_len_mm + CUT_TOLERANCE_MM) * x[(c.si, c.sj)] for c in cells_i]
+                + [caps[i] * z[k] for k in splices_i]
             ) <= caps[i]
 
     # Section-variety cap (B3): one binary y_f per donor SECTION FAMILY actually usable, x_ij <= y_f
     # and sum(y_f) <= N — variety has fabrication/QA/detailing/procurement costs no carbon term sees.
+    # A splice uses one family (both pieces share the section), so z_k <= y_f of that family.
     if max_families is not None and families is not None:
-        usable = sorted({families[c.si] for c in cells})
+        usable = sorted({families[c.si] for c in cells} | {families[s.si] for s in splices})
         y = {f: pulp.LpVariable(f"y_{k}", cat="Binary") for k, f in enumerate(usable)}
         for c in cells:
             prob += x[(c.si, c.sj)] <= y[families[c.si]]
+        for k, s in enumerate(splices):
+            prob += z[k] <= y[families[s.si]]
         prob += pulp.lpSum(y.values()) <= max_families
 
     prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=time_limit_s))
     status = pulp.LpStatus[prob.status]
     chosen = [c for c in cells if x[(c.si, c.sj)].value() and x[(c.si, c.sj)].value() > 0.5]
+    chosen += [s for k, s in enumerate(splices) if z[k].value() and z[k].value() > 0.5]
     return chosen, status
 
 
 def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None,
                   families: list[str] | None = None,
-                  max_families: int | None = None) -> list[_Cell]:
+                  max_families: int | None = None,
+                  splices: list[_Cell] | None = None) -> list[_Cell]:
     """Take highest-coefficient feasible pairs first, respecting the use constraints.
 
     Only objective-positive pairs are taken: the MILP leaves a negative-coefficient x_ij at 0, so
@@ -706,24 +903,32 @@ def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None,
     pair has a positive coefficient by construction). Cells are sorted by descending coefficient,
     so the first non-positive one ends the scan. Each slot is filled once; a donor is either used
     once (default) or packed up to its length (cutting-stock). With a section-variety cap (B3),
-    a cell whose donor family would open an (N+1)-th family is skipped.
+    a cell whose donor family would open an (N+1)-th family is skipped. Splice cells (two same-section
+    donors) consume BOTH pieces in full, so both must be untouched to take one.
     """
     used_j, chosen = set(), []
     remaining = list(caps) if caps is not None else None  # per-donor remaining length (cutting mode)
     used_s: set[int] = set()
     open_families: set[str] = set()
-    for c in sorted(cells, key=_coeff, reverse=True):
+    for c in sorted([*cells, *(splices or [])], key=_coeff, reverse=True):
         if _coeff(c) <= 0:
             break
         if c.sj in used_j:
             continue
+        donors = (c.si, c.si2) if c.is_splice else (c.si,)
         if max_families is not None and families is not None:
-            fam = families[c.si]
+            fam = families[c.si]   # both splice pieces share the family
             if fam not in open_families and len(open_families) >= max_families:
                 continue
         if remaining is None:
-            if c.si in used_s:
+            if any(d in used_s for d in donors):
                 continue
+        elif c.is_splice:
+            # A splice consumes both donor pieces in full, so both must be wholly unused.
+            if any(remaining[d] < caps[d] for d in donors):
+                continue
+            for d in donors:
+                remaining[d] = 0.0
         else:
             need = c.used_len_mm + CUT_TOLERANCE_MM
             if remaining[c.si] < need:
@@ -731,7 +936,7 @@ def _solve_greedy(cells, n_supply, n_slots, caps: list[float] | None = None,
             remaining[c.si] -= need
         chosen.append(c)
         used_j.add(c.sj)
-        used_s.add(c.si)
+        used_s.update(donors)
         if families is not None:
             open_families.add(families[c.si])
     return chosen
@@ -758,6 +963,29 @@ def _cells_from_weights(
                         counterfactual_credit=weights.get("counterfactual_credit", 0.0),
                         w_overspec=weights.get("w_overspec", 0.0),
                         min_util=weights.get("min_util", 0.0))
+
+
+def _splices_from_weights(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    factor: CarbonFactor,
+    weights: dict,
+) -> list[_Cell]:
+    """Re-derive the splice cells a solve saw (empty unless ``allow_splicing`` was set), so the
+    verifier and the what-if re-solves regenerate the *same* candidate set the match used."""
+    if not weights.get("allow_splicing"):
+        return []
+    policy = ConnectionPolicy() if weights.get("connection_screen") else None
+    baselines = [baseline_new_mass_kg(slot, catalog, weights.get("new_build_grade", "S355"))
+                 for slot in slots]
+    return _build_splices(supply, slots, catalog, factor,
+                          weights.get("w_offcut", 0.3), weights.get("connection_penalty_kg", 5.0),
+                          weights.get("splice_penalty_kg", SPLICE_PENALTY_KG), baselines,
+                          bool(weights.get("allow_cutting")), policy,
+                          counterfactual_credit=weights.get("counterfactual_credit", 0.0),
+                          w_overspec=weights.get("w_overspec", 0.0),
+                          min_util=weights.get("min_util", 0.0))
 
 
 # Minimum straight stock length for the direct re-rolling fate (A2): below this, handling and
@@ -957,22 +1185,23 @@ def assignment_alternatives(
 
 
 def _resolve_chosen(cells, n_supply, n_slots, time_limit_s, caps, fams, max_fams,
-                    balanced=False):
+                    balanced=False, splices=None):
     """Run the same MILP-then-greedy solve :func:`match` uses, over a (possibly filtered) cell set.
 
     Returns ``(chosen, status)``. Factored out so the what-if re-solves in
     :func:`donor_marginal_value` use the *identical* solve path as the original match — only the
-    candidate cells differ."""
+    candidate cells (and splice cells) differ."""
     try:
         chosen, status = _solve_milp(cells, n_supply, n_slots, time_limit_s, caps,
-                                     families=fams, max_families=max_fams, balanced=balanced)
+                                     families=fams, max_families=max_fams, balanced=balanced,
+                                     splices=splices)
         if not _is_optimal(status):
             chosen = _solve_greedy(cells, n_supply, n_slots, caps,
-                                   families=fams, max_families=max_fams)
+                                   families=fams, max_families=max_fams, splices=splices)
             status = f"greedy_fallback ({status})"
     except Exception:  # pragma: no cover - solver edge cases -> graceful fallback
         chosen = _solve_greedy(cells, n_supply, n_slots, caps,
-                               families=fams, max_families=max_fams)
+                               families=fams, max_families=max_fams, splices=splices)
         status = "greedy_fallback (solver error)"
     return chosen, status
 
@@ -1010,8 +1239,9 @@ def donor_marginal_value(
     factor = (factors or load_factors())["steel"]
     w = result.weights or {}
     cells = _cells_from_weights(supply, slots, catalog, factor, w)
+    splices = _splices_from_weights(supply, slots, catalog, factor, w)
     _apply_reserve(cells, supply, w.get("reserve_w", 0.0), factor)
-    _apply_objective(cells, w.get("objective", "co2"))
+    _apply_objective(cells + splices, w.get("objective", "co2"))
     allow_cutting = bool(w.get("allow_cutting"))
     caps = [s.length_mm for s in supply] if allow_cutting else None
     max_fams = w.get("max_distinct_sections")
@@ -1036,8 +1266,11 @@ def donor_marginal_value(
     for sid in order:
         i = sup_index[sid]
         sub = [c for c in cells if c.si != i]
+        # Removing a donor also removes every splice that consumed it (as either piece).
+        sub_splices = [s for s in splices if i not in (s.si, s.si2)]
         chosen, status = _resolve_chosen(sub, len(supply), len(slots), time_limit_s,
-                                         caps, fams, max_fams, balanced=balanced)
+                                         caps, fams, max_fams, balanced=balanced,
+                                         splices=sub_splices)
         new_co2 = round(sum(c.co2_saved_kg for c in chosen), 2)
         new_map = {slots[c.sj].id: supply[c.si].id for c in chosen}
         lost = sorted(s for s in own_slots[sid] if s not in new_map)
@@ -1073,13 +1306,18 @@ def verify_match(
     arithmetic — the economic parameters travel on ``result.weights``) and checks:
 
     1. **Constraints** — every assignment refers to a known donor and slot; no slot is filled twice;
-       a donor is used once (default) or within its length cap (cutting-stock).
-    2. **Feasibility** — every assignment re-validates as a feasible pair with the same score.
+       a donor is used once (default) or within its length cap (cutting-stock). A spliced assignment
+       re-validates against the same two-piece splice candidate and books **both** donors as
+       consumed in full.
+    2. **Feasibility** — every assignment re-validates as a feasible pair (or splice) with the same
+       score.
     3. **No improving single move** (a *necessary* condition for optimality): no donor with capacity
        left could fill an unfilled slot at a positive score, and no such donor offers a strictly
        higher score on a filled slot than the donor chosen for it. A proven-optimal MILP result can
        never violate this, and the greedy fallback satisfies it by construction — so any violation
-       indicates a real defect (stale result, mutated inputs, solver/economics drift).
+       indicates a real defect (stale result, mutated inputs, solver/economics drift). Donors
+       consumed by a splice are correctly treated as unavailable; the check covers single-donor moves
+       (splice recombination is the MILP's job, not re-searched here).
 
     This is a certificate *check*, not a proof of global optimality by itself — global optimality is
     the MILP solver's job (``MatchResult.proven_optimal``); this guards the chain around it.
@@ -1088,6 +1326,10 @@ def verify_match(
     w = result.weights or {}
     allow_cutting = bool(w.get("allow_cutting"))
     cells = _cells_from_weights(supply, slots, catalog, factor, w)
+    # Splice cells re-derived from the same weights (empty unless splicing was on), so a spliced
+    # assignment can re-validate against the same candidate the solve saw.
+    splices = _splices_from_weights(supply, slots, catalog, factor, w)
+    by_splice = {(supply[s.si].id, slots[s.sj].id, supply[s.si2].id): s for s in splices}
     # The reserve term (C2) is computed over the FULL cell matrix, exactly as the solve did, so the
     # re-derived scores match the stored ones (it is deliberately NOT part of _cells_from_weights:
     # stock_disposition's restricted sub-matrix would yield different scarcity statistics).
@@ -1117,6 +1359,7 @@ def verify_match(
     chosen_by_slot: dict[str, _Cell] = {}
     uses_per_donor: dict[str, int] = {}
     consumed_mm: dict[str, float] = {}
+    spliced_donor_ids: set[str] = set()   # donors consumed in full by a splice (no cut tolerance)
     for a in result.assignments:
         pair = f"{a.supply_id} -> {a.slot_id}"
         if a.supply_id not in sup_by_id:
@@ -1127,6 +1370,26 @@ def verify_match(
             continue
         if a.slot_id in chosen_by_slot:
             issues.append(f"slot {a.slot_id} is filled more than once")
+        if a.spliced_with is not None:
+            # Spliced reuse: re-validate against the splice candidate (two same-section pieces) and
+            # book BOTH donors as fully consumed (the whole piece, no cut tolerance).
+            if a.spliced_with not in sup_by_id:
+                issues.append(f"{pair}: unknown spliced-partner donor {a.spliced_with}")
+                continue
+            c = by_splice.get((a.supply_id, a.slot_id, a.spliced_with))
+            if c is None:
+                issues.append(f"{pair} (spliced with {a.spliced_with}): not a feasible splice "
+                              f"on independent re-check")
+                continue
+            if abs(c.score - a.score) > 0.06:
+                issues.append(f"{pair}: splice score drift (stored {a.score}, "
+                              f"recomputed {c.score:.2f})")
+            chosen_by_slot[a.slot_id] = c
+            for did, ln in ((a.supply_id, c.used_len_mm), (a.spliced_with, c.len2_mm)):
+                uses_per_donor[did] = uses_per_donor.get(did, 0) + 1
+                consumed_mm[did] = consumed_mm.get(did, 0.0) + ln
+                spliced_donor_ids.add(did)
+            continue
         c = by_pair.get((a.supply_id, a.slot_id))
         if c is None:
             issues.append(f"{pair}: not a feasible pair on independent re-check")
@@ -1138,6 +1401,8 @@ def verify_match(
         consumed_mm[a.supply_id] = (consumed_mm.get(a.supply_id, 0.0)
                                     + c.used_len_mm + CUT_TOLERANCE_MM)
     if allow_cutting:
+        # Spliced donors are booked at exactly their full length (no cut tolerance), so a correct
+        # result sits at equality; singles carry the per-piece cut tolerance.
         for sid, used in consumed_mm.items():
             if used > sup_by_id[sid].length_mm + 1e-6:
                 issues.append(f"donor {sid}: cut pieces exceed its length "

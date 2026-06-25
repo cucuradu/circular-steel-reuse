@@ -480,6 +480,7 @@ def run_pipeline(
     self_weight: bool = False,
     solver: str = "pynite",
     carbon_dataset: str = DEFAULT_CARBON_DATASET,
+    allow_splicing: bool = False,
 ) -> PipelineResult:
     catalog = catalog or load_default_catalog()
     # Embodied-carbon factor set the whole run books against (Scenario Sweep §4). Loaded once and
@@ -586,7 +587,8 @@ def run_pipeline(
     result = match(supply, slots, catalog, factors=factors, allow_cutting=allow_cutting,
                    connection_policy=policy, objective=objective,
                    counterfactual=counterfactual, w_overspec=w_overspec, min_util=min_util,
-                   max_distinct_sections=max_distinct_sections, reserve_w=reserve_w)
+                   max_distinct_sections=max_distinct_sections, reserve_w=reserve_w,
+                   allow_splicing=allow_splicing)
 
     # Objective trade-off (opt-in): re-solve the SAME feasible pairs under each goal so the user
     # sees what each policy choice costs in the other currencies. The shipped assignments stay on
@@ -609,7 +611,7 @@ def run_pipeline(
                 counterfactual=counterfactual,  # same carbon basis as the shipped result
                 w_overspec=w_overspec,          # and the same stewardship economics
                 min_util=min_util, max_distinct_sections=max_distinct_sections,
-                reserve_w=reserve_w)
+                reserve_w=reserve_w, allow_splicing=allow_splicing)
             pareto_rows.append({
                 "objective": obj,
                 "n_reused": r.n_reused,

@@ -198,3 +198,42 @@ def test_small_known_run_evidence():
     assert alt["slot_id"] == "S0" and alt["chosen_supply_id"] == "d1"
     assert alt["alternative_supply_id"] is None and alt["n_alternatives"] == 0
     assert verify_from_package(pkg, catalog=cat) == []
+
+
+def test_spliced_run_evidence_reconciles():
+    # A spliced assignment must still reconcile in the evidence package: the per-assignment carbon
+    # re-derivation books the splice-joint penalty, and the certificate verifies the two-piece join.
+    from steelreuse.core.sections import load_catalog
+    from steelreuse.match.optimize import DemandSlot, SupplyItem, match
+
+    cat = load_catalog()
+    slot = DemandSlot(id="LONG", member_id="m", role="beam", required_length_mm=10000,
+                      demand=MemberDemand(My_Ed=120e6, Vz_Ed=70e3, L=10000,
+                                          compression_flange_restrained=True),
+                      grade="S235", design_section="IPE360")
+    supply = [SupplyItem(id="a", section="IPE360", grade="S235", length_mm=6000),
+              SupplyItem(id="b", section="IPE360", grade="S235", length_mm=6000)]
+    result = match(supply, [slot], cat, allow_cutting=True, allow_splicing=True)
+    assert result.assignments[0].spliced_with is not None
+
+    class _Res:
+        pass
+    res = _Res()
+    res.match = result
+    res.supply = supply
+    res.slots = [slot]
+    res.supply_count = 2
+    res.slot_count = 1
+    res.donor = None
+
+    class _PP:
+        total_saved_kgco2e = 0.0
+    res.passport = _PP()
+
+    pkg = build_evidence_package(res, catalog=cat)
+    assert pkg["certificate"]["verified"], pkg["certificate"]["verify_match_issues"]
+    assert pkg["carbon_reconciliation"]["reconciles"]
+    ev = pkg["assignments"][0]
+    assert ev["carbon"]["reconciles"]
+    assert ev["carbon"]["spliced_with"] in ("a", "b")
+    assert ev["carbon"]["splice_joint_kgco2e"] > 0

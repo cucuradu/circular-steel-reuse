@@ -177,6 +177,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "(default: no cap). Anti-Frankenstein: section variety has fabrication, "
                          "QA, connection-detailing and procurement costs no carbon term sees; "
                          "the MILP consolidates onto at most N section families")
+    ap.add_argument("--splice", dest="splice", action="store_true",
+                    help="allow a long slot that NO single in-stock donor reaches to be filled by "
+                         "two same-section, same-grade donors joined end-to-end (one splice, two "
+                         "pieces; AISC 360 J1.4 / EC3). Each splice consumes both pieces in full and "
+                         "books an extra splice-joint carbon penalty. Off by default")
     ap.add_argument("--lab", action="store_true",
                     help="unlock EXPERIMENTAL, non-certified features so the default CLI shows only the "
                          "validated core: --reserve (single-project scarcity weight) and --solver "
@@ -369,6 +374,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         self_weight=args.self_weight,
         solver=args.solver,
         carbon_dataset=args.carbon_dataset,
+        allow_splicing=args.splice,
     )
 
     uncertainty = None
@@ -533,6 +539,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
     if args.cut and res.match.donor_leftover_mm:
         print(f"Cut donors: {len(res.match.donor_leftover_mm)} | reusable remainder "
               f"{res.match.total_donor_leftover_mm / 1000.0:.1f} m")
+    if args.splice:
+        spliced = [a for a in res.match.assignments if a.spliced_with]
+        print(f"Splicing: on | {len(spliced)} slot(s) filled by joining two same-section donors"
+              + (f" ({', '.join(f'{a.supply_id}+{a.spliced_with}->{a.slot_id}' for a in spliced[:4])}"
+                 + (' …' if len(spliced) > 4 else '') + ')' if spliced else ''))
     if res.disposition is not None:
         n_store = sum(1 for r in res.disposition if r["advice"] == "store")
         n_reroll = sum(1 for r in res.disposition if r["advice"] == "re-roll")
@@ -589,6 +600,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             "connection_screen": args.connections,
             "counterfactual": args.counterfactual,
             "carbon_dataset": args.carbon_dataset,
+            "splicing": args.splice,
             "frame_analysis": args.frame_analysis,
         }
         package = build_evidence_package(

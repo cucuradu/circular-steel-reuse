@@ -391,6 +391,53 @@ def test_objective_balanced_evens_out_utilisation():
     assert min(c.utilization for c in chosen) == pytest.approx(0.8)
 
 
+def test_splicing_fills_a_slot_no_single_donor_reaches(cat):
+    # Sweep §4 splicing: a 10 m slot that no single 6 m donor reaches is filled by joining two
+    # same-section pieces end-to-end when --splice is on; off, the slot stays unfilled. Both donor
+    # pieces are consumed, the booked CO2 nets the splice-joint penalty, and the result verifies.
+    from steelreuse.match.optimize import verify_match
+    slot = DemandSlot("LONG", "LONG", "beam", 10000.0, MemberDemand(
+        My_Ed=120e6, Vz_Ed=70e3, L=10000, compression_flange_restrained=True))
+    supply = [SupplyItem("a", "IPE360", "S235", 6000.0),
+              SupplyItem("b", "IPE360", "S235", 6000.0)]
+
+    off = match(supply, [slot], cat, allow_cutting=True, allow_splicing=False)
+    assert off.n_reused == 0 and off.unmatched_slots == ["LONG"]
+
+    on = match(supply, [slot], cat, allow_cutting=True, allow_splicing=True)
+    assert on.n_reused == 1
+    a = on.assignments[0]
+    assert {a.supply_id, a.spliced_with} == {"a", "b"}   # two pieces joined
+    assert on.unused_supply == []                        # both consumed by the splice
+    assert verify_match(supply, [slot], cat, on) == []
+
+
+def test_splice_books_the_joint_carbon_penalty(cat):
+    # The spliced reuse books strictly less CO2 than the same member would if it cost no splice — the
+    # joint penalty (SPLICE_PENALTY_KG) is subtracted on top of the ordinary connection penalty.
+    from steelreuse.match.optimize import SPLICE_PENALTY_KG
+    slot = DemandSlot("LONG", "LONG", "beam", 10000.0, MemberDemand(
+        My_Ed=120e6, Vz_Ed=70e3, L=10000, compression_flange_restrained=True))
+    supply = [SupplyItem("a", "IPE360", "S235", 6000.0),
+              SupplyItem("b", "IPE360", "S235", 6000.0)]
+    base = match(supply, [slot], cat, allow_cutting=True, allow_splicing=True)
+    cheap = match(supply, [slot], cat, allow_cutting=True, allow_splicing=True, splice_penalty_kg=0.0)
+    assert cheap.total_co2_saved_kg - base.total_co2_saved_kg == pytest.approx(SPLICE_PENALTY_KG, abs=0.01)
+
+
+def test_splice_not_used_when_a_single_donor_fits(cat):
+    # A genuine splice requires that NEITHER piece alone reaches the slot. With one long-enough donor
+    # present, the matcher uses it as a single piece and never wastes a second on a splice.
+    slot = DemandSlot("S", "S", "beam", 6000.0, MemberDemand(
+        My_Ed=120e6, Vz_Ed=70e3, L=6000, compression_flange_restrained=True))
+    supply = [SupplyItem("long", "IPE360", "S235", 6500.0),
+              SupplyItem("short", "IPE360", "S235", 4000.0)]
+    res = match(supply, [slot], cat, allow_cutting=True, allow_splicing=True)
+    assert res.n_reused == 1
+    assert res.assignments[0].spliced_with is None       # single piece, not a splice
+    assert res.assignments[0].supply_id == "long"
+
+
 def test_objective_balanced_runs_and_verifies(cat):
     # The "balanced" objective is accepted by match() end to end and produces a result the
     # independent verifier certifies (it shares the members primary: every slot a free donor can

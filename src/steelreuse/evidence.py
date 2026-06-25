@@ -244,7 +244,10 @@ def _assignment_evidence(
         connection_penalty = weights.get("connection_penalty_kg", 5.0)
         cf_credit = weights.get("counterfactual_credit", 0.0)
         counterfactual_cost = mass_used * cf_credit
-        net = avoided_new - reuse_process_cost - connection_penalty - counterfactual_cost
+        # A spliced reuse books one extra joint penalty on top of the ordinary connection refab.
+        splice_penalty = weights.get("splice_penalty_kg", 0.0) if a.spliced_with else 0.0
+        net = (avoided_new - reuse_process_cost - connection_penalty
+               - counterfactual_cost - splice_penalty)
         carbon = {
             "available": True,
             "used_length_mm": round(used_len, 1),
@@ -254,6 +257,8 @@ def _assignment_evidence(
             "reuse_process_kgco2e": round(reuse_process_cost, 2),
             "connection_refab_kgco2e": round(connection_penalty, 2),
             "counterfactual_credit_kgco2e": round(counterfactual_cost, 2),
+            "spliced_with": a.spliced_with,
+            "splice_joint_kgco2e": round(splice_penalty, 2),
             "net_co2_saved_kgco2e_recomputed": round(net, 2),
             "net_co2_saved_kgco2e_stored": a.co2_saved_kg,
             "reconciles": abs(net - a.co2_saved_kg) <= _CO2_TOL_KG,

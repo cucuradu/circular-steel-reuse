@@ -69,10 +69,13 @@ Computed once per sweep and shared by every point:
 |---|---|---|---|
 | ~~**Carbon-factor dataset axis**~~ ✅ **shipped** | how much does the carbon result depend on which EPD database I trust? | small | **Done.** Three provenance-stamped sets in `data/carbon/` selectable via `--carbon-dataset` / planner row: `ice_v3` (default, 1.55), `ice_v4` (= Climatiq "Steel - Section", 1.61), `oekobaudat` (German EPD-BFS, 1.74). Sets differ in the A1-A3 production figure (the number databases disagree on); credits/process held common. Dataset is recorded in the evidence package. |
 | ~~**Utilisation policy**~~ ✅ **shipped** | even out donor utilisation instead of some at 100% / some at 50% | small–med | **Done.** New `--objective balanced` (also a sweep value): fills the most slots (members primary) then maximises the WORST assignment utilisation via a max-min MILP variable (`t <= u_ij + (1 - x_ij)`), evening out the distribution from the bottom without reducing reuse. `w_overspec` / `min_util` remain the complementary dials (§5). |
-| **Splicing** | join two short donors end-to-end to fill a long slot | medium | feasible & code-covered (AISC 360 J1.4, EC3); needs combine-donors feasibility + a splice carbon/cost penalty (see §6) |
+| ~~**Splicing**~~ ✅ **shipped** | join two short donors end-to-end to fill a long slot | medium | **Done.** `--splice` (opt-in): a long slot no single in-stock donor reaches can be filled by **two same-section, same-grade** donors joined end-to-end (one splice, two pieces; AISC 360 §J1.4 / EC3). Pruned to genuine splices (neither piece alone reaches), both pieces consumed in full, MILP `z`-variables alongside the single-cell `x`; books a representative `SPLICE_PENALTY_KG` joint carbon on top of the connection penalty. Splice-aware verifier + evidence reconciliation. |
 
 **Out of scope (considered, dropped):** transport carbon, a cost/£ objective, inventory-subset
 sweeps, and phased (time-based) availability. Revisit only if a specific project demands one.
+
+**All three §4 features are now shipped.** Remaining roadmap items live in §5 (utilisation, done),
+§7 (staged "funnel" sweep) and §8 (cells-once speed-up).
 
 ## 5. Utilisation distribution (the "some at 100%, some at 50%" question)
 

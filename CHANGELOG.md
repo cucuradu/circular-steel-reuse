@@ -14,6 +14,19 @@ All notable changes to this project are documented here. The format is based on
   study still reproduces byte-identically; this only changes the UI defaults.
 
 ### Added
+- **Donor splicing** (`--splice`, Scenario Sweep §4, opt-in). A long demand slot that **no single
+  in-stock donor reaches** can now be filled by **two same-section, same-grade reclaimed pieces
+  joined end-to-end** (one splice, two pieces; AISC 360 §J1.4 / EC3). The matcher generates genuine
+  splice candidates (pruned to pairs where *neither* piece alone is long enough but together they
+  reach the slot), adds binary splice variables to the MILP alongside the single-cell variables
+  (with the slot/donor-use, cutting-stock length-cap, section-variety and max-min-utilisation
+  constraints all extended to cover them), and the greedy fallback handles them too. A spliced reuse
+  consumes both donor pieces in full and books a representative splice-joint carbon penalty
+  (`SPLICE_PENALTY_KG`, ~30 kgCO2e) on top of the ordinary connection-refabrication penalty. The
+  independent verifier re-validates spliced assignments (two-piece feasibility + both donors
+  consumed) and the evidence package's per-assignment carbon reconciliation books the joint penalty,
+  so a spliced result still certifies and reconciles. Exposed on the CLI and as a sweep run toggle;
+  **off by default** (results byte-identical when off).
 - **Balanced (max-min) utilisation objective** (`--objective balanced`, Scenario Sweep §5). A new
   policy objective that fills the most slots (the "members" primary) and then, among the
   maximum-count solutions, maximises the **worst** assignment utilisation — so no donor sits grossly

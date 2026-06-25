@@ -122,7 +122,7 @@ def build_command(interpreter, opts, out_dir):
                       ("include_unverified", "--include-unverified"), ("construction", "--construction"),
                       ("connections", "--connections"), ("moment_shape", "--moment-shape"),
                       ("pareto", "--pareto"), ("disposition", "--disposition"),
-                      ("donor_value", "--donor-value"),
+                      ("donor_value", "--donor-value"), ("splice", "--splice"),
                       ("verify_match", "--verify-match")):
         if opts.get(key):
             cmd.append(flag)
