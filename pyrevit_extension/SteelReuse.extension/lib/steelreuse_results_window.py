@@ -155,7 +155,18 @@ class ResultsWindow(forms.WPFWindow):
                         ms.get("unknown", 0), ms.get("quarantined", 0)))
         self.kpi_text.Text = line
         self._bind_provenance(rules, ms)
+        self.rollup_text.Text = self._fmt_rollup()
         self._apply_filters(None, None)
+
+    def _fmt_rollup(self):
+        """Reuse rolled up by donor section (count / CO2e saved / mean util / off-cut)."""
+        rows = panelmodel.section_rollup(self._view.rows)
+        out = ["%-14s %7s %14s %11s %10s"
+               % ("section", "reuses", "CO2e (kg)", "mean util", "off-cut m"), ""]
+        for g in rows:
+            out.append("%-14s %7s %14.0f %11.2f %10.1f"
+                       % (g["section"], g["n"], g["co2"], g["mean_util"], g["offcut_m"]))
+        return "\n".join(out)
 
     def _bind_provenance(self, rules, summary):
         """Fill the native 'Donor provenance' tab: the rule-data versions + the per-donor mismatch
@@ -299,10 +310,13 @@ class ResultsWindow(forms.WPFWindow):
         with open(target, "w") as handle:
             writer = csv.writer(handle)
             writer.writerow(["slot", "demand_id", "demand_section", "donor_id", "donor_section",
-                             "utilization", "status", "governing", "co2_saved_kg"])
+                             "utilization", "status", "governing", "co2_saved_kg",
+                             "next_best_donor", "next_best_margin_kg", "next_best_used_elsewhere"])
             for r in self._rows:
                 # Format numerics as strings so IronPython float repr noise stays out of the CSV.
+                margin = "" if r.alt_margin_kg is None else ("%.1f" % r.alt_margin_kg)
                 writer.writerow([r.slot_id, r.demand_id, r.demand_section, r.donor_id,
                                  r.donor_section, "%.3f" % r.utilization, r.status, r.governing,
-                                 "%.1f" % r.co2_saved_kg])
+                                 "%.1f" % r.co2_saved_kg,
+                                 r.alt_donor_id, margin, "yes" if r.alt_used_elsewhere else ""])
         forms.alert("Exported %s rows to:\n%s" % (len(self._rows), target), title="SteelReuse")

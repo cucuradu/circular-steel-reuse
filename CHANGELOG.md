@@ -7,13 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **Run Match panel gains the results-view features natively** (`steelreuse_panel`,
-  `steelreuse_panel_model`). The WPF assignments grid now colour-bands **utilisation** by severity
-  (ok / high / over-1.0) via the new `util_severity` field, the display-status filter gains a
-  **contention** option (only matches whose next-best donor went elsewhere), a new **By section** tab
-  rolls reuse up per donor section (count / CO2e saved / mean utilisation / off-cut), and the CSV
-  export gains the next-best donor / margin / used-elsewhere columns. Unit-tested in
-  `test_panel_model.py`.
+- **Both native windows gain the results-view features** (`steelreuse_panel`,
+  `steelreuse_results_window`, shared `steelreuse_panel_model`). The Run Match and Results WPF
+  assignments grids now colour-band **utilisation** by severity (ok / high / over-1.0) via the new
+  `util_severity` field, the display-status filter gains a **contention** option (only matches whose
+  next-best donor went elsewhere), a new **By section** tab rolls reuse up per donor section (count /
+  CO2e saved / mean utilisation / off-cut) via `section_rollup`, the Results grid gains the **Next
+  best** column, and both CSV exports gain the next-best donor / margin / used-elsewhere columns.
+  Unit-tested in `test_panel_model.py`.
 - **HTML report is rendered on demand, not written every run** (`cli.py --no-report`, `runner`,
   `steelreuse_panel`). A match run no longer drops a `report.html` on disk each time: the Revit Run
   Match window's **Open report (HTML)** button (and the Results window) render the report fresh from
