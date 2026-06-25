@@ -75,6 +75,41 @@ def test_marginal_value_block_optional():
     assert v.has_marginal_value is True and v.marginal_value[0]["supply_id"] == "D1"
 
 
+def test_rows_carry_util_severity_band():
+    rows = model.parse(_SAMPLE).rows
+    assert rows[0].util_severity == "low"      # 0.40
+    assert rows[1].util_severity == "high"     # 0.95
+    bands = [(0.30, "low"), (0.60, "ok"), (0.90, "high"), (1.20, "over")]
+    for u, expected in bands:
+        assert model.Row({"utilization": u}).util_severity == expected
+
+
+def test_filter_by_contention():
+    data = dict(_SAMPLE)
+    data["assignments"] = [
+        dict(_SAMPLE["assignments"][0], alt_used_elsewhere=True),
+        dict(_SAMPLE["assignments"][1], alt_used_elsewhere=False),
+    ]
+    rows = model.parse(data).rows
+    contended = model.filter_rows(rows, status="contention")
+    assert [r.donor_id for r in contended] == ["D1"]
+    assert len(model.filter_rows(rows, status="all")) == 2
+
+
+def test_section_rollup_groups_and_orders_by_co2():
+    data = dict(_SAMPLE)
+    data["assignments"] = [
+        {"donor_section": "IPE300", "utilization": 0.6, "co2_saved_kg": 100.0, "offcut_mm": 500.0},
+        {"donor_section": "IPE300", "utilization": 0.8, "co2_saved_kg": 200.0, "offcut_mm": 1500.0},
+        {"donor_section": "IPE400", "utilization": 0.5, "co2_saved_kg": 50.0, "offcut_mm": 0.0},
+    ]
+    roll = model.section_rollup(model.parse(data).rows)
+    assert [g["section"] for g in roll] == ["IPE300", "IPE400"]   # ordered by CO2e saved desc
+    ipe300 = roll[0]
+    assert ipe300["n"] == 2 and ipe300["co2"] == 300.0
+    assert abs(ipe300["mean_util"] - 0.7) < 1e-9 and ipe300["offcut_m"] == 2.0
+
+
 def test_filter_by_status():
     rows = model.parse(_SAMPLE).rows
     assert [r.donor_id for r in model.filter_rows(rows, status="review")] == ["D2"]

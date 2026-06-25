@@ -288,10 +288,11 @@
       <Label Content="Filter:"/>
       <TextBlock Style="{StaticResource InfoIcon}" Margin="0,0,2,0"
                  ToolTip="These filter the VISIBLE rows only - they never re-run the match.   Status: 'filled' (a donor satisfies the slot) or 'review' (passes, but a check/connection needs an engineer's look).   Section: show rows whose donor or demand section name contains the text (e.g. 'W18', case-insensitive).   Min util: show only assignments at or above this governing EN 1993 utilisation (0-1). To exclude low-utilisation pairs from the match itself, use the Policy tab's Min-utilisation gate instead."/>
-      <ComboBox x:Name="status_filter" Width="90" VerticalAlignment="Center">
+      <ComboBox x:Name="status_filter" Width="110" VerticalAlignment="Center">
         <ComboBoxItem Content="all"/>
         <ComboBoxItem Content="filled"/>
         <ComboBoxItem Content="review"/>
+        <ComboBoxItem Content="contention"/>
       </ComboBox>
       <Label Content="Section" Margin="12,0,0,0"/>
       <TextBox x:Name="section_filter" Width="130" VerticalAlignment="Center" Padding="3"/>
@@ -310,7 +311,23 @@
             <DataGridTextColumn Header="Demand sec." Binding="{Binding demand_section}" Width="95"/>
             <DataGridTextColumn Header="Donor" Binding="{Binding donor_id}" Width="80"/>
             <DataGridTextColumn Header="Donor sec." Binding="{Binding donor_section}" Width="95"/>
-            <DataGridTextColumn Header="Util" Binding="{Binding utilization, StringFormat=N2}" Width="60"/>
+            <DataGridTextColumn Header="Util" Binding="{Binding utilization, StringFormat=N2}" Width="60">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding util_severity}" Value="ok">
+                      <Setter Property="Foreground" Value="#0A6"/><Setter Property="FontWeight" Value="Bold"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding util_severity}" Value="high">
+                      <Setter Property="Foreground" Value="#B8860B"/><Setter Property="FontWeight" Value="Bold"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding util_severity}" Value="over">
+                      <Setter Property="Foreground" Value="#C33"/><Setter Property="FontWeight" Value="Bold"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
             <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="70"/>
             <DataGridTextColumn Header="Gov. case" Binding="{Binding governing}" Width="130"/>
             <DataGridTextColumn Header="CO2 (kg)" Binding="{Binding co2_saved_kg, StringFormat=N0}" Width="80"/>
@@ -324,6 +341,10 @@
             </DataGridTextColumn>
           </DataGrid.Columns>
         </DataGrid>
+      </TabItem>
+      <TabItem Header="By section" x:Name="tab_rollup">
+        <TextBox x:Name="rollup_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
       </TabItem>
       <TabItem Header="Unfilled + diagnosis" x:Name="tab_unfilled">
         <Grid>

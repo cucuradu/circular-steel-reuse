@@ -62,7 +62,7 @@ class SteelReusePanel(forms.WPFWindow):
         self._apply_event = revit_events.make_event(self._apply_handler)
         self.apply_button.Click += self._on_apply
         # Optional result tabs start hidden; a run reveals the ones whose data is present.
-        for tab in (self.tab_unfilled, self.tab_portfolio, self.tab_pareto,
+        for tab in (self.tab_rollup, self.tab_unfilled, self.tab_portfolio, self.tab_pareto,
                     self.tab_disposition, self.tab_marginal, self.tab_audit, self.tab_warnings):
             tab.Visibility = Visibility.Collapsed
         self._restore()
@@ -312,6 +312,10 @@ class SteelReusePanel(forms.WPFWindow):
         self.unfilled_text.Text = "\n".join(lines)
         self.tab_unfilled.Visibility = Visibility.Visible
 
+        # Reuse rolled up by donor section -- always available (derived from the assignments).
+        self.rollup_text.Text = self._fmt_rollup()
+        self.tab_rollup.Visibility = Visibility.Visible
+
         self.warnings_text.Text = self._fmt_warnings()
         self.tab_warnings.Visibility = Visibility.Visible
 
@@ -331,6 +335,15 @@ class SteelReusePanel(forms.WPFWindow):
             tab.Visibility = Visibility.Visible
         else:
             tab.Visibility = Visibility.Collapsed
+
+    def _fmt_rollup(self):
+        rows = panelmodel.section_rollup(self._view.rows)
+        out = ["%-14s %7s %14s %11s %10s"
+               % ("section", "reuses", "CO2e (kg)", "mean util", "off-cut m"), ""]
+        for g in rows:
+            out.append("%-14s %7s %14.0f %11.2f %10.1f"
+                       % (g["section"], g["n"], g["co2"], g["mean_util"], g["offcut_m"]))
+        return "\n".join(out)
 
     def _fmt_warnings(self):
         w = self._view.warnings
@@ -544,13 +557,17 @@ class SteelReusePanel(forms.WPFWindow):
         with open(target, "w") as handle:
             writer = csv.writer(handle)
             writer.writerow(["slot", "demand_section", "donor", "donor_section", "utilization",
-                             "status", "governing", "co2_saved_kg"])
+                             "status", "governing", "co2_saved_kg",
+                             "next_best_donor", "next_best_margin_kg", "next_best_used_elsewhere"])
             for r in self._rows:
                 # Format the numerics as strings so IronPython float repr noise
                 # (0.25900000000000001) stays out of the exported CSV.
+                margin = "" if r.alt_margin_kg is None else ("%.1f" % r.alt_margin_kg)
                 writer.writerow([r.slot_id, r.demand_section, r.donor_id, r.donor_section,
                                  "%.3f" % r.utilization, r.status, r.governing,
-                                 "%.1f" % r.co2_saved_kg])
+                                 "%.1f" % r.co2_saved_kg,
+                                 r.alt_donor_id, margin,
+                                 "yes" if r.alt_used_elsewhere else ""])
         forms.alert("Exported %s rows to:\n%s" % (len(self._rows), target), title="SteelReuse")
 
     # -- run history (auto-save each run for the separate Compare Runs tool) -----------------------

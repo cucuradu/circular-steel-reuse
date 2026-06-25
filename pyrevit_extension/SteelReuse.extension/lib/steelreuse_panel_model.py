@@ -27,6 +27,19 @@ def _restraint_warn(a):
     return chi == 1.0 and free is not None and free < 0.85
 
 
+def _util_severity(u):
+    """Coarse utilisation band for the grid's colour cue: '' / low / ok / high / over (>1.0)."""
+    if u is None:
+        return ""
+    if u > 1.0:
+        return "over"
+    if u >= 0.85:
+        return "high"
+    if u >= 0.5:
+        return "ok"
+    return "low"
+
+
 def _alt_display(a):
     """Tier 3 'next best' cell: the runner-up donor for this slot, its net-CO2 margin, and (when it
     was reused elsewhere) why it did not take this slot. '' when no substitute existed."""
@@ -47,7 +60,8 @@ class Row:
 
     __slots__ = ("slot_id", "demand_id", "demand_section", "donor_id", "donor_section",
                  "utilization", "governing", "status", "restraint_warn", "connection",
-                 "offcut_mm", "co2_saved_kg", "verification", "condition", "alt_display")
+                 "offcut_mm", "co2_saved_kg", "verification", "condition", "alt_display",
+                 "alt_donor_id", "alt_margin_kg", "alt_used_elsewhere", "util_severity")
 
     def __init__(self, a):
         self.slot_id = a.get("slot_id", "")
@@ -65,6 +79,11 @@ class Row:
         self.verification = a.get("verification", "")
         self.condition = a.get("condition", "")
         self.alt_display = _alt_display(a)
+        # Tier 3 next-best (raw fields for filtering + CSV export, alongside the display string).
+        self.alt_donor_id = a.get("alt_donor_id") or ""
+        self.alt_margin_kg = a.get("alt_margin_kg")
+        self.alt_used_elsewhere = bool(a.get("alt_used_elsewhere"))
+        self.util_severity = _util_severity(self.utilization)
 
 
 class MismatchRow:
@@ -142,20 +161,53 @@ def parse(data):
 def filter_rows(rows, status="all", section="", min_util=0.0):
     """Filter the assignment rows for the grid view (never re-runs the match).
 
-    ``status`` 'all' or a chip value; ``section`` a case-insensitive substring matched against either
-    the donor or demand section; ``min_util`` a governing-utilisation floor. All independent.
+    ``status`` 'all', a chip value ('filled'/'review'), or 'contention' (only rows whose next-best
+    donor was used elsewhere); ``section`` a case-insensitive substring matched against either the
+    donor or demand section; ``min_util`` a governing-utilisation floor. All independent.
     """
     out = []
     needle = (section or "").strip().upper()
     for r in rows:
-        if status and status != "all" and r.status != status:
-            continue
+        if status and status != "all":
+            if status == "contention":
+                if not r.alt_used_elsewhere:
+                    continue
+            elif r.status != status:
+                continue
         if needle and needle not in (r.donor_section + " " + r.demand_section).upper():
             continue
         if min_util and r.utilization < min_util:
             continue
         out.append(r)
     return out
+
+
+def section_rollup(rows):
+    """Roll the assignment rows up by donor section: count, total CO2e saved, mean utilisation and
+    total off-cut per section, ordered by CO2e saved (descending). Pure; for the 'By section' tab."""
+    groups = {}
+    order = []
+    for r in rows:
+        sec = r.donor_section or "(unmapped)"
+        g = groups.get(sec)
+        if g is None:
+            g = groups[sec] = {"section": sec, "n": 0, "co2": 0.0, "offcut_mm": 0.0,
+                               "util_sum": 0.0, "util_n": 0}
+            order.append(sec)
+        g["n"] += 1
+        g["co2"] += r.co2_saved_kg or 0.0
+        g["offcut_mm"] += r.offcut_mm or 0.0
+        if r.utilization is not None:
+            g["util_sum"] += r.utilization
+            g["util_n"] += 1
+    result = []
+    for sec in order:
+        g = groups[sec]
+        g["mean_util"] = (g["util_sum"] / g["util_n"]) if g["util_n"] else 0.0
+        g["offcut_m"] = g["offcut_mm"] / 1000.0
+        result.append(g)
+    result.sort(key=lambda g: -g["co2"])
+    return result
 
 
 # KPI rows compared between two runs: (display label, kpis-block key). The unfilled count is handled
