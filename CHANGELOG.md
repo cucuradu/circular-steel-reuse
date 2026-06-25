@@ -7,6 +7,19 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Spreadsheet inventory input (`.csv` / `.xlsx`) + a blank template** (`inventory_sheet.py`). A
+  donor or demand model no longer has to be extractor JSON: a `.csv`/`.xlsx` list of members is read
+  straight into the schema (headers matched by alias — `section`/`profile`, `grade`, `length`,
+  `member type`, `provenance`…; values coerced/normalised; blank rows skipped), so a stockist or
+  engineer with no Revit/IFC model can still drive the matcher. `steelreuse --inventory-template
+  <path>` writes a **blank template** — column headers, one worked example row, and the conservative
+  `unverified` provenance flag (the `.xlsx` form adds a *Guide* sheet documenting every column). The
+  reader is one dispatch point (`load_model_file`), so it applies to the matcher, portfolio, sensitivity,
+  value-case and validate alike. In Revit: a new **Extract → Inventory Template** button writes the
+  template; the **Run Match** window's Donor/Demand pickers and the shared donor picker (Value Case /
+  Review) now accept `json|csv|xlsx`, with a *Blank inventory template…* shortcut under the model
+  boxes. `.xlsx` needs the optional `xlsx` extra (openpyxl); `.csv` needs nothing. Unit-tested in
+  `test_inventory_sheet.py`.
 - **Revit surfacing of the evidence package + mismatch log (Run Match / Results buttons)**. The Run
   Match runner now always emits `evidence.json` (Roadmap §1.1) and `mismatch.csv` (§1.2) alongside the
   report/status/results in each run folder, so every run is self-contained — no new button. The

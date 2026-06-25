@@ -33,7 +33,8 @@ report = ["jinja2>=3.1"]
 llm = ["google-genai>=0.3"]
 ui = ["streamlit>=1.33", "plotly>=5.20"]
 bim = ["ifcopenshell>=0.7"]            # optional IFC extraction path
-xlsx = ["openpyxl>=3.1"]               # optional: read .xlsx survey files (steelreuse.survey)
+xlsx = ["openpyxl>=3.1"]               # optional: read/write .xlsx survey + inventory spreadsheets
+                                       #   (steelreuse.survey, steelreuse.inventory_sheet)
 dev = ["pytest>=8.0", "ruff>=0.4"]
 
 [tool.hatch.version]

@@ -39,13 +39,28 @@ IronPython 3 engine**. We deliberately do *not* request the CPython engine: pyRe
 CPython 3.12 has a version-parsing bug under Revit 2026 ("input string '3.12.3' was not in a correct
 format"). The extractor is stdlib-only and IronPython-safe, so it runs fine on the default engine.
 
+## Use: Inventory Template (no Revit model needed)
+
+Have a list of reclaimed members but no Revit/IFC model to extract? **SteelReuse tab → Inventory
+Template** writes a **blank inventory spreadsheet** — column headers, one worked example row, and the
+conservative `unverified` provenance flag — as `.xlsx` (a second *Guide* sheet documents every column)
+or `.csv`. Fill one row per member in any spreadsheet tool, then use the file as the **Donor** (or
+Demand) model anywhere a model is asked for: **Run Match**, **Value Case**, **Review**. The engine
+reads `.json`, `.csv` and `.xlsx` interchangeably (headers are matched by alias — `section`, `profile`,
+`grade`, `length`, `member type`, `provenance`… all resolve), so no JSON authoring is required.
+
+> The file is written by the same CPython engine (`steelreuse --inventory-template <path>`); the
+> `.xlsx` path needs the optional `xlsx` extra (`pip install steelreuse[xlsx]`), `.csv` needs nothing.
+
 ## Use: Run Match (the SteelReuse window)
 
 **SteelReuse tab → Run Match** opens a window that runs the whole matcher and shows the results — no
 terminal:
 
-1. Pick the **Donor** and **Demand** JSON (one or several demand models → portfolio matching); the
-   last pair is remembered. Choose the **Objective** and cutting mode; open **Advanced options** for
+1. Pick the **Donor** and **Demand** model — `.json` from the extractor, or a `.csv`/`.xlsx`
+   inventory (see **Inventory Template** above); one or several demand models → portfolio matching; the
+   last pair is remembered. A **Blank inventory template…** button sits under the model boxes. Choose
+   the **Objective** and cutting mode; open **Advanced options** for
    the full engine surface (Policy / Carbon / Loads / Load cases / Frame / Audit & checks). Untouched,
    the defaults reproduce the canonical run.
 2. **Run Match.** The heavy engine never runs inside Revit (it shells out to the signed CPython venv
@@ -164,7 +179,8 @@ pyrevit_extension/                         <- register THIS as a custom extensio
    │  └─ steelreuse_pda_params.py          # PDA shared-param map + value coercion
    └─ SteelReuse.tab/
       ├─ Extract.panel/
-      │  └─ Extract.pushbutton/            # runs extractor/pyrevit_extract.py:main() (reads PDA params back)
+      │  ├─ Extract.pushbutton/            # runs extractor/pyrevit_extract.py:main() (reads PDA params back)
+      │  └─ InventoryTemplate.pushbutton/  # writes a blank .xlsx/.csv inventory template (no-Revit input)
       ├─ Match.panel/
       │  ├─ RunMatch.pushbutton/           # opens the SteelReuse window (run + review, no terminal)
       │  ├─ Results.pushbutton/            # re-open the last results.json in an HTML view
