@@ -7,6 +7,20 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Scenario-sweep orchestration core (lean-first)** (new `steelreuse_sweep`). Backbone for turning
+  one fixed base config + a few varied dials (objective, min-util, cutting, connection screen,
+  knockdown, …) into many runs at once and ranking them, so the engineer stops hand-running the match
+  and eyeballing diffs two-at-a-time. Pure, unit-tested pieces: `expand_grid`/`grid_size` (the
+  cartesian product + a count for the planner's cap), `point_id`/`point_label`/`plan` (stable
+  per-point folders), `lean` (strips the finalist-only audit add-ons — donor-value, verify-match,
+  disposition — so sweep points are seconds, not minutes; keeps the cheap Pareto solve),
+  `collect`/`rank`/`pareto_front` (read each point's `results.json` into a board record, order
+  best-first per metric, keep only the non-dominated trade-offs). Plus `run_grid`, a bounded thread
+  pool over an injected run function (defaults to `steelreuse_runner.run_match`) that runs
+  `default_workers()` = CPU-1 engine processes at once, leaving Revit a core. Every point is a normal
+  `results.json` run, so the existing Compare / Results windows open and drill into any of them. The
+  WPF planner + ranked board, and an optional cells-once core speed-up, slot in behind this surface.
+  Tested in `test_sweep.py`.
 - **The Pareto tab now reads as a trade-off, not just three rows of numbers**
   (`steelreuse_result_tabs.pareto`). Each alternative goal shows, in parentheses, what choosing it
   would change in every currency relative to the objective the run actually shipped (marked `*`), and
