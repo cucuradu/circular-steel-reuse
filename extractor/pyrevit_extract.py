@@ -18,6 +18,7 @@ Two geometry conventions (see plan, "Continuous-beam handling"):
 """
 
 import json
+import os
 import re
 
 from pyrevit import DB, forms, revit, script
@@ -75,15 +76,69 @@ def _type_name(elem):
         return ""
 
 
+def _structural_material(elem):
+    """The element's structural Material, or None (IronPython-safe)."""
+    try:
+        p = elem.get_Parameter(DB.BuiltInParameter.STRUCTURAL_MATERIAL_PARAM)
+        return doc.GetElement(p.AsElementId()) if p else None
+    except Exception:
+        return None
+
+
 def _grade(elem):
     """Try to read a steel grade (S235/S275/...) from the structural material name."""
     try:
-        p = elem.get_Parameter(DB.BuiltInParameter.STRUCTURAL_MATERIAL_PARAM)
-        mat = doc.GetElement(p.AsElementId()) if p else None
+        mat = _structural_material(elem)
         m = _GRADE_RE.search(mat.Name) if mat else None
         return ("S" + m.group(1)) if m else None
     except Exception:
         return None
+
+
+# Structural-material classes that are positively NOT reusable steel, so the extractor drops those
+# members up front. This tool reasons only about steel reuse; concrete and timber members would
+# otherwise swamp the totals/reports with rows that can never map to a section. The test is
+# deliberately one-sided — only a POSITIVE non-steel signal excludes a member — so steel families the
+# catalog does not know yet (K-series, special beams), which still carry a steel material, and members
+# with no/unknown material are kept. The (language-independent) StructuralAssetClass enum is checked
+# first, then the material's class string as a fallback.
+_NON_STEEL_ASSET_CLASSES = ("Concrete", "Wood")
+_NON_STEEL_CLASS_WORDS = ("CONCRETE", "WOOD", "TIMBER")
+
+
+def _is_non_steel(elem):
+    """True only when the member's structural material is POSITIVELY non-steel (concrete/timber).
+
+    Steel, generic, and unknown/unassigned materials all return False, so unmapped *steel* families and
+    members lacking material data are never dropped — we exclude only what we can prove is out of scope.
+    """
+    mat = _structural_material(elem)
+    if mat is None:
+        return False
+    # Preferred: the structural asset's class (a language-independent enum).
+    try:
+        ps = doc.GetElement(mat.StructuralAssetId)
+        asset = ps.GetStructuralAsset() if ps is not None else None
+        cls = getattr(asset, "StructuralAssetClass", None)
+        if cls is not None:
+            metal = getattr(DB.StructuralAssetClass, "Metal", None)
+            if metal is not None and cls == metal:
+                return False
+            for nm in _NON_STEEL_ASSET_CLASSES:
+                bad = getattr(DB.StructuralAssetClass, nm, None)
+                if bad is not None and cls == bad:
+                    return True
+    except Exception:
+        pass
+    # Fallback: the material's class string ("Concrete" / "Metal" / "Wood" ...).
+    try:
+        name = (getattr(mat, "MaterialClass", "") or "").upper()
+        for word in _NON_STEEL_CLASS_WORDS:
+            if word in name:
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def _level_name(elem):
@@ -223,6 +278,22 @@ def _collect(category):
             .ToElements())
 
 
+def _partition_steel(elements):
+    """Split a collected category into (members to keep, count of non-steel members dropped).
+
+    Concrete/timber members are out of scope for steel reuse and are dropped here so they never reach
+    the JSON — and therefore never inflate any downstream count, report, or match (see ``_is_non_steel``).
+    """
+    kept = []
+    dropped = 0
+    for e in elements:
+        if _is_non_steel(e):
+            dropped += 1
+        else:
+            kept.append(e)
+    return kept, dropped
+
+
 def _support_points(columns, beams):
     """Candidate support locations: column points + all beam endpoints (XYZ in feet)."""
     pts = []
@@ -298,8 +369,9 @@ def _read_pda(elem):
 
 
 def extract(kind):
-    beams = _collect(DB.BuiltInCategory.OST_StructuralFraming)
-    columns = _collect(DB.BuiltInCategory.OST_StructuralColumns)
+    beams, dropped_beams = _partition_steel(_collect(DB.BuiltInCategory.OST_StructuralFraming))
+    columns, dropped_cols = _partition_steel(_collect(DB.BuiltInCategory.OST_StructuralColumns))
+    skipped_non_steel = dropped_beams + dropped_cols
     support_pts = _support_points(columns, beams) if kind == "demand" else []
 
     members = []
@@ -346,8 +418,25 @@ def extract(kind):
     return {
         "kind": kind, "members": members, "source": "pyrevit",
         "units": "extract:mm | internal:N,mm", "schema_version": 1,
-        "model_name": doc.Title,
+        "model_name": doc.Title, "skipped_non_steel": skipped_non_steel,
     }
+
+
+def _default_out_dir():
+    """The folder Extract auto-saves into: a ``steelreuse_reports`` folder next to the open model.
+
+    Same ``steelreuse_reports`` convention the Run Match button writes its outputs to (see
+    ``steelreuse_panel``), so an extraction lands beside the reports for that model instead of
+    prompting for a location every time. Returns ``None`` when the model has never been saved (no
+    folder to anchor to) so the caller can fall back to asking.
+    """
+    try:
+        model_path = doc.PathName
+    except Exception:
+        model_path = ""
+    if not model_path:
+        return None
+    return os.path.join(os.path.dirname(model_path), "steelreuse_reports")
 
 
 def main(kind=None):
@@ -355,6 +444,10 @@ def main(kind=None):
 
     The ribbon split-button passes the kind directly (no popup). When called with no kind (e.g. a
     legacy single Extract button), it falls back to asking.
+
+    The file is auto-saved as ``<kind>.json`` into a ``steelreuse_reports`` folder next to the model
+    (no save dialog). Only a model that was never saved — or a non-filesystem cloud path where the
+    folder cannot be created — falls back to prompting for a location.
     """
     if kind is None:
         kind = forms.CommandSwitchWindow.show(
@@ -364,12 +457,32 @@ def main(kind=None):
     if not kind:
         return
     payload = extract(kind)
-    path = forms.save_file(file_ext="json", default_name="%s" % kind)
+
+    out_dir = _default_out_dir()
+    path = None
+    if out_dir:
+        try:
+            if not os.path.isdir(out_dir):
+                os.makedirs(out_dir)
+            path = os.path.join(out_dir, "%s.json" % kind)
+        except Exception:  # noqa: BLE001 -- unwritable/cloud path -> fall back to asking
+            path = None
     if not path:
-        return
+        path = forms.save_file(file_ext="json", default_name="%s" % kind)
+        if not path:
+            return
+
     with open(path, "w") as fh:
         json.dump(payload, fh, indent=2)
-    output.print_md("**Extracted %d members** (%s) -> `%s`" % (len(payload["members"]), kind, path))
+
+    # Confirm via a TaskDialog, not the pyRevit output window: under Revit 2026 that window's WebView
+    # renders blank, so print_md feedback would be invisible (the user would not know it saved/where).
+    msg = "Extracted %d members (%s).\n\nSaved to:\n%s" % (len(payload["members"]), kind, path)
+    skipped = payload.get("skipped_non_steel", 0)
+    if skipped:
+        msg += ("\n\nSkipped %d non-steel member(s) (concrete/timber) — out of scope for steel reuse."
+                % skipped)
+    forms.alert(msg, title="SteelReuse — Extract")
 
 
 if __name__ == "__main__":
