@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **HTML report is rendered on demand, not written every run** (`cli.py --no-report`, `runner`,
+  `steelreuse_panel`). A match run no longer drops a `report.html` on disk each time: the Revit Run
+  Match window's **Open report (HTML)** button (and the Results window) render the report fresh from
+  `results.json` only when asked, via the shared standalone-HTML writer. The CLI gains `--no-report`
+  (the results JSON / evidence / apply-matches / mismatch outputs are still written); the terminal
+  default still writes `report.html` unless `--no-report` is passed.
+- **Results view filtering/visual upgrades** (`steelreuse_results_view.py`). The assignments table
+  now colour-bands **utilisation** by severity (low / ok / high / over 1.0), the status filter gains a
+  **contention** option (show only matches whose next-best donor went elsewhere), a **Copy table as
+  CSV** button copies the currently-filtered rows to the clipboard, and a **Reuse by donor section**
+  roll-up summarises count / CO2e saved / mean utilisation / off-cut per section. Unit-tested in
+  `test_results_view.py`.
 - **Results window now mirrors the full run** (`steelreuse_results_view.py`). The HTML Results view
   showed only assignments / unfilled / quarantine / provenance; it now also renders the **warnings**
   flags (LTB restraint-reliant, imperfection-governed, connection-review, cut donors + remainder,
