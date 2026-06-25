@@ -186,9 +186,8 @@ def plan(fixed, axes, out_root):
 # Execution (impure: a bounded thread pool over an injected run function)
 # --------------------------------------------------------------------------------------------------
 
-def default_workers():
-    """How many engine processes to run at once: one fewer than the CPU count, so Revit keeps a core
-    (never below 1). Each point is a separate process, so this caps real parallelism, not threads."""
+def cpu_total():
+    """Logical processor count (Windows ``NUMBER_OF_PROCESSORS``, else ``multiprocessing``); >= 1."""
     n = 0
     try:
         n = int(os.environ.get("NUMBER_OF_PROCESSORS", "0"))
@@ -200,7 +199,28 @@ def default_workers():
             n = multiprocessing.cpu_count()
         except Exception:  # noqa: BLE001 - cpu_count can be unavailable; fall back to a safe default
             n = 2
-    return max(1, n - 1)
+    return max(1, n)
+
+
+def default_workers():
+    """How many engine processes to run at once by default: one fewer than the CPU count, so Revit
+    keeps a core (never below 1). Each point is a separate process, so this caps real parallelism."""
+    return max(1, cpu_total() - 1)
+
+
+def clamp_workers(requested):
+    """The effective worker count for a requested value: at least 1, never more than the logical CPU
+    count.
+
+    More workers than cores gives no speed-up -- the work is CPU-bound, so throughput plateaus at the
+    core count -- and only risks exhausting RAM on smaller machines (each worker is a separate engine
+    process holding the models). Un-parseable input falls back to :func:`default_workers`.
+    """
+    try:
+        n = int(requested)
+    except (TypeError, ValueError):
+        return default_workers()
+    return max(1, min(n, cpu_total()))
 
 
 def run_grid(plan_rows, interpreter, run_fn=None, max_workers=None, on_done=None):

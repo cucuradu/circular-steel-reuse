@@ -106,9 +106,17 @@ def test_run_grid_runs_every_point_and_reports_progress(tmp_path):
 
 def test_default_workers_leaves_a_core_for_revit(monkeypatch):
     monkeypatch.setenv("NUMBER_OF_PROCESSORS", "8")
-    assert sweep.default_workers() == 7
+    assert sweep.cpu_total() == 8 and sweep.default_workers() == 7
     monkeypatch.setenv("NUMBER_OF_PROCESSORS", "1")
     assert sweep.default_workers() == 1               # never below 1
+
+
+def test_clamp_workers_caps_at_cpu_and_floors_at_one(monkeypatch):
+    monkeypatch.setenv("NUMBER_OF_PROCESSORS", "24")
+    assert sweep.clamp_workers(40) == 24              # oversubscription capped to logical cores
+    assert sweep.clamp_workers(16) == 16              # within budget -> honoured
+    assert sweep.clamp_workers(0) == 1                # never below 1
+    assert sweep.clamp_workers("nonsense") == sweep.default_workers()
 
 
 # --- collecting + ranking -------------------------------------------------------------------------

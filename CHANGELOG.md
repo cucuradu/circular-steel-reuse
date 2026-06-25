@@ -28,7 +28,9 @@ All notable changes to this project are documented here. The format is based on
   `collect`/`rank`/`pareto_front` (read each point's `results.json` into a board record, order
   best-first per metric, keep only the non-dominated trade-offs). Plus `run_grid`, a bounded thread
   pool over an injected run function (defaults to `steelreuse_runner.run_match`) that runs
-  `default_workers()` = CPU-1 engine processes at once, leaving Revit a core. Every point is a normal
+  `default_workers()` = CPU-1 engine processes at once, leaving Revit a core; `clamp_workers` caps a
+  manual override at the logical core count, so a teammate on a smaller machine can't oversubscribe
+  RAM by typing a big number (more workers than cores gives no speed-up anyway). Every point is a normal
   `results.json` run, so the existing Compare / Results windows open and drill into any of them. The
   WPF planner + ranked board, and an optional cells-once core speed-up, slot in behind this surface.
   Tested in `test_sweep.py`.

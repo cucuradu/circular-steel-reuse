@@ -120,16 +120,21 @@ class SweepPlanner(forms.WPFWindow):
         self._settings["last_demand"] = demand
         runner.save_settings(self._ext_root, self._settings)
 
-        try:
-            workers = int(self.workers_box.Text.strip())
-        except ValueError:
-            workers = sweep.default_workers()
+        requested = self.workers_box.Text.strip()
+        workers = sweep.clamp_workers(requested)
         out_root = os.path.join(runner.reports_dir(self._ext_root),
                                 "sweep_" + time.strftime("%Y%m%d-%H%M%S"))
         plan_rows = sweep.plan({"donor": donor, "demand": demand}, axes, out_root)
 
         self.run_button.IsEnabled = False
-        self.progress_box.Text = "Running %d match(es), %d at a time...\n" % (len(plan_rows), workers)
+        note = ""
+        try:
+            if int(requested) > workers:
+                note = " (capped to your %d logical cores -- more gives no speed-up)" % sweep.cpu_total()
+        except ValueError:
+            pass
+        self.progress_box.Text = ("Running %d match(es), %d at a time%s...\n"
+                                  % (len(plan_rows), workers, note))
         threading.Thread(target=self._worker,
                          args=(interp, plan_rows, out_root, workers)).start()
 
