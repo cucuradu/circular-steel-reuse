@@ -65,7 +65,7 @@ class ReviewWindow(forms.WPFWindow):
 
     # -- report actions ---------------------------------------------------------------------------
     def _reports_dir(self):
-        out_dir = os.path.join(self._ext_root, "steelreuse_reports")
+        out_dir = runner.reports_dir(self._ext_root)
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir)
         return out_dir

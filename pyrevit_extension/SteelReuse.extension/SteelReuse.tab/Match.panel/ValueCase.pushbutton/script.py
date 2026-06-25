@@ -26,7 +26,7 @@ doc = revit.doc
 
 # .../ValueCase.pushbutton -> Match.panel -> SteelReuse.tab -> SteelReuse.extension
 _EXT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-_OUT_DIR = os.path.join(_EXT_ROOT, "steelreuse_reports")
+_OUT_DIR = runner.reports_dir(_EXT_ROOT)
 
 
 def _skipped_line(kpis):

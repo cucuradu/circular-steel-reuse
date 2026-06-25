@@ -62,7 +62,7 @@ def review_or_reuse(ext_root, interp, donor):
     is None and ``error`` is the runner result dict (for the caller's alert); on success ``error`` is
     None.
     """
-    out_dir = os.path.join(ext_root, "steelreuse_reports")
+    out_dir = runner.reports_dir(ext_root)
     review_json = runner.review_paths(out_dir)["review_json"]
     settings = runner.load_settings(ext_root)
     fresh = (os.path.isfile(review_json) and os.path.isfile(donor)

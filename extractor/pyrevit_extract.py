@@ -422,21 +422,29 @@ def extract(kind):
     }
 
 
-def _default_out_dir():
-    """The folder Extract auto-saves into: a ``steelreuse_reports`` folder next to the open model.
+def _out_dir():
+    """Fixed folder Extract auto-saves into: ``<repo>/steelreuse_reports`` (no save dialog).
 
-    Same ``steelreuse_reports`` convention the Run Match button writes its outputs to (see
-    ``steelreuse_panel``), so an extraction lands beside the reports for that model instead of
-    prompting for a location every time. Returns ``None`` when the model has never been saved (no
-    folder to anchor to) so the caller can fall back to asking.
+    Anchored to THIS file's location (``<repo>/extractor/pyrevit_extract.py``) rather than the Revit
+    model's path, so the destination is identical whether the model is saved, unsaved, or cloud-hosted
+    (a cloud/BIM360 model has no local folder to anchor to). One predictable project folder, chosen
+    over a per-model location.
     """
-    try:
-        model_path = doc.PathName
-    except Exception:
-        model_path = ""
-    if not model_path:
-        return None
-    return os.path.join(os.path.dirname(model_path), "steelreuse_reports")
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(repo_root, "steelreuse_reports")
+
+
+def _safe_stem(name, default):
+    """A safe file stem from free user input: trims, drops a trailing ``.json``, and replaces the
+    characters Windows forbids in a filename. Falls back to ``default`` when nothing usable remains.
+    """
+    text = (name or "").strip()
+    if text.lower().endswith(".json"):
+        text = text[:-len(".json")]
+    for ch in "\\/:*?\"<>|":
+        text = text.replace(ch, "_")
+    text = text.strip().strip(".")
+    return text or default
 
 
 def main(kind=None):
@@ -445,9 +453,10 @@ def main(kind=None):
     The ribbon split-button passes the kind directly (no popup). When called with no kind (e.g. a
     legacy single Extract button), it falls back to asking.
 
-    The file is auto-saved as ``<kind>.json`` into a ``steelreuse_reports`` folder next to the model
-    (no save dialog). Only a model that was never saved — or a non-filesystem cloud path where the
-    folder cannot be created — falls back to prompting for a location.
+    The file is saved into the fixed ``<repo>/steelreuse_reports`` folder (no folder-picking dialog —
+    see :func:`_out_dir`). A small name prompt lets the user set the file name, defaulting to ``kind``
+    (``donor``/``demand``); it is saved as ``<name>.json``. Only an unwritable folder (rare) falls back
+    to the full save dialog.
     """
     if kind is None:
         kind = forms.CommandSwitchWindow.show(
@@ -456,19 +465,29 @@ def main(kind=None):
         )
     if not kind:
         return
+
+    # Ask only for the file NAME (not the folder): the destination is fixed, but the user wants to
+    # name each extraction (e.g. by project/phase) rather than always overwrite donor.json/demand.json.
+    name = forms.ask_for_string(
+        default=kind,
+        prompt="File name for this extraction (saved in steelreuse_reports as <name>.json):",
+        title="SteelReuse — Extract")
+    if not name:
+        return
+    name = _safe_stem(name, kind)
+
     payload = extract(kind)
 
-    out_dir = _default_out_dir()
+    out_dir = _out_dir()
     path = None
-    if out_dir:
-        try:
-            if not os.path.isdir(out_dir):
-                os.makedirs(out_dir)
-            path = os.path.join(out_dir, "%s.json" % kind)
-        except Exception:  # noqa: BLE001 -- unwritable/cloud path -> fall back to asking
-            path = None
+    try:
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
+        path = os.path.join(out_dir, name + ".json")
+    except Exception:  # noqa: BLE001 -- folder unwritable (rare) -> fall back to asking
+        path = None
     if not path:
-        path = forms.save_file(file_ext="json", default_name="%s" % kind)
+        path = forms.save_file(file_ext="json", default_name=name)
         if not path:
             return
 
