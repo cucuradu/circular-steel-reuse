@@ -120,6 +120,7 @@ class SteelReusePanel(forms.WPFWindow):
             # Carbon
             "counterfactual": self.counterfactual_combo.SelectedItem.Content,
             "disposition": bool(self.disposition_check.IsChecked),
+            "donor_value": bool(self.donor_value_check.IsChecked),
             # Loads
             "national_annex": self.national_annex_combo.SelectedItem.Content,
             "occupancy": self.occupancy_combo.SelectedItem.Content,
@@ -214,7 +215,7 @@ class SteelReusePanel(forms.WPFWindow):
         self._settings["last_demand"] = opts["demand"]
         runner.save_settings(self._ext_root, self._settings)
 
-        out_dir = os.path.join(os.path.dirname(opts["demand"][0]), "steelreuse_reports")
+        out_dir = runner.reports_dir(self._ext_root)
         self.run_button.IsEnabled = False
         self.progress_box.Text = "Running the match... Revit stays responsive; this can take ~30 s.\n"
         threading.Thread(target=self._worker, args=(interp, opts, out_dir)).start()

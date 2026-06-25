@@ -137,6 +137,10 @@
                 <CheckBox x:Name="disposition_check" Content="Stock disposition advisory"/>
                 <TextBlock Style="{StaticResource InfoIcon}"
                            ToolTip="For every UNUSED donor, advises its best fate - store (still useful for an unfilled slot here), re-roll, or recycle - with the associated CO2 credits, shown on the Disposition tab. Advisory only: it never changes the match."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="donor_value_check" Content="Donor what-if value"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="For every REUSED donor, re-solves the whole match with it removed and reports the drop in total CO2 saved - its true global marginal value (the cascade of who-moves-where included), shown on the Donor value tab. One extra solve per donor, so it is slower; advisory only."/></StackPanel>
             </StackPanel>
           </TabItem>
           <TabItem Header="Loads">

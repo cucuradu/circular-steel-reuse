@@ -81,3 +81,62 @@ def test_render_escapes_html_in_free_text():
     assert "&lt;flange&gt;" in html
     assert "&amp;" in html
     assert "<flange>" not in html
+
+
+def test_render_includes_reuse_rate_bar_and_sortable_headers():
+    html = view.render_results_html(_SAMPLE)
+    assert "bar-fill" in html and "% of slots reused" in html   # progress bar (2/3 -> 67%)
+    assert "67%" in html
+    assert "srxSort" in html and 'class="srx-sort"' in html      # click-to-sort headers
+
+
+def test_render_shows_diagnosis_and_warnings_sections():
+    data = dict(_SAMPLE)
+    data["diagnosis"] = {"binding_constraint": "length", "lever": "splice or source longer stock",
+                         "n_unmatched": 1, "n_overspec": 0}
+    data["warnings"] = {"ltb_restraint_reliant": 1, "imperfection_governed": 0, "connection_review": 1,
+                        "cut_donors": 2, "reusable_remainder_m": 3.5, "unknown": 4,
+                        "unknown_breakdown": [{"name": "BAR JOIST", "count": 4}]}
+    html = view.render_results_html(data)
+    # diagnosis 'why' box
+    assert "binding constraint" in html and "length" in html and "splice" in html
+    # warnings table + unknown breakdown
+    assert "Warnings" in html and "LTB restraint-reliant beams" in html
+    assert "Reusable remainder" in html and "3.5" in html
+    assert "BAR JOIST" in html
+
+
+def test_render_unfilled_section_positive_note_when_none():
+    data = dict(_SAMPLE)
+    data["unfilled"] = []
+    html = view.render_results_html(data)
+    assert "every demand slot that could be filled was filled" in html.lower()
+
+
+def test_render_optional_blocks_only_when_present():
+    # A plain run (no disposition/marginal/pareto/portfolio/audit) omits those headings...
+    html = view.render_results_html(_SAMPLE)
+    for absent in ("Stock disposition", "Donor what-if value", "Objective trade-off",
+                   "Portfolio", "Pre-demolition audit"):
+        assert absent not in html
+    # ...and a rich run surfaces them.
+    data = dict(_SAMPLE)
+    data["disposition"] = {"totals": {"n": 2, "store": 1, "reroll": 1, "recycle": 0,
+                                      "reroll_credit_kg": 12.0, "recycle_credit_kg": 8.0,
+                                      "by_reason": {"too-short": 1, "too-weak": 0,
+                                                    "contention": 1, "uneconomic": 0}},
+                           "by_section": [{"section": "IPE300", "n": 2, "store": 1,
+                                           "reroll": 1, "recycle": 0}]}
+    data["marginal_value"] = [{"supply_id": "D1", "section": "IPE300", "marginal_co2_kg": 120.5,
+                               "slots_lost": ["N1#0"], "reshuffled_slots": 1}]
+    data["pareto"] = [{"objective": "co2", "label": "co2", "n_reused": 2, "co2_saved_kg": 1200.0,
+                       "mass_reused_kg": 500.0, "selected": True}]
+    data["portfolio"] = [{"tag": "blockA", "slot_count": 3, "n_reused": 2, "co2_saved_kg": 1200.0,
+                          "n_unmatched": 1}]
+    data["audit"] = {"audited": 5, "admitted": 4, "quarantined": 1, "avg_knockdown": 0.92,
+                     "quarantined_list": [{"id": "D9", "reason": "unverified"}]}
+    rich = view.render_results_html(data)
+    for present in ("Stock disposition", "Donor what-if value", "Objective trade-off",
+                    "Portfolio", "Pre-demolition audit"):
+        assert present in rich
+    assert "120.5" in rich and "blockA" in rich and "unverified" in rich

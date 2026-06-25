@@ -93,11 +93,12 @@ def test_command_omits_zero_valued_optional_flags():
 
 def test_command_emits_carbon_and_policy_flags():
     opts = {"donor": "d", "demand": "m", "counterfactual": "recycling", "pareto": True,
-            "disposition": True, "w_overspec": 1.5, "reserve": 0.4, "connections": True,
-            "moment_shape": True, "max_distinct_sections": 8}
+            "disposition": True, "donor_value": True, "w_overspec": 1.5, "reserve": 0.4,
+            "connections": True, "moment_shape": True, "max_distinct_sections": 8}
     cmd = runner.build_command("py", opts, "o")
     assert _pair(cmd, "--counterfactual") == "recycling"
     assert "--pareto" in cmd and "--disposition" in cmd and "--connections" in cmd
+    assert "--donor-value" in cmd
     assert "--moment-shape" in cmd
     assert _pair(cmd, "--w-overspec") == "1.5"
     assert _pair(cmd, "--reserve") == "0.4"
@@ -171,6 +172,14 @@ def test_output_paths_are_under_the_given_dir():
     assert paths["status"].endswith("status.json")
     assert paths["report"].endswith("report.html")
     assert all(os.path.join("C:", "run42") in p for p in paths.values())
+
+
+def test_reports_dir_is_repo_root_steelreuse_reports():
+    # ext_root = <repo>/pyrevit_extension/SteelReuse.extension -> reports live two levels up, at the
+    # repo root, so every button + the extractor share ONE fixed folder (not per-model, not in-code).
+    ext_root = os.path.join("C:", "proj", "pyrevit_extension", "SteelReuse.extension")
+    out = runner.reports_dir(ext_root)
+    assert out == os.path.join("C:", "proj", "steelreuse_reports")
 
 
 def test_settings_round_trip_and_missing_dir_is_empty(tmp_path):

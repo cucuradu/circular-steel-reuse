@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Results window now mirrors the full run** (`steelreuse_results_view.py`). The HTML Results view
+  showed only assignments / unfilled / quarantine / provenance; it now also renders the **warnings**
+  flags (LTB restraint-reliant, imperfection-governed, connection-review, cut donors + remainder,
+  unidentified types), the **"why" diagnosis** box (binding constraint + lever), and — when the run
+  computed them — **stock disposition**, **donor what-if value**, **objective trade-off (Pareto)**,
+  **portfolio** and **pre-demolition audit** sections, so the window is a complete review surface.
+  Plus usability: a **reuse-rate bar** and extra KPIs in the header, **click-to-sort** assignment
+  columns (alongside the existing filters), and a positive note when no slot went unfilled. The Run
+  Match window also gains a **Donor what-if value** checkbox so its Tier-4 "Donor value" tab can be
+  populated. Unit-tested in `test_results_view.py`.
 - **Per-element "why" on every empty slot and every unused donor** (`match/optimize.py`). The match
   diagnosis no longer collapses into a single headline: `diagnose_match` now returns
   `unfilled_reasons` — one element-specific verdict per empty slot (its id, member, section, length,

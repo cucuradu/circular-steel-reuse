@@ -34,6 +34,20 @@ _SETTINGS_FILE = "steelreuse_runner_config.json"
 _HIGHLIGHT_FILE = "steelreuse_highlight.json"
 
 
+def reports_dir(ext_root):
+    """The single fixed output folder for ALL SteelReuse artifacts: ``<repo>/steelreuse_reports``.
+
+    Anchored to the repository root -- two levels above the extension dir, which is
+    ``<repo>/pyrevit_extension/SteelReuse.extension`` -- so every button (Run Match, Value Case,
+    Review) and the extractor write to the SAME project-root folder, instead of scattering outputs
+    next to each model or inside the extension's own code folder. The extractor derives the identical
+    path from its own location (``<repo>/extractor/pyrevit_extract.py``). Pure: it only computes the
+    path (callers ``makedirs`` as needed); the folder is gitignored via ``steelreuse_reports/``.
+    """
+    repo_root = os.path.dirname(os.path.dirname(ext_root))
+    return os.path.join(repo_root, "steelreuse_reports")
+
+
 def output_paths(out_dir):
     """The three artifact paths for a run, all under ``out_dir``."""
     paths = {}
@@ -106,6 +120,7 @@ def build_command(interpreter, opts, out_dir):
                       ("include_unverified", "--include-unverified"), ("construction", "--construction"),
                       ("connections", "--connections"), ("moment_shape", "--moment-shape"),
                       ("pareto", "--pareto"), ("disposition", "--disposition"),
+                      ("donor_value", "--donor-value"),
                       ("verify_match", "--verify-match")):
         if opts.get(key):
             cmd.append(flag)
