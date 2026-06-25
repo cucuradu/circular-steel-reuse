@@ -25,31 +25,43 @@ _MODEL_EXTS = ("json", "csv", "xlsx")
 
 
 def _ext_filter(exts):
-    """A VALID WinForms OpenFileDialog filter string for ``exts`` (e.g. ('json','csv','xlsx')).
+    """A common-file-dialog filter string for ``exts`` (e.g. ('json','csv','xlsx')).
 
-    pyRevit's ``pick_file`` builds its own filter as ``"|*.{file_ext}"``, so a multi-extension
-    ``file_ext="json|csv|xlsx"`` yields the MALFORMED string ``"|*.json|csv|xlsx"`` -- WinForms reads
-    that as the pairs ("", "*.json") and ("csv", "xlsx"), a filter literally named "csv" matching
-    files named ``xlsx``. A single-select dialog tolerates it, but the multi-select (Vista COM
-    ``IFileOpenDialog``) dialog validates the spec and throws a COMException (0xe0434352) which, left
-    unhandled in the WPF click handler, takes Revit down with a fatal error. Passing a well-formed
-    ``files_filter`` instead both defuses that crash and actually filters for all the extensions.
+    Description|Pattern pairs, the format both WinForms and WPF (Microsoft.Win32) dialogs expect, with
+    every extension in one pattern so all of them show at once plus an "All files" escape hatch.
     """
     pats = ";".join("*." + e for e in exts)
     return "Supported (%s)|%s|All files (*.*)|*.*" % (pats, pats)
 
 
-def pick_model_file(title, multi_file=False, exts=_MODEL_EXTS):
-    """``forms.pick_file`` for a model/inventory input, hardened for the modeless Run Match window.
+def pick_model_file(title, multi_file=False, exts=_MODEL_EXTS, owner=None):
+    """Pick a model/inventory file with the WPF dialog (Microsoft.Win32), NOT pyRevit's WinForms one.
 
-    Two fixes over a raw ``forms.pick_file(file_ext="json|csv|xlsx")`` call: a well-formed
-    multi-extension filter (see :func:`_ext_filter`), and a guard so a dialog/COM error can NEVER
-    escape the WPF click handler -- an unhandled exception there is a Revit-fatal crash, not a Python
-    traceback. Returns a path, a list of paths (``multi_file``), or None on cancel/error.
+    Why not ``forms.pick_file``: its WinForms ``OpenFileDialog`` with ``Multiselect=True``, shown from
+    the modeless Run Match WPF window under Revit 2026, throws a managed exception *inside its own
+    modal message pump* (0xe0434352) -- a hard Revit crash that NO surrounding try/except can catch,
+    because the throw never unwinds through our call frame (confirmed in journal.0042: a fatal error
+    on the demand click with no Python traceback, while the single-select donor dialog worked). The
+    WPF ``Microsoft.Win32.OpenFileDialog`` is the dialog meant for a WPF app, supports ``Multiselect``,
+    and runs cleanly in the window's own dispatcher.
+
+    Returns a path, a list of paths (``multi_file``), or None on cancel/error. ``owner`` (the WPF
+    window) parents the dialog when given. The try/except is belt-and-braces for the catchable errors
+    (a bad assembly load, etc.); the real fix is the dialog swap.
     """
     try:
-        return forms.pick_file(files_filter=_ext_filter(exts), multi_file=multi_file, title=title)
-    except Exception as ex:  # noqa: BLE001 -- never let a picker exception crash Revit
+        import clr
+        clr.AddReference("PresentationFramework")  # where Microsoft.Win32.OpenFileDialog lives
+        from Microsoft.Win32 import OpenFileDialog
+        dlg = OpenFileDialog()
+        dlg.Title = title
+        dlg.Filter = _ext_filter(exts)
+        dlg.Multiselect = bool(multi_file)
+        ok = dlg.ShowDialog(owner) if owner is not None else dlg.ShowDialog()
+        if not ok:  # ShowDialog returns Nullable<bool>: False/None both mean cancelled
+            return None
+        return list(dlg.FileNames) if multi_file else dlg.FileName
+    except Exception as ex:  # noqa: BLE001 -- never let a picker error crash Revit
         forms.alert("Could not open the file picker:\n\n%s" % ex, title="SteelReuse")
         return None
 

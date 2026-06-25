@@ -159,19 +159,20 @@ class SteelReusePanel(forms.WPFWindow):
         }
 
     def _pick_donor(self, sender, args):
-        path = buttons.pick_model_file("Donor (supply) model or inventory")
+        path = buttons.pick_model_file("Donor (supply) model or inventory", owner=self)
         if path:
             self.donor_box.Text = path
 
     def _pick_demand(self, sender, args):
-        # multi_file -> the Vista COM dialog; a raw forms.pick_file(file_ext="json|csv|xlsx") here built
-        # a malformed filter that threw an unhandled COMException and crashed Revit (see pick_model_file).
-        picked = buttons.pick_model_file("New-design (demand) model or inventory", multi_file=True)
+        # multi_file uses the WPF Microsoft.Win32 dialog: pyRevit's WinForms multi-select OpenFileDialog
+        # crashed Revit from this modeless window (see buttons.pick_model_file). owner=self parents it.
+        picked = buttons.pick_model_file("New-design (demand) model or inventory",
+                                         multi_file=True, owner=self)
         if picked:
             self.demand_box.Text = "; ".join(picked) if isinstance(picked, list) else picked
 
     def _pick_pda(self, sender, args):
-        path = forms.pick_file(file_ext="csv", title="Pre-demolition audit CSV")
+        path = buttons.pick_model_file("Pre-demolition audit CSV", exts=("csv",), owner=self)
         if path:
             self.pda_box.Text = path
 
