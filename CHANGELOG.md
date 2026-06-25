@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The Results window now shows the full set of review tabs** (`steelreuse_results_window`, new
+  shared `steelreuse_result_tabs`). The saved-runs Results window — the main place to review a run —
+  previously had only Assignments / By section / Donor provenance; it now also has **Unfilled +
+  diagnosis**, **Warnings**, and (when the run produced them) **Disposition**, **Donor value**,
+  **Pareto** and **Portfolio** tabs, matching the Run Match window. The tab bodies were extracted
+  into a shared, unit-tested formatter module so both windows render identically from one source.
+  Tested in `test_result_tabs.py`.
 - **Both native windows gain the results-view features** (`steelreuse_panel`,
   `steelreuse_results_window`, shared `steelreuse_panel_model`). The Run Match and Results WPF
   assignments grids now colour-band **utilisation** by severity (ok / high / over-1.0) via the new

@@ -17,11 +17,13 @@ import json
 import os
 
 import steelreuse_panel_model as panelmodel
+import steelreuse_result_tabs as tabs  # shared monospace formatters for the review tabs
 import steelreuse_results_view as resultsview  # render the printable HTML report on demand
 import steelreuse_revit_events as revit_events  # shared select/zoom/trace/apply ExternalEvent handlers
 import steelreuse_runner as runner
 import steelreuse_runs as runhist
 from pyrevit import forms
+from System.Windows import Visibility  # show/hide the optional review tabs
 
 _DIR = os.path.dirname(__file__)
 
@@ -65,6 +67,11 @@ class ResultsWindow(forms.WPFWindow):
         self.open_evidence_button.Click += self._open_evidence
         self.open_folder_button.Click += self._open_folder
         self.export_button.Click += self._export_csv
+
+        # Optional review tabs start hidden; loading a run reveals the ones whose data is present.
+        for tab in (self.tab_disposition, self.tab_marginal, self.tab_pareto,
+                    self.tab_portfolio, self.tab_audit):
+            tab.Visibility = Visibility.Collapsed
 
         self._reload_runs()
 
@@ -155,18 +162,29 @@ class ResultsWindow(forms.WPFWindow):
                         ms.get("unknown", 0), ms.get("quarantined", 0)))
         self.kpi_text.Text = line
         self._bind_provenance(rules, ms)
-        self.rollup_text.Text = self._fmt_rollup()
+        self._render_review_tabs()
         self._apply_filters(None, None)
 
-    def _fmt_rollup(self):
-        """Reuse rolled up by donor section (count / CO2e saved / mean util / off-cut)."""
-        rows = panelmodel.section_rollup(self._view.rows)
-        out = ["%-14s %7s %14s %11s %10s"
-               % ("section", "reuses", "CO2e (kg)", "mean util", "off-cut m"), ""]
-        for g in rows:
-            out.append("%-14s %7s %14.0f %11.2f %10.1f"
-                       % (g["section"], g["n"], g["co2"], g["mean_util"], g["offcut_m"]))
-        return "\n".join(out)
+    def _render_review_tabs(self):
+        """Fill the review tabs from the shared formatters (same content as the Run Match window), and
+        hide the optional ones whose block this run did not produce."""
+        v = self._view
+        self.diagnosis_text.Text = tabs.diagnosis(v)
+        self.unfilled_text.Text = tabs.unfilled(v)
+        self.rollup_text.Text = tabs.rollup(v)
+        self.warnings_text.Text = tabs.warnings(v)
+        self._opt_tab(self.tab_disposition, v.has_disposition, self.disposition_text, tabs.disposition)
+        self._opt_tab(self.tab_marginal, v.has_marginal_value, self.marginal_text, tabs.marginal)
+        self._opt_tab(self.tab_pareto, v.has_pareto, self.pareto_text, tabs.pareto)
+        self._opt_tab(self.tab_portfolio, v.has_portfolio, self.portfolio_text, tabs.portfolio)
+        self._opt_tab(self.tab_audit, v.has_audit, self.audit_text, tabs.audit)
+
+    def _opt_tab(self, tab, present, box, fmt):
+        if present:
+            box.Text = fmt(self._view)
+            tab.Visibility = Visibility.Visible
+        else:
+            tab.Visibility = Visibility.Collapsed
 
     def _bind_provenance(self, rules, summary):
         """Fill the native 'Donor provenance' tab: the rule-data versions + the per-donor mismatch

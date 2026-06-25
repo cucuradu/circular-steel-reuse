@@ -95,6 +95,43 @@
         <TextBox x:Name="rollup_text" IsReadOnly="True" FontFamily="Consolas"
                  TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
       </TabItem>
+      <TabItem Header="Unfilled + diagnosis" x:Name="tab_unfilled">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#FFF7E6" Padding="10" Margin="0,0,0,6">
+            <TextBlock x:Name="diagnosis_text" TextWrapping="Wrap" FontSize="13"/>
+          </Border>
+          <TextBox Grid.Row="1" x:Name="unfilled_text" IsReadOnly="True" FontFamily="Consolas"
+                   TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Warnings" x:Name="tab_warnings">
+        <TextBox x:Name="warnings_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Disposition" x:Name="tab_disposition">
+        <TextBox x:Name="disposition_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Donor value" x:Name="tab_marginal">
+        <TextBox x:Name="marginal_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Pareto" x:Name="tab_pareto">
+        <TextBox x:Name="pareto_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Portfolio" x:Name="tab_portfolio">
+        <TextBox x:Name="portfolio_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Audit" x:Name="tab_audit">
+        <TextBox x:Name="audit_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
       <TabItem Header="Donor provenance">
         <Grid>
           <Grid.RowDefinitions>
