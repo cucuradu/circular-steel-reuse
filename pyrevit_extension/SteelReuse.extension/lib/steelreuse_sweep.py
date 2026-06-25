@@ -52,6 +52,12 @@ RANK_DIRECTION = {
     "unfilled": "min",
 }
 
+# The currencies the board's trade-off front weighs by default: most reuse / saving, fewest distinct
+# section families (simpler fabrication). The board leads with this non-dominated set rather than one
+# ranked metric, so the engineer sees the genuine trade-offs, not an arbitrary single winner.
+DEFAULT_FRONT_METRICS = [("reused", "max"), ("co2_saved_kg", "max"),
+                         ("mass_reused_kg", "max"), ("distinct_sections", "min")]
+
 
 # --------------------------------------------------------------------------------------------------
 # Planning (pure)
@@ -63,6 +69,42 @@ def lean(opts):
     for key in _HEAVY_KEYS:
         out.pop(key, None)
     return out
+
+
+# Axes whose value list is numeric (floats). Choice axes (objective, counterfactual, …) stay strings;
+# max_distinct_sections is handled specially ('none' -> no cap). Centralised here so the planner UI
+# does not duplicate per-dial parsing and the typing is unit-tested.
+_FLOAT_AXES = ("min_util", "knockdown", "w_overspec", "reserve", "dead", "live", "wind", "seismic")
+
+
+def parse_values(param, text):
+    """Parse a comma-separated axis value list into typed values for ``param``.
+
+    ``max_distinct_sections`` -> ints with ``'none'`` mapping to ``None`` (no cap); numeric dials
+    (see ``_FLOAT_AXES``) -> floats; everything else (choice dials like ``objective``) -> trimmed
+    strings. Un-parseable tokens are skipped, so a stray comma never aborts a sweep.
+    """
+    tokens = [part.strip() for part in (text or "").split(",") if part.strip()]
+    if param == "max_distinct_sections":
+        out = []
+        for tok in tokens:
+            if tok.lower() == "none":
+                out.append(None)
+            else:
+                try:
+                    out.append(int(float(tok)))
+                except ValueError:
+                    pass
+        return out
+    if param in _FLOAT_AXES:
+        out = []
+        for tok in tokens:
+            try:
+                out.append(float(tok))
+            except ValueError:
+                pass
+        return out
+    return tokens
 
 
 def grid_size(axes):
@@ -220,7 +262,8 @@ def collect_point(row):
     still sees that the combination was tried). ``unfilled`` is ``slots - reused`` when both are
     present, else the length of the unfilled list.
     """
-    rec = {"id": row.get("id"), "label": row.get("label"), "ok": False,
+    rec = {"id": row.get("id"), "label": row.get("label"), "out_dir": row.get("out_dir", ""),
+           "ok": False, "on_front": False,
            "reused": None, "co2_saved_kg": None, "mass_reused_kg": None,
            "distinct_sections": None, "unfilled": None, "reuse_rate_pct": None,
            "proven_optimal": None, "solver_status": "", "objective": ""}
@@ -293,3 +336,16 @@ def pareto_front(records, metrics):
     """
     live = [r for r in records if all(r.get(key) is not None for key, _ in metrics)]
     return [r for r in live if not any(_dominates(other, r, metrics) for other in live if other is not r)]
+
+
+def mark_front(records, metrics=None):
+    """Set ``on_front`` on each record (True iff it is on the non-dominated front); return ``records``.
+
+    Mutates in place so the board can bind the flag straight to a row highlight. ``metrics`` defaults to
+    :data:`DEFAULT_FRONT_METRICS`.
+    """
+    front = pareto_front(records, metrics or DEFAULT_FRONT_METRICS)
+    front_ids = set(id(r) for r in front)
+    for rec in records:
+        rec["on_front"] = id(rec) in front_ids
+    return records

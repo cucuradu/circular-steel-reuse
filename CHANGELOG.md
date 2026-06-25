@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Scenario Sweep — the planner + trade-off board** (new `Match.panel/Sweep.pushbutton`,
+  `steelreuse_sweep_planner`, `steelreuse_sweep_board`). A new Match-panel button opens a planner:
+  lock the donor + demand, tick which dials to vary (objective, min-util, max distinct sections,
+  knockdown) with a comma-separated value list each, see a live run-count (with a confirm above 60),
+  and run every combination at once. Runs go through the lean orchestration core on a background
+  thread (CPU-1 engine processes at a time) so Revit stays responsive, with per-point progress. When
+  every point is done a **board** opens: one row per combination, **front-first** — the rows on the
+  non-dominated trade-off front are highlighted (no single run beats them on every currency at once),
+  failed points greyed, every column sortable. Each point is a normal `results.json` run, so "Open
+  selected run folder" reaches its full output and the Compare / Results windows open it too. Value
+  typing moved into the tested core as `sweep.parse_values`; the windows are thin Revit glue.
 - **Scenario-sweep orchestration core (lean-first)** (new `steelreuse_sweep`). Backbone for turning
   one fixed base config + a few varied dials (objective, min-util, cutting, connection screen,
   knockdown, …) into many runs at once and ranking them, so the engineer stops hand-running the match

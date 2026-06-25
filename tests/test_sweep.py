@@ -42,6 +42,15 @@ def test_grid_size_and_expand_are_the_cartesian_product():
     assert (points[2]["objective"], points[2]["min_util"]) == ("members", 0.0)
 
 
+def test_parse_values_types_each_axis_and_skips_junk():
+    assert sweep.parse_values("objective", "co2, members , mass") == ["co2", "members", "mass"]
+    assert sweep.parse_values("min_util", "0.0, 0.5, x, 0.7") == [0.0, 0.5, 0.7]   # 'x' skipped
+    assert sweep.parse_values("knockdown", "0.9,0.85") == [0.9, 0.85]
+    # max_distinct_sections: 'none' -> no cap (None), numbers coerced to int
+    assert sweep.parse_values("max_distinct_sections", "none, 6, 10") == [None, 6, 10]
+    assert sweep.parse_values("objective", "") == []
+
+
 def test_no_axes_is_a_single_run():
     assert sweep.grid_size([]) == 1
     points = sweep.expand_grid({"donor": "d.json"}, [])
@@ -111,6 +120,7 @@ def test_collect_reads_kpis_and_flags_missing_runs(tmp_path):
     sweep.run_grid(rows[:1], interpreter="py", run_fn=_fake_run({"co2": 5}), max_workers=1)
     records = sweep.collect(rows)
     assert records[0]["ok"] and records[0]["reused"] == 5 and records[0]["unfilled"] == 5
+    assert records[0]["out_dir"] == rows[0]["out_dir"]      # board uses it for "Open folder"
     assert records[1]["ok"] is False and records[1]["reused"] is None
 
 
@@ -142,3 +152,13 @@ def test_pareto_front_excludes_failed_runs():
     broken = {"id": "broken", "reused": None, "co2_saved_kg": None}
     metrics = [("reused", "max"), ("co2_saved_kg", "max")]
     assert [r["id"] for r in sweep.pareto_front([a, broken], metrics)] == ["a"]
+
+
+def test_mark_front_flags_records_in_place_with_default_metrics():
+    a = _rec("a", 5, 500.0, 250.0, 5)   # wins co2
+    b = _rec("b", 7, 400.0, 200.0, 6)   # wins members
+    c = _rec("c", 4, 450.0, 220.0, 7)   # dominated by a on all four default metrics
+    recs = [a, b, c]
+    out = sweep.mark_front(recs)
+    assert out is recs                                   # mutates + returns the same list
+    assert a["on_front"] is True and b["on_front"] is True and c["on_front"] is False

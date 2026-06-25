@@ -1,0 +1,57 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SteelReuse - Sweep results" Height="600" Width="960"
+        WindowStartupLocation="CenterScreen" Background="#FAFAFA">
+  <Window.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="Margin" Value="4,0,0,0"/>
+    </Style>
+  </Window.Resources>
+
+  <Grid Margin="14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" x:Name="summary_text" TextWrapping="Wrap" Margin="0,0,0,8"
+               Foreground="#444" Text=""/>
+
+    <DataGrid Grid.Row="1" x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True"
+              HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="True">
+      <DataGrid.RowStyle>
+        <Style TargetType="DataGridRow">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding front_flag}" Value="front">
+              <Setter Property="Background" Value="#E3F6E8"/>
+              <Setter Property="FontWeight" Value="SemiBold"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding ok_flag}" Value="fail">
+              <Setter Property="Foreground" Value="#999999"/>
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </DataGrid.RowStyle>
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Front" Binding="{Binding front_mark}" Width="46"/>
+        <DataGridTextColumn Header="Variation" Binding="{Binding label}" Width="*"/>
+        <DataGridTextColumn Header="Objective" Binding="{Binding objective}" Width="90"/>
+        <DataGridTextColumn Header="Reused" Binding="{Binding reused}" Width="70"/>
+        <DataGridTextColumn Header="Unfilled" Binding="{Binding unfilled}" Width="70"/>
+        <DataGridTextColumn Header="CO2e (kg)" Binding="{Binding co2}" Width="100"/>
+        <DataGridTextColumn Header="Mass (kg)" Binding="{Binding mass}" Width="100"/>
+        <DataGridTextColumn Header="Distinct" Binding="{Binding distinct}" Width="70"/>
+        <DataGridTextColumn Header="Reuse %" Binding="{Binding reuse_rate}" Width="80"/>
+        <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="90"/>
+      </DataGrid.Columns>
+    </DataGrid>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+      <Button x:Name="open_button" Content="Open selected run folder" Background="#0A6EBD"
+              Foreground="White" FontWeight="Bold" Padding="14,5"/>
+      <Button x:Name="open_root_button" Content="Open sweep folder"/>
+    </StackPanel>
+  </Grid>
+</Window>

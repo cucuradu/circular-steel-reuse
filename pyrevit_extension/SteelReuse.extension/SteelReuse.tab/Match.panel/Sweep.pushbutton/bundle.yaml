@@ -1,0 +1,2 @@
+title: Scenario Sweep
+tooltip: Lock the donor + demand, vary a few dials (objective, min-util, max sections, knockdown), run every combination at once, and rank the results on a trade-off board.
