@@ -14,6 +14,15 @@ All notable changes to this project are documented here. The format is based on
   study still reproduces byte-identically; this only changes the UI defaults.
 
 ### Added
+- **Balanced (max-min) utilisation objective** (`--objective balanced`, Scenario Sweep §5). A new
+  policy objective that fills the most slots (the "members" primary) and then, among the
+  maximum-count solutions, maximises the **worst** assignment utilisation — so no donor sits grossly
+  under-used (at, say, 50 %) while another is at 100 %. Implemented as a single max-min MILP variable
+  bounded below every selected pair (`t <= u_ij + (1 - x_ij)`), with the slot count kept strictly
+  primary so evening-out never costs reuse. Selectable on the CLI, threaded through the what-if
+  re-solves and the independent verifier (which judges it on the members primary), and usable as a
+  sweep `objective` value; the CLI prints the achieved min/avg/max utilisation. Complements the
+  existing `--w-overspec` / `--min-util` dials.
 - **Selectable carbon-factor dataset + sweep axis** (`--carbon-dataset`, Scenario Sweep §4). The
   embodied-carbon factor set every saving is booked against is now a choice of three
   provenance-stamped, self-contained CSVs in `data/carbon/`: `ice_v3` (Circular Ecology ICE v3 2019,

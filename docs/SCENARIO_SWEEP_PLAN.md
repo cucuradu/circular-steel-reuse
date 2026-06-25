@@ -68,7 +68,7 @@ Computed once per sweep and shared by every point:
 | Feature | What it answers | Build size | Notes |
 |---|---|---|---|
 | ~~**Carbon-factor dataset axis**~~ ✅ **shipped** | how much does the carbon result depend on which EPD database I trust? | small | **Done.** Three provenance-stamped sets in `data/carbon/` selectable via `--carbon-dataset` / planner row: `ice_v3` (default, 1.55), `ice_v4` (= Climatiq "Steel - Section", 1.61), `oekobaudat` (German EPD-BFS, 1.74). Sets differ in the A1-A3 production figure (the number databases disagree on); credits/process held common. Dataset is recorded in the evidence package. |
-| **Utilisation policy** | even out donor utilisation instead of some at 100% / some at 50% | small–med | see §5 — largely served by `w_overspec`; the principled addition is a max-min-utilisation objective |
+| ~~**Utilisation policy**~~ ✅ **shipped** | even out donor utilisation instead of some at 100% / some at 50% | small–med | **Done.** New `--objective balanced` (also a sweep value): fills the most slots (members primary) then maximises the WORST assignment utilisation via a max-min MILP variable (`t <= u_ij + (1 - x_ij)`), evening out the distribution from the bottom without reducing reuse. `w_overspec` / `min_util` remain the complementary dials (§5). |
 | **Splicing** | join two short donors end-to-end to fill a long slot | medium | feasible & code-covered (AISC 360 J1.4, EC3); needs combine-donors feasibility + a splice carbon/cost penalty (see §6) |
 
 **Out of scope (considered, dropped):** transport carbon, a cost/£ objective, inventory-subset
@@ -90,9 +90,9 @@ uncertainty demands (which `knockdown` already encodes).
 **Recommended approach:**
 1. **First, turn on `w_overspec`** — it is precisely the "don't spend the solid column on a thin slot"
    lever and already exists; it raises low utilisations toward a tighter fit.
-2. **If that's not enough, add a max-min utilisation objective** ("balanced" mode): maximise the
-   *minimum* utilisation (or penalise utilisation variance) so no donor is grossly under-used. This is
-   the principled way to "even it out."
+2. **If that's not enough, the max-min utilisation objective** (`--objective balanced`, ✅ shipped):
+   fills the most slots, then maximises the *minimum* utilisation so no donor is grossly under-used.
+   This is the principled way to "even it out."
 3. **Do NOT chase 100 % everywhere** — reclaimed steel needs headroom; the knockdown factor is the
    place that margin lives, not an artificially low utilisation target.
 

@@ -69,7 +69,7 @@
       <CheckBox Grid.Row="0" Grid.Column="0" x:Name="obj_check" IsChecked="True"
                 VerticalAlignment="Center" Margin="0,3" Content="Objective"/>
       <TextBox  Grid.Row="0" Grid.Column="1" x:Name="obj_box" Margin="0,3" Text="co2, members, mass"
-                ToolTip="Any of: co2, members, mass (comma-separated)."/>
+                ToolTip="Any of: co2, members, mass, balanced (comma-separated)."/>
 
       <CheckBox Grid.Row="1" Grid.Column="0" x:Name="minutil_check"
                 VerticalAlignment="Center" Margin="0,3" Content="Min utilisation"/>

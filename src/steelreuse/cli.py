@@ -141,11 +141,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="whole-member reuse only: a donor fills at most one slot, never cut "
                          "(by default one donor may be cut into several pieces for several slots)")
     ap.set_defaults(cut=True)
-    ap.add_argument("--objective", choices=("co2", "members", "mass"), default="co2",
+    ap.add_argument("--objective", choices=("co2", "members", "mass", "balanced"), default="co2",
                     help="what the matcher maximizes: net CO2 saved (default), the number of "
-                         "members reused, or the reclaimed steel mass put back to work (the latter "
-                         "two break ties toward CO2 and may select carbon-negative reuses when "
-                         "that serves the goal)")
+                         "members reused, the reclaimed steel mass put back to work (these break "
+                         "ties toward CO2 and may select carbon-negative reuses when that serves the "
+                         "goal), or 'balanced' — fill the most slots and then even out donor "
+                         "utilisation (max-min), so no donor sits grossly under-used")
     ap.add_argument("--pareto", action="store_true",
                     help="also solve the match under every objective (co2, members, mass) and "
                          "print/report the trade-off table; the shipped assignments still follow "
@@ -479,13 +480,18 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
             print(f"  {p['tag']}: {p['slot_count']} slots | reused {p['n_reused']} | "
                   f"{p['co2_saved_kg']:.1f} kg CO2e | unfilled {p['n_unmatched']}{frame_note}")
     goal = {"co2": "net-CO2", "members": "members-reused",
-            "mass": "reclaimed-mass"}[args.objective]
+            "mass": "reclaimed-mass", "balanced": "balanced-utilisation"}[args.objective]
     if res.match.proven_optimal:
         print(f"Matching: MILP proven optimal (CBC) — best possible {goal} assignment "
               f"under the use constraints")
     elif res.match.solver_status != "no_feasible_pairs":
         print(f"Matching: heuristic ({goal} objective) — {res.match.solver_status}; result is "
               f"feasible but NOT guaranteed optimal")
+    if args.objective == "balanced" and res.match.assignments:
+        utils = [a.utilization for a in res.match.assignments]
+        print(f"Utilisation (balanced): min {min(utils):.2f} | avg "
+              f"{sum(utils) / len(utils):.2f} | max {max(utils):.2f} over "
+              f"{len(utils)} reused member(s)")
     if res.pareto:
         print("Objective trade-off (same feasibility, different goals; * = shipped):")
         for p in res.pareto:

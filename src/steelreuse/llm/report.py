@@ -20,7 +20,8 @@ SCOPE_DISCLAIMER = (
 )
 
 # Human wording for the matcher's optimization goal (kept number-free for the LLM guard).
-_OBJECTIVE_LABEL = {"co2": "net-CO2", "members": "members-reused", "mass": "reclaimed-mass"}
+_OBJECTIVE_LABEL = {"co2": "net-CO2", "members": "members-reused", "mass": "reclaimed-mass",
+                    "balanced": "balanced-utilisation"}
 
 
 def build_report_context(res: PipelineResult, uncertainty: dict | None = None) -> dict:

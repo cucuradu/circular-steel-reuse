@@ -144,7 +144,18 @@ class _Cell:
     objective_coeff: float | None = None
 
 
+# The three "currency" objectives compared on the Pareto trade-off board.
 OBJECTIVES = ("co2", "members", "mass")
+# "balanced" (Scenario Sweep §5): a *policy* objective, not a currency — maximise the number of slots
+# filled (like "members") and, among the max-count solutions, push up the WORST (lowest) assignment
+# utilisation, so no donor is grossly under-used while another sits at 100 %. Implemented as a max-min
+# MILP (a single min-utilisation variable bounded below the selected pairs); see :func:`_solve_milp`.
+# Kept out of OBJECTIVES so the Pareto board still compares the three currencies, but selectable as an
+# --objective value.
+SELECTABLE_OBJECTIVES = (*OBJECTIVES, "balanced")
+# Count weight for "balanced": each filled slot is worth this much, the min-utilisation term at most
+# 1.0, so the count stays strictly primary (any extra slot beats any utilisation gain).
+_BALANCED_COUNT_WEIGHT = 1000.0
 
 # End-of-life counterfactual modes (A1ii): what the donor steel consumed by a reuse would otherwise
 # have done. "none" books plain avoided-new (the historical behavior); the others subtract the
@@ -169,6 +180,13 @@ def _apply_objective(cells: list[_Cell], objective: str) -> None:
     if objective == "co2":
         for c in cells:
             c.objective_coeff = c.score
+        return
+    if objective == "balanced":
+        # Count is primary (each pair worth the big weight); the max-min utilisation term is added as
+        # a single variable in the MILP (see _solve_milp). No CO2 tie-break here — balanced is a
+        # utilisation-distribution policy, so its only secondary criterion is the worst utilisation.
+        for c in cells:
+            c.objective_coeff = _BALANCED_COUNT_WEIGHT
         return
     big = sum(abs(c.score) for c in cells) + 1.0
     for c in cells:
@@ -493,8 +511,10 @@ def match(
 
     ``objective`` selects what "best" means (see :func:`_apply_objective`): ``"co2"`` (default)
     maximizes net CO2 saved; ``"members"`` maximizes the number of slots filled; ``"mass"``
-    maximizes the reclaimed steel mass put back to work — the latter two break ties toward CO2.
-    Feasibility (every EN check, lengths, use constraints) is identical for all objectives.
+    maximizes the reclaimed steel mass put back to work (the latter two break ties toward CO2);
+    ``"balanced"`` fills the most slots and then maximizes the WORST assignment utilisation (max-min,
+    Sweep §5), evening out the distribution so no donor sits grossly under-used. Feasibility (every
+    EN check, lengths, use constraints) is identical for all objectives.
 
     ``allow_cutting`` switches on the **cutting-stock** model: one donor may be cut into several pieces
     to fill several slots, bounded by its length (``sum(required_len + cut tolerance) <= donor length``)
@@ -537,8 +557,9 @@ def match(
     proxy for option value (see :func:`_apply_reserve`); the principled tool is portfolio
     matching (C1). Score-only; booked CO2 unchanged.
     """
-    if objective not in OBJECTIVES:
-        raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
+    if objective not in SELECTABLE_OBJECTIVES:
+        raise ValueError(
+            f"unknown objective {objective!r}; expected one of {SELECTABLE_OBJECTIVES}")
     if counterfactual not in COUNTERFACTUALS:
         raise ValueError(
             f"unknown counterfactual {counterfactual!r}; expected one of {COUNTERFACTUALS}")
@@ -570,9 +591,11 @@ def match(
     caps = [s.length_mm for s in supply] if allow_cutting else None
     # Donor section family per supply index, for the variety cap (only materialized when capping).
     fams = [s.section for s in supply] if max_distinct_sections is not None else None
+    balanced = objective == "balanced"
     try:
         chosen, status = _solve_milp(cells, len(supply), len(slots), time_limit_s, caps,
-                                     families=fams, max_families=max_distinct_sections)
+                                     families=fams, max_families=max_distinct_sections,
+                                     balanced=balanced)
         if not _is_optimal(status):  # timeout / "Not Solved" -> don't trust a partial MILP result
             chosen, status = _solve_greedy(cells, len(supply), len(slots), caps,
                                            families=fams,
@@ -625,10 +648,22 @@ def _is_optimal(status: str) -> bool:
 def _solve_milp(cells, n_supply, n_slots, time_limit_s,
                 caps: list[float] | None = None,
                 families: list[str] | None = None,
-                max_families: int | None = None) -> tuple[list[_Cell], str]:
+                max_families: int | None = None,
+                balanced: bool = False) -> tuple[list[_Cell], str]:
     prob = pulp.LpProblem("reuse_matching", pulp.LpMaximize)
     x = {(c.si, c.sj): pulp.LpVariable(f"x_{c.si}_{c.sj}", cat="Binary") for c in cells}
-    prob += pulp.lpSum(_coeff(c) * x[(c.si, c.sj)] for c in cells)
+    objective = pulp.lpSum(_coeff(c) * x[(c.si, c.sj)] for c in cells)
+    if balanced:
+        # Max-min utilisation (Sweep §5): one continuous variable bounded below every SELECTED pair's
+        # utilisation. ``t <= u_ij + (1 - x_ij)`` is slack when x_ij = 0 (RHS >= 1 >= t) and binds to
+        # ``t <= u_ij`` when x_ij = 1, so t = the minimum utilisation among chosen pairs. The per-cell
+        # coefficients (set to the big count weight) keep slot count strictly primary; maximising t
+        # then evens out the distribution from the bottom without ever filling fewer slots.
+        t = pulp.LpVariable("min_utilisation", lowBound=0.0, upBound=1.0)
+        objective = objective + t
+        for c in cells:
+            prob += t <= c.utilization + (1.0 - x[(c.si, c.sj)])
+    prob += objective
 
     for j in range(n_slots):  # each slot gets at most one supply
         terms = [x[(c.si, c.sj)] for c in cells if c.sj == j]
@@ -921,7 +956,8 @@ def assignment_alternatives(
     return rows
 
 
-def _resolve_chosen(cells, n_supply, n_slots, time_limit_s, caps, fams, max_fams):
+def _resolve_chosen(cells, n_supply, n_slots, time_limit_s, caps, fams, max_fams,
+                    balanced=False):
     """Run the same MILP-then-greedy solve :func:`match` uses, over a (possibly filtered) cell set.
 
     Returns ``(chosen, status)``. Factored out so the what-if re-solves in
@@ -929,7 +965,7 @@ def _resolve_chosen(cells, n_supply, n_slots, time_limit_s, caps, fams, max_fams
     candidate cells differ."""
     try:
         chosen, status = _solve_milp(cells, n_supply, n_slots, time_limit_s, caps,
-                                     families=fams, max_families=max_fams)
+                                     families=fams, max_families=max_fams, balanced=balanced)
         if not _is_optimal(status):
             chosen = _solve_greedy(cells, n_supply, n_slots, caps,
                                    families=fams, max_families=max_fams)
@@ -980,6 +1016,7 @@ def donor_marginal_value(
     caps = [s.length_mm for s in supply] if allow_cutting else None
     max_fams = w.get("max_distinct_sections")
     fams = [s.section for s in supply] if max_fams is not None else None
+    balanced = w.get("objective") == "balanced"
     sup_index = {s.id: i for i, s in enumerate(supply)}
 
     base_co2 = round(result.total_co2_saved_kg, 2)
@@ -1000,7 +1037,7 @@ def donor_marginal_value(
         i = sup_index[sid]
         sub = [c for c in cells if c.si != i]
         chosen, status = _resolve_chosen(sub, len(supply), len(slots), time_limit_s,
-                                         caps, fams, max_fams)
+                                         caps, fams, max_fams, balanced=balanced)
         new_co2 = round(sum(c.co2_saved_kg for c in chosen), 2)
         new_map = {slots[c.sj].id: supply[c.si].id for c in chosen}
         lost = sorted(s for s in own_slots[sid] if s not in new_map)
@@ -1063,7 +1100,9 @@ def verify_match(
     objective = result.objective
 
     def _primary(c: _Cell) -> float:
-        if objective == "members":
+        # "balanced" shares the members primary (slot count); its max-min utilisation secondary sits
+        # below the MILP/greedy tolerances here, like the CO2 tie-break, so it is not re-checked.
+        if objective in ("members", "balanced"):
             return 1.0
         if objective == "mass":
             return c.mass_used_kg

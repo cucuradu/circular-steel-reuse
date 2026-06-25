@@ -363,6 +363,53 @@ def test_objective_members_fills_more_slots_than_co2_when_they_diverge():
     assert {(c.si, c.sj) for c in chosen} == {(0, 1), (1, 0)}    # two filled slots beat one
 
 
+def test_objective_balanced_evens_out_utilisation():
+    # Sweep §5: "balanced" fills the most slots (like members) and, among the max-count solutions,
+    # maximises the WORST utilisation. Here both donors fit both slots:
+    #   allocation A = (0,0)+(1,1): utilisations 0.9 / 0.8  -> min 0.8 (even)
+    #   allocation B = (0,1)+(1,0): utilisations 0.2 / 0.5  -> min 0.2 (one badly under-used)
+    # CO2 scores are rigged so the carbon objective prefers B; balanced must override to A.
+    from steelreuse.match.optimize import _apply_objective, _Cell, _solve_milp
+
+    def cells():
+        return [
+            _Cell(si=0, sj=0, utilization=.9, status="OK", offcut_mm=0, co2_saved_kg=1, score=1.0),
+            _Cell(si=0, sj=1, utilization=.2, status="OK", offcut_mm=0, co2_saved_kg=10, score=10.0),
+            _Cell(si=1, sj=0, utilization=.5, status="OK", offcut_mm=0, co2_saved_kg=10, score=10.0),
+            _Cell(si=1, sj=1, utilization=.8, status="OK", offcut_mm=0, co2_saved_kg=1, score=1.0),
+        ]
+    by_co2 = cells()
+    _apply_objective(by_co2, "co2")
+    chosen, _ = _solve_milp(by_co2, n_supply=2, n_slots=2, time_limit_s=30)
+    assert {(c.si, c.sj) for c in chosen} == {(0, 1), (1, 0)}    # carbon prefers the uneven pairing
+
+    by_balanced = cells()
+    _apply_objective(by_balanced, "balanced")
+    chosen, status = _solve_milp(by_balanced, n_supply=2, n_slots=2, time_limit_s=30, balanced=True)
+    assert status == "Optimal"
+    assert {(c.si, c.sj) for c in chosen} == {(0, 0), (1, 1)}    # both filled AND worst util lifted
+    assert min(c.utilization for c in chosen) == pytest.approx(0.8)
+
+
+def test_objective_balanced_runs_and_verifies(cat):
+    # The "balanced" objective is accepted by match() end to end and produces a result the
+    # independent verifier certifies (it shares the members primary: every slot a free donor can
+    # fill must be filled).
+    from steelreuse.match.optimize import verify_match
+    slots = [
+        DemandSlot("A", "A", "beam", 6000.0, MemberDemand(
+            My_Ed=80e6, Vz_Ed=60e3, L=6000, compression_flange_restrained=True)),
+        DemandSlot("B", "B", "beam", 6000.0, MemberDemand(
+            My_Ed=160e6, Vz_Ed=120e3, L=6000, compression_flange_restrained=True)),
+    ]
+    supply = [SupplyItem("d_strong", "IPE400", "S235", 6500.0),
+              SupplyItem("d_mid", "IPE330", "S235", 6500.0)]
+    res = match(supply, slots, cat, objective="balanced")
+    assert res.n_reused == 2
+    assert res.objective == "balanced"
+    assert verify_match(supply, slots, cat, res) == []
+
+
 def test_objective_mass_prefers_the_heavier_donor(cat):
     # Both donors pass the same slot. Net CO2 prefers the lighter one (less recovery/refab carbon
     # for the same avoided-new baseline); the mass objective puts the most reclaimed steel back
