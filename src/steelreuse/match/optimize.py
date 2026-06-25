@@ -759,8 +759,14 @@ def stock_disposition(
     * **recycle** — conventional EAF scrap route: ``mass x recycle_credit`` (always available).
 
     The advice is the argmax: "store" if feasible at positive score, else "re-roll" vs "recycle"
-    by credit. Returns one dict per unused donor (id, section, length, mass, the three numbers,
-    flags, and ``advice``); pure function — no behavior change to any solve. The C2 reserve term
+    by credit. Each row also carries a ``reason`` for *why the donor went unused* (Tier 2), judged
+    against the **whole** slot set rather than only the unfilled ones: ``"too-short"`` / ``"too-weak"``
+    (never feasible for any slot), ``"contention"`` (feasible — even economic — somewhere, but a
+    better donor won that slot; ``feasible_slot_ids`` lists where) or ``"uneconomic"`` (feasible but
+    every fit books negative net CO2). ``reason_detail`` is the one-line phrasing.
+
+    Returns one dict per unused donor (id, section, length, mass, the three numbers, flags, ``advice``,
+    and the ``reason`` trio); pure function — no behavior change to any solve. The C2 reserve term
     is deliberately NOT applied here: it shapes competition between live candidates during the
     solve, while the storage decision for an already-unused donor is judged on base economics
     (and the restricted sub-matrix would yield different scarcity statistics anyway).
@@ -776,6 +782,33 @@ def stock_disposition(
         sid = sub_supply[c.si].id
         if sid not in best or c.score > best[sid].score:
             best[sid] = c
+
+    # WHY each unused donor went unused (Tier 2): re-derive feasibility against the WHOLE slot set (not
+    # just the unfilled ones), so we can separate "never feasible" (too short / too weak for any slot)
+    # from "lost on contention" (feasible — even economic — somewhere, but a better donor won that slot)
+    # and "uneconomic" (feasible but every fit books negative net CO2). The full matrix is needed
+    # because a donor most often loses contention on a FILLED slot, absent from the unfilled sub-matrix.
+    full_cells = _cells_from_weights(sub_supply, slots, catalog, factor, result.weights or {})
+    feas_by_donor: dict[str, set[int]] = {}
+    econ_by_donor: dict[str, set[int]] = {}
+    for c in full_cells:
+        sid = sub_supply[c.si].id
+        feas_by_donor.setdefault(sid, set()).add(c.sj)
+        if c.score > 0:
+            econ_by_donor.setdefault(sid, set()).add(c.sj)
+
+    # Too-short vs too-weak split for never-feasible donors: does the section pass ANY slot's EN check
+    # ignoring length? Memoised by (section, grade, knockdown) since donors of a kind share the answer.
+    _en_ok: dict[tuple, bool] = {}
+
+    def _section_fits_any(s: SupplyItem) -> bool:
+        key = (s.section, s.grade, round(s.knockdown, 4))
+        if key not in _en_ok:
+            sec2 = catalog.get(s.section)
+            _en_ok[key] = sec2 is not None and any(
+                _passes_all(sec2, s.grade or "S235", sl, s.knockdown) for sl in slots)
+        return _en_ok[key]
+
     rows: list[dict] = []
     for s in sub_supply:
         sec = catalog.get(s.section)
@@ -791,6 +824,22 @@ def stock_disposition(
             advice = "re-roll"
         else:
             advice = "recycle"
+
+        # Why it went unused (Tier 2), from the full-slot feasibility above.
+        feas = feas_by_donor.get(s.id)
+        if not feas:
+            reason = "too-short" if _section_fits_any(s) else "too-weak"
+            feasible_ids: list[str] = []
+        elif s.id in econ_by_donor:
+            reason = "contention"
+            feasible_ids = [slots[j].id for j in sorted(econ_by_donor[s.id])]
+        else:
+            reason = "uneconomic"
+            feasible_ids = [slots[j].id for j in sorted(feas)]
+        shown = ", ".join(feasible_ids[:4]) + (" …" if len(feasible_ids) > 4 else "")
+        reason_detail = _DONOR_UNUSED_REASON[reason].format(
+            length=s.length_mm / 1000.0, slots=shown)
+
         rows.append({
             "supply_id": s.id,
             "section": s.section,
@@ -803,6 +852,173 @@ def stock_disposition(
             "reroll_credit_kg": round(reroll_credit_kg, 2),
             "recycle_credit_kg": round(recycle_credit_kg, 2),
             "advice": advice,
+            # Why this donor went unused, judged against the whole slot set (not just the unfilled).
+            "reason": reason,
+            "reason_detail": reason_detail,
+            "feasible_slot_ids": feasible_ids[:8],
+        })
+    return rows
+
+
+def assignment_alternatives(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    result: MatchResult,
+    factors: dict[str, CarbonFactor] | None = None,
+) -> list[dict]:
+    """Per-assignment **next-best alternative** (Tier 3): for each reused pair, the runner-up donor
+    that could have filled that slot and the margin in net CO2 saved.
+
+    For every filled slot the feasibility/economics cells are re-derived (via ``result.weights``, so
+    the economics match the solve) and the donors that pass that slot are ranked by their net-CO2
+    ``score``. The chosen donor is reported alongside the best **other** feasible donor and the gap
+    between them, with a flag for whether that runner-up was itself reused elsewhere — which is what
+    explains the optimiser's choice: a runner-up that scores higher locally but is "used elsewhere"
+    means the chosen donor won this slot because the better one was more valuable on another.
+
+    This is a **local** trade-off, not a global counterfactual: it ranks the substitutes for one slot,
+    it does not re-solve the MILP with a donor removed (that — LP shadow prices — is deliberately out
+    of scope; see docs). Ranking is by ``score`` (net CO2 saved, after the off-cut/over-spec
+    preferences) so the ``margin_kg`` reads as kgCO2e regardless of the run's objective; under a
+    ``members``/``mass`` objective it is the CO2 lens on the otherwise count/mass-driven choice.
+
+    Returns one dict per assignment (pure; no behaviour change to any solve). ``margin_kg`` can be
+    negative — the runner-up out-scores the chosen donor locally but went to a better slot.
+    """
+    factor = (factors or load_factors())["steel"]
+    filled = {a.slot_id for a in result.assignments}
+    # Only the FILLED slots are needed (we rank substitutes for slots that got an assignment), so the
+    # re-derivation is over a narrow sub-matrix — much cheaper than the full grid.
+    sub_slots = [s for s in slots if s.id in filled]
+    cells = _cells_from_weights(supply, sub_slots, catalog, factor, result.weights or {})
+    by_slot: dict[str, list[_Cell]] = {}
+    for c in cells:
+        by_slot.setdefault(sub_slots[c.sj].id, []).append(c)
+    reused_ids = {a.supply_id for a in result.assignments}
+
+    rows: list[dict] = []
+    for a in result.assignments:
+        cands = sorted(by_slot.get(a.slot_id, []), key=lambda c: c.score, reverse=True)
+        chosen = next((c for c in cands if supply[c.si].id == a.supply_id), None)
+        alt = next((c for c in cands if supply[c.si].id != a.supply_id), None)
+        rows.append({
+            "slot_id": a.slot_id,
+            "chosen_supply_id": a.supply_id,
+            "chosen_section": a.section,
+            "chosen_score_kg": round(chosen.score, 2) if chosen is not None else None,
+            "chosen_co2_saved_kg": round(chosen.co2_saved_kg, 2) if chosen is not None else None,
+            "n_alternatives": sum(1 for c in cands if supply[c.si].id != a.supply_id),
+            "alternative_supply_id": supply[alt.si].id if alt is not None else None,
+            "alternative_section": supply[alt.si].section if alt is not None else None,
+            "alternative_score_kg": round(alt.score, 2) if alt is not None else None,
+            "alternative_co2_saved_kg": round(alt.co2_saved_kg, 2) if alt is not None else None,
+            "alternative_used_elsewhere": (
+                supply[alt.si].id in reused_ids if alt is not None else False),
+            "margin_kg": (round(chosen.score - alt.score, 2)
+                          if (chosen is not None and alt is not None) else None),
+        })
+    return rows
+
+
+def _resolve_chosen(cells, n_supply, n_slots, time_limit_s, caps, fams, max_fams):
+    """Run the same MILP-then-greedy solve :func:`match` uses, over a (possibly filtered) cell set.
+
+    Returns ``(chosen, status)``. Factored out so the what-if re-solves in
+    :func:`donor_marginal_value` use the *identical* solve path as the original match — only the
+    candidate cells differ."""
+    try:
+        chosen, status = _solve_milp(cells, n_supply, n_slots, time_limit_s, caps,
+                                     families=fams, max_families=max_fams)
+        if not _is_optimal(status):
+            chosen = _solve_greedy(cells, n_supply, n_slots, caps,
+                                   families=fams, max_families=max_fams)
+            status = f"greedy_fallback ({status})"
+    except Exception:  # pragma: no cover - solver edge cases -> graceful fallback
+        chosen = _solve_greedy(cells, n_supply, n_slots, caps,
+                               families=fams, max_families=max_fams)
+        status = "greedy_fallback (solver error)"
+    return chosen, status
+
+
+def donor_marginal_value(
+    supply: list[SupplyItem],
+    slots: list[DemandSlot],
+    catalog: dict[str, SectionProps],
+    result: MatchResult,
+    factors: dict[str, CarbonFactor] | None = None,
+    time_limit_s: float = 10.0,
+    max_donors: int | None = None,
+) -> list[dict]:
+    """Per-donor **what-if** value (Tier 4): re-solve the whole match with one donor removed.
+
+    Tier 3 (:func:`assignment_alternatives`) answers a *local* question — the runner-up for one slot.
+    This answers the *global* one: **how much is a donor worth to the solution as a whole?** For each
+    reused donor the MILP is re-solved with that donor deleted from the stock (over the cells already
+    derived from ``result.weights`` — same EN checks, same economics, only the candidate set shrinks),
+    and the new optimum is compared with the original. The drop in total booked CO2 is the donor's
+    true marginal value — the concrete, re-solved analogue of an LP shadow price, but honest about the
+    integer problem (it accounts for the whole cascade: the runner-up freeing up, that slot's loser
+    moving, and so on), and verifiable by re-running the solver rather than trusting a dual.
+
+    Only **reused** donors are analysed: removing an already-unused donor cannot change the optimum,
+    so its marginal value is zero by definition (and :func:`stock_disposition` explains *why* it went
+    unused). The re-solves are ordered by booked CO2 (largest first) and optionally capped at
+    ``max_donors`` — this is the one genuinely expensive advisory (one MILP solve per donor), hence
+    opt-in. Pure: no behaviour change to any solve.
+
+    Each row: donor id/section, total CO2 with and without it, the ``marginal_co2_kg`` drop, the change
+    in slots filled, the donor's own slot(s) that go unfilled in the counterfactual, how many *other*
+    slots reshuffle (the cascade), and the re-solve status.
+    """
+    factor = (factors or load_factors())["steel"]
+    w = result.weights or {}
+    cells = _cells_from_weights(supply, slots, catalog, factor, w)
+    _apply_reserve(cells, supply, w.get("reserve_w", 0.0), factor)
+    _apply_objective(cells, w.get("objective", "co2"))
+    allow_cutting = bool(w.get("allow_cutting"))
+    caps = [s.length_mm for s in supply] if allow_cutting else None
+    max_fams = w.get("max_distinct_sections")
+    fams = [s.section for s in supply] if max_fams is not None else None
+    sup_index = {s.id: i for i, s in enumerate(supply)}
+
+    base_co2 = round(result.total_co2_saved_kg, 2)
+    base_n = result.n_reused
+    orig_map = {a.slot_id: a.supply_id for a in result.assignments}
+    booked: dict[str, float] = {}
+    own_slots: dict[str, list[str]] = {}
+    for a in result.assignments:
+        booked[a.supply_id] = booked.get(a.supply_id, 0.0) + a.co2_saved_kg
+        own_slots.setdefault(a.supply_id, []).append(a.slot_id)
+
+    order = sorted(booked, key=lambda sid: -booked[sid])
+    if max_donors is not None:
+        order = order[:max_donors]
+
+    rows: list[dict] = []
+    for sid in order:
+        i = sup_index[sid]
+        sub = [c for c in cells if c.si != i]
+        chosen, status = _resolve_chosen(sub, len(supply), len(slots), time_limit_s,
+                                         caps, fams, max_fams)
+        new_co2 = round(sum(c.co2_saved_kg for c in chosen), 2)
+        new_map = {slots[c.sj].id: supply[c.si].id for c in chosen}
+        lost = sorted(s for s in own_slots[sid] if s not in new_map)
+        # Cascade: OTHER slots (not this donor's own) whose donor changed when it was removed.
+        mine = set(own_slots[sid])
+        reshuffled = sum(1 for s in (set(orig_map) | set(new_map))
+                         if s not in mine and orig_map.get(s) != new_map.get(s))
+        rows.append({
+            "supply_id": sid,
+            "section": supply[i].section,
+            "co2_saved_with_kg": base_co2,
+            "co2_saved_without_kg": new_co2,
+            "marginal_co2_kg": round(base_co2 - new_co2, 2),
+            "n_reused_without": len(chosen),
+            "n_reused_delta": len(chosen) - base_n,
+            "slots_lost": lost,
+            "reshuffled_slots": reshuffled,
+            "resolve_status": status,
         })
     return rows
 
@@ -943,6 +1159,32 @@ _LEVER = {
     "none": "every demand slot was filled",
 }
 
+# Per-unfilled-slot reason (Tier 1): the element-specific verdict for ONE empty slot — the same four
+# categories diagnose_match counts, phrased for that slot. The aggregate ``binding_constraint`` names
+# the dominant lever; these say which wall each individual slot hit. ``{length}`` is the span in metres.
+_SLOT_REASON = {
+    "length": "an adequate donor section is in stock, but none is long enough to reach this "
+              "{length:.1f} m span — cut/splice or source longer stock",
+    "capacity": "no donor section in stock is strong or stiff enough for this slot's forces — "
+                "heavier or stiffer stock is needed",
+    "contention": "a usable, economic donor existed but went to a better-scoring slot — the "
+                  "adequate stock of its section is exhausted",
+    "economics": "the only donors that fit are so over-spec that reusing them here would book "
+                 "negative net CO2 under the current objective",
+}
+
+# Per-unused-donor reason (Tier 2): why ONE donor in the stock went unused, judged against the WHOLE
+# slot set. ``{length}`` is the donor length in metres; ``{slots}`` is the (capped) list of slot ids it
+# could have served.
+_DONOR_UNUSED_REASON = {
+    "too-short": "this {length:.1f} m piece is too short for any demand slot — its section is "
+                 "adequate, so longer stock (or splicing two pieces) is the lever",
+    "too-weak": "this section is not strong or stiff enough for any demand slot at its knockdown",
+    "contention": "feasible for slot(s) {slots} but a better-fitting donor was chosen there",
+    "uneconomic": "feasible for slot(s) {slots}, but reuse there would book negative net CO2 under "
+                  "the current objective",
+}
+
 
 def _median(xs: list[float]) -> float:
     s = sorted(xs)
@@ -997,30 +1239,41 @@ def diagnose_match(
         key = (s.section, s.grade, round(s.knockdown, 4))
         kinds[key] = max(kinds.get(key, 0.0), s.length_mm)
 
-    length = capacity = contention = economics = 0
+    # Classify every unfilled slot and KEEP the per-slot verdict (Tier 1), not just the tally: each
+    # empty slot can then say which wall it hit, with its own section/length, instead of the report
+    # collapsing all of them into one headline.
+    unfilled_reasons: list[dict] = []
     for sid in result.unmatched_slots:
         j = slot_at.get(sid)
         if j is None:
             continue
+        slot = slots[j]
         if j in slots_selectable:
-            contention += 1
+            reason = "contention"
         elif j in slots_with_cell:
-            economics += 1
+            reason = "economics"
         else:
-            slot = slots[j]
             cap_ok = False
             for (section, grade, _kd), _maxlen in kinds.items():
                 sec = catalog.get(section)
                 if sec is not None and _passes_all(sec, grade or "S235", slot, _kd):
                     cap_ok = True
                     break
-            if cap_ok:
-                length += 1
-            else:
-                capacity += 1
+            reason = "length" if cap_ok else "capacity"
+        unfilled_reasons.append({
+            "slot_id": sid,
+            "member_id": slot.member_id,
+            "section": slot.design_section or "",
+            "length_mm": round(slot.required_length_mm, 1),
+            "reason": reason,
+            "detail": _SLOT_REASON[reason].format(length=slot.required_length_mm / 1000.0),
+        })
 
-    buckets = {"length": length, "capacity": capacity,
-               "contention": contention, "economics": economics}
+    buckets = {"length": 0, "capacity": 0, "contention": 0, "economics": 0}
+    for r in unfilled_reasons:
+        buckets[r["reason"]] += 1
+    length, capacity = buckets["length"], buckets["capacity"]
+    contention, economics = buckets["contention"], buckets["economics"]
     binding = max(buckets, key=lambda k: buckets[k]) if result.unmatched_slots else "none"
 
     # "Contention" can really be a SHORT-STOCK (length) story: the few donors long *and* strong
@@ -1065,6 +1318,9 @@ def diagnose_match(
         "uneconomic": economics,
         "binding_constraint": binding,
         "lever": _LEVER[binding],
+        # Per-slot verdicts (Tier 1): one element-specific reason per empty slot. The aggregate above
+        # names the dominant lever; this lets the report point at each individual slot.
+        "unfilled_reasons": unfilled_reasons,
         "donors_eligible": len({c.si for c in cells}),   # donors with at least one feasible slot
         "donors_total": len(supply),
         "n_overspec": n_overspec,

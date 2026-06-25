@@ -77,6 +77,74 @@ def test_diagnose_contention(cat):
     assert d["contention"] == 1
 
 
+def test_diagnose_per_slot_reasons_carry_element_detail(cat):
+    # Tier 1: every unfilled slot carries its OWN verdict (id, member, section, length, reason),
+    # not just the aggregate count — and the per-slot reasons sum back to the headline buckets.
+    short = _beam_slot(6000, 20.0, "SHORT")     # IPE360 passes but every donor is too short
+    weak = _beam_slot(8000, 40.0, "WEAK")       # long enough donors, all too weak
+    supply = [
+        SupplyItem(id="short360", section="IPE360", grade="S275", length_mm=3000),
+        SupplyItem(id="weak200", section="IPE200", grade="S235", length_mm=10000),
+    ]
+    res = match(supply, [short, weak], cat)
+    assert res.n_reused == 0
+    d = diagnose_match(supply, [short, weak], cat, res)
+    by_slot = {r["slot_id"]: r for r in d["unfilled_reasons"]}
+    assert by_slot["SHORT"]["reason"] == "length"
+    assert "long enough" in by_slot["SHORT"]["detail"]
+    assert by_slot["SHORT"]["length_mm"] == 6000.0
+    assert by_slot["WEAK"]["reason"] == "capacity"
+    # the per-slot reasons are exactly the headline tallies
+    assert d["length_limited"] == 1 and d["capacity_limited"] == 1
+    assert len(d["unfilled_reasons"]) == d["n_unmatched"] == 2
+
+
+def test_diagnose_per_slot_reason_contention(cat):
+    # Two equal slots, one adequate donor: the unfilled slot's per-slot reason is contention.
+    slots = [_beam_slot(6000, 20.0, "S0"), _beam_slot(6000, 20.0, "S1")]
+    supply = [SupplyItem(id="one", section="IPE360", grade="S275", length_mm=7000)]
+    res = match(supply, slots, cat)
+    d = diagnose_match(supply, slots, cat, res)
+    assert [r["reason"] for r in d["unfilled_reasons"]] == ["contention"]
+
+
+def test_alternatives_next_best_and_used_elsewhere(cat):
+    # Tier 3: two equal slots, a lighter and a heavier feasible donor. Both slots fill (one donor
+    # each), so each slot's runner-up is the OTHER donor — itself reused elsewhere. The lighter donor
+    # saves more, so where it is chosen the margin is positive and where it is the runner-up it is the
+    # negation (the runner-up out-scored the chosen one locally but went to the other slot).
+    from steelreuse.match.optimize import assignment_alternatives
+    slots = [_beam_slot(6000, 20.0, "S0"), _beam_slot(6000, 20.0, "S1")]
+    supply = [
+        SupplyItem(id="light", section="IPE360", grade="S275", length_mm=7000),
+        SupplyItem(id="heavy", section="IPE500", grade="S355", length_mm=7000),
+    ]
+    res = match(supply, slots, cat)
+    assert res.n_reused == 2
+    rows = assignment_alternatives(supply, slots, cat, res)
+    assert {r["slot_id"] for r in rows} == {"S0", "S1"}
+    for r in rows:
+        assert r["alternative_supply_id"] != r["chosen_supply_id"]
+        assert r["alternative_supply_id"] in ("light", "heavy")
+        assert r["alternative_used_elsewhere"] is True
+        assert r["n_alternatives"] == 1
+    margins = sorted(r["margin_kg"] for r in rows)
+    assert margins[0] < 0 < margins[1]
+    assert margins[0] == pytest.approx(-margins[1], abs=0.02)
+
+
+def test_alternatives_no_substitute_when_only_donor(cat):
+    # A slot filled by the only feasible donor has no runner-up.
+    from steelreuse.match.optimize import assignment_alternatives
+    slot = _beam_slot(6000, 20.0, "S0")
+    supply = [SupplyItem(id="only", section="IPE360", grade="S275", length_mm=7000)]
+    res = match(supply, [slot], cat)
+    (r,) = assignment_alternatives(supply, [slot], cat, res)
+    assert r["chosen_supply_id"] == "only" and r["n_alternatives"] == 0
+    assert r["alternative_supply_id"] is None and r["margin_kg"] is None
+    assert r["alternative_used_elsewhere"] is False
+
+
 def test_diagnose_all_filled_has_no_binding_constraint(cat):
     slot = _beam_slot(6000, 20.0)
     supply = [SupplyItem(id="ok", section="IPE360", grade="S275", length_mm=7000)]

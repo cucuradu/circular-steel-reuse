@@ -192,6 +192,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--disposition-csv",
                     help="also write the per-donor disposition advisory rows to this CSV "
                          "(implies --disposition)")
+    ap.add_argument("--donor-value", action="store_true",
+                    help="per-donor what-if value (Tier 4): for every REUSED donor, re-solve the "
+                         "whole match with it removed and report the drop in total CO2 saved — its "
+                         "true global marginal value (the cascade of who-moves-where included). One "
+                         "extra MILP solve per donor, so off by default.")
     ap.add_argument("--passport-out",
                     help="write the material passport to this path as CSV (every mapped donor member: "
                          "mass, audit provenance, avoided-new carbon, and the EN 1993 reuse verdict for "
@@ -345,6 +350,7 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
         wind_kpa=args.wind, seismic_cs=args.seismic, objective=args.objective,
         pareto=args.pareto,
         disposition=args.disposition or bool(args.disposition_csv),
+        donor_value=args.donor_value,
         counterfactual=args.counterfactual, w_overspec=args.w_overspec,
         min_util=args.min_util, max_distinct_sections=args.max_distinct_sections,
         reserve_w=args.reserve, moment_shape=args.moment_shape,
@@ -515,6 +521,11 @@ def _execute(args: argparse.Namespace, donor: str, demand: str | list[str]) -> i
                     w.writeheader()
                     w.writerows(res.disposition)
             print(f"Disposition advisory written -> {dpath}")
+    if res.marginal_value:
+        top = max(res.marginal_value, key=lambda r: r["marginal_co2_kg"])
+        print(f"Donor what-if value: {len(res.marginal_value)} reused donor(s) re-solved; "
+              f"most valuable {top['supply_id']} ({top['section']}) is worth "
+              f"{top['marginal_co2_kg']:.1f} kg CO2e to the solution")
     if args.passport_out:
         rows = passport_rows(res.passport, res.match.assignments)
         ppath = Path(args.passport_out)

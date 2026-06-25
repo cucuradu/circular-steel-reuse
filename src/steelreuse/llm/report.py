@@ -31,15 +31,23 @@ def build_report_context(res: PipelineResult, uncertainty: dict | None = None) -
     m = res.match
     p = res.passport
     decisions = res.audit.decisions if res.audit else {}
+    # Next-best alternative per filled slot (Tier 3), keyed by slot id for the assignments table.
+    alt_by_slot = {r["slot_id"]: r for r in (res.alternatives or [])}
     assignments = []
     for a in m.assignments:
         d = decisions.get(a.supply_id)
+        alt = alt_by_slot.get(a.slot_id, {})
         assignments.append({
             "slot": a.slot_id, "supply": a.supply_id, "section": a.section,
             "utilization": a.utilization, "status": a.status,
             "offcut_mm": a.offcut_mm, "co2_saved_kg": a.co2_saved_kg,
             "chi_lt": a.chi_lt, "chi_lt_if_free": a.chi_lt_if_free,
             "governing": a.governing_combination,
+            # Tier 3: the runner-up donor for this slot + the net-CO2 margin and where it went.
+            "alt_supply": alt.get("alternative_supply_id"),
+            "alt_section": alt.get("alternative_section"),
+            "alt_margin_kg": alt.get("margin_kg"),
+            "alt_used_elsewhere": alt.get("alternative_used_elsewhere", False),
             # Pre-demolition-audit provenance for the reclaimed member used in this assignment.
             "verification": (d.verification or "—") if (d and d.audited) else "—",
             "condition": (d.condition.upper() or "—") if (d and d.audited and d.condition) else "—",
@@ -151,9 +159,22 @@ def build_report_context(res: PipelineResult, uncertainty: dict | None = None) -
             "recycle": sum(1 for r in res.disposition if r["advice"] == "recycle"),
             "reroll_credit_kg": round(sum(r["reroll_credit_kg"] for r in res.disposition), 1),
             "recycle_credit_kg": round(sum(r["recycle_credit_kg"] for r in res.disposition), 1),
+            # Why the unused stock went unused (Tier 2): one bucket per donor reason.
+            "by_reason": {
+                k: sum(1 for r in res.disposition if r.get("reason") == k)
+                for k in ("too-short", "too-weak", "contention", "uneconomic")
+            },
         }
     else:
         ctx["disposition_present"] = False
+    # Per-donor what-if value (Tier 4, only when run_pipeline(donor_value=True) re-solved it): the
+    # most valuable donors first, so the report leads with the stock the result leans on hardest.
+    if res.marginal_value:
+        ctx["marginal_value_present"] = True
+        ctx["marginal_value"] = sorted(
+            res.marginal_value, key=lambda r: -r["marginal_co2_kg"])
+    else:
+        ctx["marginal_value_present"] = False
     # Pre-demolition-audit provenance summary (only shown when the donor model carried audit data).
     if res.audit and res.audit.present:
         a = res.audit
@@ -322,7 +343,15 @@ _TEMPLATE = """<!doctype html>
 </div>
 {% if ctx.diagnosis and ctx.diagnosis.binding_constraint and ctx.diagnosis.binding_constraint != 'none' %}
 <p class="note"><b>Why the rest went unfilled:</b> the binding constraint is
-<b>{{ ctx.diagnosis.binding_constraint }}</b> — {{ ctx.diagnosis.lever }}.</p>{% endif %}
+<b>{{ ctx.diagnosis.binding_constraint }}</b> — {{ ctx.diagnosis.lever }}.</p>
+{% if ctx.diagnosis.unfilled_reasons %}<details class="note"><summary>Per-slot reasons
+({{ ctx.diagnosis.unfilled_reasons|length }} unfilled)</summary>
+<table><tr><th>Slot</th><th>Member</th><th>Section</th><th>Length (mm)</th><th>Reason</th>
+<th>Why</th></tr>
+{% for u in ctx.diagnosis.unfilled_reasons %}<tr>
+ <td>{{ u.slot_id }}</td><td>{{ u.member_id }}</td><td>{{ u.section }}</td>
+ <td>{{ u.length_mm }}</td><td>{{ u.reason }}</td><td>{{ u.detail }}</td></tr>{% endfor %}
+</table></details>{% endif %}{% endif %}
 {% if ctx.projects %}<h2>Portfolio — projects sharing one donor stock</h2>
 <p class="note">One optimization allocated the donor stock across all the projects below at once —
 a donor goes wherever it saves the most, so "save the heavy sections for the project that needs
@@ -337,7 +366,7 @@ them" is an optimization outcome, not a hunch. Slot ids are prefixed with the pr
 <table><tr><th>Demand slot</th><th>Reclaimed member</th><th>Section</th><th>Utilization</th>
 <th>Gov. load case</th><th>Status</th><th>&chi;<sub>LT</sub></th><th>Connection</th>
 {% if ctx.audit_present %}<th>Provenance</th>{% endif %}<th>Off-cut (mm)</th>
-<th>CO2e saved (kg)</th></tr>
+<th>CO2e saved (kg)</th><th>Next best</th></tr>
 {% for a in ctx.assignments %}<tr>
  <td>{{ a.slot }}</td><td>{{ a.supply }}</td><td>{{ a.section }}</td>
  <td>{{ '%.2f'|format(a.utilization) }}</td>
@@ -346,8 +375,12 @@ them" is an optimization outcome, not a hunch. Slot ids are prefixed with the pr
  <td>{% if a.chi_lt is none %}—{% else %}{{ '%.2f'|format(a.chi_lt) }}{% if a.chi_lt == 1.0 and a.chi_lt_if_free is not none and a.chi_lt_if_free < 0.85 %} <span class="review" title="would be {{ '%.2f'|format(a.chi_lt_if_free) }} if the flange were unrestrained">⚠</span>{% endif %}{% endif %}</td>
  <td>{% if a.connection == 'review' %}<span class="review" title="{{ a.connection_note }}">review</span>{% elif a.connection == 'unknown' %}—{% else %}{{ a.connection }}{% endif %}</td>
  {% if ctx.audit_present %}<td>{{ a.verification }}{% if a.condition != '—' %} / cond {{ a.condition }}{% endif %}{% if a.knockdown < 1.0 %} / k={{ '%.2f'|format(a.knockdown) }}{% endif %}</td>{% endif %}
- <td>{{ a.offcut_mm }}</td><td>{{ a.co2_saved_kg }}</td></tr>{% endfor %}
+ <td>{{ a.offcut_mm }}</td><td>{{ a.co2_saved_kg }}</td>
+ <td>{% if a.alt_supply %}{{ a.alt_supply }} (Δ{{ a.alt_margin_kg }} kg{% if a.alt_used_elsewhere %}, used elsewhere{% endif %}){% else %}—{% endif %}</td></tr>{% endfor %}
 </table>
+<p class="note"><b>Next best</b> names the runner-up donor for each slot and the net-CO2 margin (kg) of
+the chosen donor over it; "used elsewhere" means that runner-up was itself reused on another slot —
+why it did not take this one. This is a per-slot trade-off, not a re-solve.</p>
 {% if ctx.connection_review %}<p class="note">{{ ctx.connection_review }} assignment(s) are geometrically
 compatible but flagged <b>connection review</b> (shallower than the design section, thinner web, or
 narrower flange than the connections were detailed for — hover the cell for the reason). Connection
@@ -413,11 +446,29 @@ conventional EAF recycling. Potential end-of-life credits if none were stored:
 {{ ctx.disposition_totals.recycle_credit_kg }} kg CO2e via recycling (all stock — the two are
 alternatives per member, not additive). Summarized by section; per-donor rows via
 <code>--disposition-csv</code>.</p>
+<p class="note"><b>Why each went unused:</b>
+{{ ctx.disposition_totals.by_reason['too-short'] }} too short for any slot,
+{{ ctx.disposition_totals.by_reason['too-weak'] }} too weak for any slot,
+{{ ctx.disposition_totals.by_reason.contention }} feasible but a better donor won the slot,
+{{ ctx.disposition_totals.by_reason.uneconomic }} feasible but uneconomic.</p>
 <table><tr><th>Section</th><th>Donors</th><th>Store</th><th>Re-roll</th><th>Recycle</th>
 <th>Re-roll credit (kg CO2e)</th><th>Recycle credit (kg CO2e)</th></tr>
 {% for d in ctx.disposition_by_section %}<tr>
  <td>{{ d.section }}</td><td>{{ d.n }}</td><td>{{ d.store }}</td><td>{{ d.reroll }}</td>
  <td>{{ d.recycle }}</td><td>{{ d.reroll_credit_kg }}</td><td>{{ d.recycle_credit_kg }}</td></tr>{% endfor %}
+</table>{% endif %}
+{% if ctx.marginal_value_present %}<h2>Donor what-if value</h2>
+<p class="note">For each reused donor the whole match was re-solved with it removed: the
+<b>marginal value</b> is the drop in total CO2e saved — its true worth to the solution, the cascade of
+who-moves-where included. A small marginal value means a close substitute exists (losing the donor
+barely hurts); a large one means the result leans on it. This is a re-solve, not a shadow price.</p>
+<table><tr><th>Donor</th><th>Section</th><th>Marginal value (kg CO2e)</th>
+<th>Total without it (kg CO2e)</th><th>Slots lost</th><th>Other slots reshuffled</th></tr>
+{% for r in ctx.marginal_value %}<tr>
+ <td>{{ r.supply_id }}</td><td>{{ r.section }}</td><td>{{ r.marginal_co2_kg }}</td>
+ <td>{{ r.co2_saved_without_kg }}</td>
+ <td>{% if r.slots_lost %}{{ r.slots_lost|join(', ') }}{% else %}—{% endif %}</td>
+ <td>{{ r.reshuffled_slots }}</td></tr>{% endfor %}
 </table>{% endif %}
 <p>Mapped {{ ctx.mapped }} · fuzzy {{ ctx.fuzzy }} · unknown {{ ctx.unknown }} ·
  {{ ctx.distinct_sections }} distinct donor section(s) used{% if ctx.max_distinct_sections is not none %}

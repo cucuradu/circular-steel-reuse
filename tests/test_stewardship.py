@@ -468,6 +468,78 @@ def test_disposition_known_answer_store_reroll_recycle(cat):
     assert stub["recycle_credit_kg"] == pytest.approx(mass_stub * f.recycle_credit, abs=0.01)
 
 
+def test_disposition_unused_reason_too_short_weak_contention(cat):
+    # Tier 2: each unused donor says WHY it went unused, judged against the whole slot set.
+    #   * "fits"  — feasible (and economic) for slot S -> contention, S in feasible_slot_ids;
+    #   * "long"  — IPE200 cannot carry the slot at any length -> too-weak;
+    #   * "stub"  — IPE300 is strong enough but the 1 m piece can reach nothing -> too-short.
+    slot = _beam_slot(6000, 20.0, "S")
+    supply = [
+        SupplyItem(id="fits", section="IPE400", grade="S275", length_mm=7000),
+        SupplyItem(id="long", section="IPE200", grade="S235", length_mm=8000),
+        SupplyItem(id="stub", section="IPE300", grade="S275", length_mm=1000),
+    ]
+    real = match(supply, [slot], cat)
+    review = dataclasses.replace(
+        real, assignments=[], unmatched_slots=["S"], unused_supply=[s.id for s in supply])
+    by_id = {r["supply_id"]: r for r in stock_disposition(supply, [slot], cat, review)}
+
+    assert by_id["fits"]["reason"] == "contention"
+    assert "S" in by_id["fits"]["feasible_slot_ids"]
+    assert "S" in by_id["fits"]["reason_detail"]
+    assert by_id["long"]["reason"] == "too-weak"
+    assert by_id["long"]["feasible_slot_ids"] == []
+    assert by_id["stub"]["reason"] == "too-short"
+    assert "too short" in by_id["stub"]["reason_detail"]
+
+
+# ---------------------------------------------------------------------------
+# Tier 4 — per-donor what-if marginal value (re-solve with the donor removed)
+# ---------------------------------------------------------------------------
+
+def test_marginal_value_zero_when_a_substitute_exists(cat):
+    # Two identical donors, one slot: the match uses one; removing it lets the twin take the slot at
+    # the same saving -> marginal value ~ 0 (the result does not lean on that specific donor).
+    from steelreuse.match.optimize import donor_marginal_value
+    slot = _beam_slot(6000, 20.0, "S0")
+    supply = [SupplyItem(id="d1", section="IPE360", grade="S275", length_mm=7000),
+              SupplyItem(id="d2", section="IPE360", grade="S275", length_mm=7000)]
+    res = match(supply, [slot], cat)
+    assert res.n_reused == 1
+    (r,) = donor_marginal_value(supply, [slot], cat, res)   # only the reused donor is analysed
+    assert r["supply_id"] == res.assignments[0].supply_id
+    assert r["marginal_co2_kg"] == pytest.approx(0.0, abs=0.01)
+    assert r["slots_lost"] == [] and r["n_reused_without"] == 1 and r["reshuffled_slots"] == 0
+
+
+def test_marginal_value_full_when_no_substitute(cat):
+    # The only feasible donor for a slot is worth its whole booked saving: remove it and the slot
+    # cannot be filled at all.
+    from steelreuse.match.optimize import donor_marginal_value
+    slot = _beam_slot(6000, 20.0, "S0")
+    supply = [SupplyItem(id="only", section="IPE360", grade="S275", length_mm=7000)]
+    res = match(supply, [slot], cat)
+    (r,) = donor_marginal_value(supply, [slot], cat, res)
+    assert r["supply_id"] == "only" and r["slots_lost"] == ["S0"]
+    assert r["n_reused_without"] == 0 and r["n_reused_delta"] == -1
+    assert r["co2_saved_without_kg"] == 0.0
+    assert r["marginal_co2_kg"] == pytest.approx(res.total_co2_saved_kg, abs=0.05)
+
+
+def test_marginal_value_only_via_pipeline_flag_and_renders():
+    from steelreuse.llm.report import build_report_context, render_html
+
+    donor, demand = str(DATA / "samples" / "donor.json"), str(DATA / "samples" / "demand.json")
+    off = run_pipeline(donor, demand)
+    assert off.marginal_value is None                       # off by default (one solve per donor)
+    on = run_pipeline(donor, demand, donor_value=True)
+    assert on.marginal_value and len(on.marginal_value) == on.match.n_reused
+    assert all(r["marginal_co2_kg"] >= -0.01 for r in on.marginal_value)  # never improves on optimum
+    html = render_html(build_report_context(on), "narrative")
+    assert "Donor what-if value" in html
+    assert "Donor what-if value" not in render_html(build_report_context(off), "narrative")
+
+
 # ---------------------------------------------------------------------------
 # A1(ii) — counterfactual booking (opt-in)
 # ---------------------------------------------------------------------------
@@ -567,8 +639,13 @@ def test_disposition_report_section_summarizes_by_section():
     assert totals["n"] == len(res.disposition)
     assert totals["store"] + totals["reroll"] + totals["recycle"] == totals["n"]
     assert sum(r["n"] for r in ctx["disposition_by_section"]) == totals["n"]
+    # Tier 2: every unused donor falls in exactly one why-unused bucket, summing to the total.
+    assert sum(totals["by_reason"].values()) == totals["n"]
+    assert all(r["reason"] in ("too-short", "too-weak", "contention", "uneconomic")
+               for r in res.disposition)
     html = render_html(ctx, "narrative")
     assert "Stock disposition" in html
+    assert "Why each went unused" in html
 
     # without the advisory the section is absent
     ctx_off = build_report_context(run_pipeline(

@@ -310,6 +310,14 @@
             <DataGridTextColumn Header="Status" Binding="{Binding status}" Width="70"/>
             <DataGridTextColumn Header="Gov. case" Binding="{Binding governing}" Width="130"/>
             <DataGridTextColumn Header="CO2 (kg)" Binding="{Binding co2_saved_kg, StringFormat=N0}" Width="80"/>
+            <!-- ToolTip belongs on the header (a FrameworkElement), NOT on DataGridTextColumn, which
+                 has no ToolTip member -> setting it there throws a XamlObjectWriterException at load. -->
+            <DataGridTextColumn Binding="{Binding alt_display}" Width="200">
+              <DataGridTextColumn.Header>
+                <TextBlock Text="Next best"
+                           ToolTip="The runner-up donor for this slot and the net-CO2 margin (kg) of the chosen one over it; 'used elsewhere' means that runner-up was reused on another slot - which is why it did not take this one. A per-slot trade-off, not a re-solve."/>
+              </DataGridTextColumn.Header>
+            </DataGridTextColumn>
           </DataGrid.Columns>
         </DataGrid>
       </TabItem>
@@ -337,6 +345,10 @@
       </TabItem>
       <TabItem Header="Disposition" x:Name="tab_disposition">
         <TextBox x:Name="disposition_text" IsReadOnly="True" FontFamily="Consolas"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+      </TabItem>
+      <TabItem Header="Donor value" x:Name="tab_marginal">
+        <TextBox x:Name="marginal_text" IsReadOnly="True" FontFamily="Consolas"
                  TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
       </TabItem>
       <TabItem Header="Audit" x:Name="tab_audit">

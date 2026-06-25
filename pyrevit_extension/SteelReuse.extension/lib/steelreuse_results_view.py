@@ -100,10 +100,23 @@ def _chi_cell(row):
     return cell
 
 
+def _alt_cell(r):
+    """Tier 3 'next best' cell: the runner-up donor for this slot + the net-CO2 margin."""
+    alt = r.get("alt_donor_id")
+    if not alt:
+        return "&mdash;"
+    margin = r.get("alt_margin_kg")
+    txt = "%s (&Delta;%s kg)" % (_esc(alt), _num(margin, "%.0f"))
+    if r.get("alt_used_elsewhere"):
+        txt += ' <span class="review" title="this runner-up was reused on another slot">used elsewhere</span>'
+    return txt
+
+
 def _assignments_table(rows):
     head = ("<table><thead><tr>"
             "<th>Demand id</th><th>Demand</th><th>Donor id</th><th>Donor</th>"
             "<th>Util</th><th>Status</th><th>&chi;LT</th><th>Conn</th><th>CO2e kg</th>"
+            "<th>Next best</th>"
             "</tr></thead><tbody id=\"srx-rows\">")
     body = []
     for r in rows:
@@ -113,12 +126,12 @@ def _assignments_table(rows):
         body.append(
             ('<tr class="srx-row" data-section="%s" data-status="%s" data-conn="%s" data-util="%s">'
              '<td>%s</td><td>%s</td><td>%s</td><td>%s</td>'
-             '<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>')
+             '<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>')
             % (data_section, _esc(r.get("check_status", "")), conn, r.get("utilization", 0),
                _esc(r.get("demand_id", "")), _esc(r.get("demand_section", "")),
                _esc(r.get("donor_id", "")), _esc(r.get("donor_section", "")),
                _num(r.get("utilization"), "%.2f"), _esc(r.get("check_status", "")),
-               _chi_cell(r), conn_cell, _num(r.get("co2_saved_kg"), "%.0f")))
+               _chi_cell(r), conn_cell, _num(r.get("co2_saved_kg"), "%.0f"), _alt_cell(r)))
     return head + "".join(body) + "</tbody></table>"
 
 
@@ -132,10 +145,12 @@ def _simple_table(title, headers, rows_html):
 
 
 def _unfilled_section(unfilled):
-    rows = ["<tr><td>%s</td><td>%s</td></tr>" % (_esc(u.get("demand_id", "")),
-                                                 _esc(u.get("demand_section", "")))
+    rows = ["<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+            % (_esc(u.get("demand_id", "")), _esc(u.get("demand_section", "")),
+               _esc(u.get("reason_detail", "")))
             for u in unfilled]
-    return _simple_table("Unfilled demand slots (need new steel)", ["Demand id", "Section"], rows)
+    return _simple_table("Unfilled demand slots (need new steel)",
+                         ["Demand id", "Section", "Why unfilled"], rows)
 
 
 def _quarantine_section(quarantined):

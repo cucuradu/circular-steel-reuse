@@ -30,7 +30,9 @@ from .match.optimize import (
     DemandSlot,
     MatchResult,
     SupplyItem,
+    assignment_alternatives,
     diagnose_match,
+    donor_marginal_value,
     match,
     stock_disposition,
 )
@@ -336,6 +338,16 @@ class PipelineResult:
     # :func:`steelreuse.core.mismatch.build_mismatch_log`. Accounts for 100% of donor rows so nothing
     # is silently dropped; surfaced in the evidence package.
     mismatch_log: list[dict] | None = None
+    # Per-assignment next-best alternative (Tier 3, always computed): for each reused pair, the
+    # runner-up donor for that slot + the net-CO2 margin, and whether that runner-up was used
+    # elsewhere — see :func:`steelreuse.match.optimize.assignment_alternatives`. Explains the
+    # optimiser's local choice; advisory, never changes the result.
+    alternatives: list[dict] | None = None
+    # Per-donor what-if value (Tier 4, opt-in): for each REUSED donor, the whole match re-solved with
+    # it removed — the drop in total booked CO2 is the donor's true global marginal value (the
+    # concrete re-solved analogue of an LP shadow price). One MILP solve per donor, so opt-in. See
+    # :func:`steelreuse.match.optimize.donor_marginal_value`. None unless run_pipeline(donor_value=True).
+    marginal_value: list[dict] | None = None
     # Reuse self-weight re-solve (only when --self-weight + --frame-analysis): the demand frame is
     # re-solved with the MATCHED (heavier reclaimed) sections in place, so their extra self-weight
     # flows down the load path, and every matched member is re-checked against the new demand. Set to
@@ -447,6 +459,7 @@ def run_pipeline(
     objective: str = "co2",
     pareto: bool = False,
     disposition: bool = False,
+    donor_value: bool = False,
     counterfactual: str = "none",
     w_overspec: float = 0.0,
     min_util: float = 0.0,
@@ -597,6 +610,12 @@ def run_pipeline(
     if disposition:
         disposition_rows = stock_disposition(supply, slots, catalog, result)
 
+    # Per-donor what-if value (Tier 4, opt-in): re-solve the match with each reused donor removed to
+    # measure its true global marginal CO2. One MILP solve per donor, so only when explicitly asked.
+    marginal_value_rows: list[dict] | None = None
+    if donor_value:
+        marginal_value_rows = donor_marginal_value(supply, slots, catalog, result)
+
     # Portfolio: per-project outcome of the combined allocation (slot ids carry "tag::" prefixes).
     if project_rows is not None:
         for row in project_rows:
@@ -611,6 +630,10 @@ def run_pipeline(
     # Diagnose WHY the match came out this way (binding constraint + lever) for the narrative — always
     # computed, cheap, advisory, never changes the result.
     diagnosis = diagnose_match(supply, slots, catalog, result)
+
+    # Per-assignment next-best alternative (always computed; cheap — only the filled slots are
+    # re-derived). Explains WHY each slot's donor won it over the runner-up; advisory only.
+    alternatives = assignment_alternatives(supply, slots, catalog, result)
 
     # Donor-row mismatch log (Roadmap §1.2): classify every donor member (mapped / fuzzy / unknown /
     # quarantined) with a reason from the section mapping + the audit, cross-referenced with the match
@@ -635,5 +658,6 @@ def run_pipeline(
         validation=report, passport=passport, match=result, frame=frame_result, audit=audit,
         donor=donor, demand=demand, slots=slots, supply=supply, pareto=pareto_rows,
         disposition=disposition_rows, projects=project_rows, diagnosis=diagnosis,
-        mismatch_log=mismatch_log, reuse_recheck=reuse_recheck,
+        mismatch_log=mismatch_log, alternatives=alternatives,
+        marginal_value=marginal_value_rows, reuse_recheck=reuse_recheck,
     )

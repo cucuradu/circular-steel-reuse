@@ -27,12 +27,27 @@ def _restraint_warn(a):
     return chi == 1.0 and free is not None and free < 0.85
 
 
+def _alt_display(a):
+    """Tier 3 'next best' cell: the runner-up donor for this slot, its net-CO2 margin, and (when it
+    was reused elsewhere) why it did not take this slot. '' when no substitute existed."""
+    alt = a.get("alt_donor_id")
+    if not alt:
+        return ""
+    txt = str(alt)
+    margin = a.get("alt_margin_kg")
+    if margin is not None:
+        txt += " (margin " + str(margin) + " kg)"
+    if a.get("alt_used_elsewhere"):
+        txt += " - used elsewhere"
+    return txt
+
+
 class Row:
     """One assignment row, flattened for the grid (plain attributes, no JSON dict lookups in XAML)."""
 
     __slots__ = ("slot_id", "demand_id", "demand_section", "donor_id", "donor_section",
                  "utilization", "governing", "status", "restraint_warn", "connection",
-                 "offcut_mm", "co2_saved_kg", "verification", "condition")
+                 "offcut_mm", "co2_saved_kg", "verification", "condition", "alt_display")
 
     def __init__(self, a):
         self.slot_id = a.get("slot_id", "")
@@ -49,6 +64,7 @@ class Row:
         self.co2_saved_kg = a.get("co2_saved_kg") or 0.0
         self.verification = a.get("verification", "")
         self.condition = a.get("condition", "")
+        self.alt_display = _alt_display(a)
 
 
 class MismatchRow:
@@ -80,6 +96,9 @@ class ResultsView:
         self.portfolio = data.get("portfolio", [])
         self.pareto = data.get("pareto", [])
         self.disposition = data.get("disposition", {})
+        # Tier 4: per-donor what-if marginal value (one row per reused donor); present only when the
+        # run was launched with --donor-value (one extra MILP solve per donor).
+        self.marginal_value = data.get("marginal_value", [])
         self.audit = data.get("audit", {})
         self.paths = data.get("paths", {})
         # Roadmap §1.2: the externalised rule-data versions + the donor-row mismatch log
@@ -101,6 +120,10 @@ class ResultsView:
     @property
     def has_disposition(self):
         return bool(self.disposition)
+
+    @property
+    def has_marginal_value(self):
+        return bool(self.marginal_value)
 
     @property
     def has_audit(self):

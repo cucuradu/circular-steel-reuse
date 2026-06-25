@@ -50,6 +50,31 @@ def test_rows_carry_display_status_chip():
     assert rows[1].status == "review" and rows[1].restraint_warn is False
 
 
+def test_alt_display_renders_next_best():
+    # Tier 3: the assignments grid's "Next best" cell.
+    a = {"slot_id": "S0", "donor_id": "D1", "alt_donor_id": "D5",
+         "alt_margin_kg": 12.0, "alt_used_elsewhere": True}
+    assert model._alt_display(a) == "D5 (margin 12.0 kg) - used elsewhere"
+    assert model.Row(a).alt_display == "D5 (margin 12.0 kg) - used elsewhere"
+    # runner-up not reused elsewhere; negative margin (it out-scored the chosen one locally)
+    assert model._alt_display(
+        {"alt_donor_id": "D7", "alt_margin_kg": -3.5, "alt_used_elsewhere": False}) \
+        == "D7 (margin -3.5 kg)"
+    # no substitute -> blank cell (and the plain sample carries none)
+    assert model._alt_display({"donor_id": "D1"}) == ""
+    assert model.parse(_SAMPLE).rows[0].alt_display == ""
+
+
+def test_marginal_value_block_optional():
+    # Tier 4 'Donor value' tab: absent unless the run computed it (--donor-value).
+    assert model.parse(_SAMPLE).has_marginal_value is False
+    with_mv = dict(_SAMPLE, marginal_value=[
+        {"supply_id": "D1", "section": "IPE300", "marginal_co2_kg": 120.5,
+         "slots_lost": ["N1#0"], "reshuffled_slots": 1}])
+    v = model.parse(with_mv)
+    assert v.has_marginal_value is True and v.marginal_value[0]["supply_id"] == "D1"
+
+
 def test_filter_by_status():
     rows = model.parse(_SAMPLE).rows
     assert [r.donor_id for r in model.filter_rows(rows, status="review")] == ["D2"]

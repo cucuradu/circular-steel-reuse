@@ -367,17 +367,28 @@ def build_results(result: PipelineResult) -> dict:
             "verification": a["verification"],
             "condition": a["condition"],
             "knockdown": a["knockdown"],
+            # Tier 3: runner-up donor for this slot + net-CO2 margin and where it went.
+            "alt_donor_id": a.get("alt_supply"),
+            "alt_donor_section": a.get("alt_section"),
+            "alt_margin_kg": a.get("alt_margin_kg"),
+            "alt_used_elsewhere": a.get("alt_used_elsewhere", False),
         })
 
+    # Per-slot reason for each empty slot (diagnose_match Tier 1), keyed by slot id.
+    reason_by_slot = {r["slot_id"]: r
+                      for r in (ctx.get("diagnosis") or {}).get("unfilled_reasons", [])}
     unfilled = []
     for slot_id in m.unmatched_slots:
         slot = slots_by_id.get(slot_id)
         if slot is None:
             continue
+        dr = reason_by_slot.get(slot_id, {})
         unfilled.append({
             "demand_id": slot.member_id,
             "slot_id": slot.id,
             "demand_section": slot.design_section or "",
+            "reason": dr.get("reason", ""),
+            "reason_detail": dr.get("detail", ""),
         })
 
     quarantined_donors = []
@@ -443,6 +454,8 @@ def build_results(result: PipelineResult) -> dict:
     if ctx.get("disposition_present"):
         out["disposition"] = {"totals": ctx["disposition_totals"],
                               "by_section": ctx["disposition_by_section"]}
+    if ctx.get("marginal_value_present"):
+        out["marginal_value"] = ctx["marginal_value"]
     if ctx.get("audit_present"):
         out["audit"] = {
             "audited": ctx["audit_audited"], "admitted": ctx["audit_admitted"],

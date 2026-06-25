@@ -52,6 +52,7 @@ from .match.optimize import (
     DemandSlot,
     MatchResult,
     SupplyItem,
+    assignment_alternatives,
     baseline_new_mass_kg,
     verify_match,
 )
@@ -305,6 +306,8 @@ def build_evidence_package(
 
     # The verify_match certificate, computed now over the same objects the solve produced.
     issues = verify_match(res.supply, res.slots, catalog, m, factors)
+    # Per-assignment next-best alternative (Tier 3), re-derived from the same inputs.
+    alternatives = assignment_alternatives(res.supply, res.slots, catalog, m, factors)
 
     assignments_evidence = []
     for a in m.assignments:
@@ -413,6 +416,10 @@ def build_evidence_package(
         # with a reason — 100% coverage so nothing is silently dropped (Roadmap §1.2).
         "mismatch_log": mlog,
         "mismatch_summary": mismatch_summary(mlog),
+        # Demand-side WHY: the binding constraint, its lever, and a per-unfilled-slot reason (Tier 1).
+        "diagnosis": getattr(res, "diagnosis", None) or {},
+        # Per-assignment WHY: the runner-up donor for each filled slot + the net-CO2 margin (Tier 3).
+        "assignment_alternatives": alternatives,
         # Everything needed to re-run verify_match from the package alone (see rebuild_run).
         "reconstruction": {
             "supply": [_supply_to_dict(s) for s in res.supply],
@@ -420,6 +427,14 @@ def build_evidence_package(
             "result": _result_to_dict(m),
         },
     }
+    # Per-unused-donor end-of-fate + WHY-unused reason (Tier 2), when the run computed it.
+    disposition = getattr(res, "disposition", None)
+    if disposition is not None:
+        package["stock_disposition"] = disposition
+    # Per-donor what-if marginal value (Tier 4), when the run re-solved it (opt-in).
+    marginal_value = getattr(res, "marginal_value", None)
+    if marginal_value is not None:
+        package["donor_marginal_value"] = marginal_value
     return package
 
 

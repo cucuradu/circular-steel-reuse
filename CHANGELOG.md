@@ -7,6 +7,41 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Per-element "why" on every empty slot and every unused donor** (`match/optimize.py`). The match
+  diagnosis no longer collapses into a single headline: `diagnose_match` now returns
+  `unfilled_reasons` — one element-specific verdict per empty slot (its id, member, section, length,
+  and `length` / `capacity` / `contention` / `economics` reason with a one-line explanation). And
+  `stock_disposition` now tags each unused donor with **why it went unused**, judged against the
+  *whole* slot set rather than only the unfilled ones: `too-short` / `too-weak` (never feasible),
+  `contention` (feasible — even economic — somewhere, but a better donor won that slot; the slots are
+  listed) or `uneconomic` (feasible but every fit books negative net CO2). Both surface through the
+  pipeline: the HTML report gains a per-slot reasons table and a why-unused breakdown, the Revit
+  results.json/Results window show the per-slot reason and a disposition reason summary, and the
+  evidence package carries the full diagnosis + per-donor disposition. Numbers stay computed in Python
+  (the LLM only renders them). Unit-tested in `test_narrative.py` and `test_stewardship.py`.
+- **Per-assignment "next best alternative"** (`assignment_alternatives` in `match/optimize.py`). For
+  every reused pair the matcher now records the **runner-up donor** for that slot, the net-CO2
+  `margin_kg` of the chosen donor over it, and whether that runner-up was itself reused elsewhere —
+  which explains the optimiser's local choice ("D1 won N2#0 over D3 by 8.6 kg; D3 went to a better
+  slot"). It ranks the substitutes for a slot, so `margin_kg` reads as kgCO2e under any objective and
+  can be negative (the runner-up out-scored the chosen donor locally but was more valuable
+  elsewhere); it is *not* a re-solve with a donor removed (LP shadow prices stay out of scope). Always
+  computed (only the filled slots are re-derived, so it is cheap) and surfaced as a "Next best" column
+  in the HTML report, the Revit results.json/Results assignments grid, and the evidence package.
+  Unit-tested in `test_narrative.py`, `test_panel_model.py` and `test_evidence.py`.
+- **Per-donor "what-if" marginal value** (`donor_marginal_value` in `match/optimize.py`; opt-in via
+  `--donor-value` / `run_pipeline(donor_value=True)`). Where the next-best column answers a *local*
+  question, this answers the *global* one: for each REUSED donor the whole match is re-solved with it
+  deleted from the stock, and the drop in total booked CO2 is its true marginal value — the concrete,
+  re-solved analogue of an LP shadow price, honest about the integer problem (it includes the whole
+  cascade: the runner-up freeing up, that slot's loser moving, and so on) and verifiable by re-running
+  the solver rather than trusting a dual. A small value means a close substitute exists; a large one
+  means the result leans on that donor. Only reused donors are analysed (an unused donor's marginal
+  value is zero by construction), ordered by booked CO2. It is the one genuinely expensive advisory —
+  one MILP solve per donor — hence off by default. Surfaced as a console summary line, a "Donor
+  what-if value" report table (donor, marginal value, slots lost, cascade size), a "Donor value"
+  Revit results tab, and a `donor_marginal_value` block in the evidence package. Unit-tested in
+  `test_stewardship.py` and `test_panel_model.py`.
 - **Spreadsheet inventory input (`.csv` / `.xlsx`) + a blank template** (`inventory_sheet.py`). A
   donor or demand model no longer has to be extractor JSON: a `.csv`/`.xlsx` list of members is read
   straight into the schema (headers matched by alias — `section`/`profile`, `grade`, `length`,

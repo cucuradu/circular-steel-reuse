@@ -59,7 +59,7 @@ class SteelReusePanel(forms.WPFWindow):
         self.apply_button.Click += self._on_apply
         # Optional result tabs start hidden; a run reveals the ones whose data is present.
         for tab in (self.tab_unfilled, self.tab_portfolio, self.tab_pareto,
-                    self.tab_disposition, self.tab_audit, self.tab_warnings):
+                    self.tab_disposition, self.tab_marginal, self.tab_audit, self.tab_warnings):
             tab.Visibility = Visibility.Collapsed
         self._restore()
 
@@ -297,7 +297,9 @@ class SteelReusePanel(forms.WPFWindow):
         unfilled = v.unfilled
         lines = ["%s unfilled slot(s) need new steel:" % len(unfilled), ""]
         for r in unfilled:
-            lines.append("  %-16s %s" % (r.get("slot_id", ""), r.get("demand_section", "")))
+            detail = r.get("reason_detail", "")
+            lines.append("  %-16s %-12s %s"
+                         % (r.get("slot_id", ""), r.get("demand_section", ""), detail))
         self.unfilled_text.Text = "\n".join(lines)
         self.tab_unfilled.Visibility = Visibility.Visible
 
@@ -308,6 +310,8 @@ class SteelReusePanel(forms.WPFWindow):
         self._opt_tab(self.tab_pareto, v.has_pareto, self.pareto_text, self._fmt_pareto)
         self._opt_tab(self.tab_disposition, v.has_disposition,
                       self.disposition_text, self._fmt_disposition)
+        self._opt_tab(self.tab_marginal, v.has_marginal_value,
+                      self.marginal_text, self._fmt_marginal)
         self._opt_tab(self.tab_audit, v.has_audit, self.audit_text, self._fmt_audit)
         self._opt_tab(self.tab_provenance, v.has_mismatch,
                       self.provenance_text, self._fmt_provenance)
@@ -351,11 +355,19 @@ class SteelReusePanel(forms.WPFWindow):
     def _fmt_disposition(self):
         d = self._view.disposition
         t = d.get("totals", {})
+        br = t.get("by_reason", {})
         out = [
             "Unused donors: %s    store %s | re-roll %s | recycle %s"
             % (t.get("n", ""), t.get("store", ""), t.get("reroll", ""), t.get("recycle", "")),
             "Potential credits: %.1f kg CO2e re-roll, %.1f kg CO2e recycle"
             % (float(t.get("reroll_credit_kg") or 0), float(t.get("recycle_credit_kg") or 0)),
+        ]
+        if br:
+            out.append(
+                "Why unused: too-short %s | too-weak %s | contention %s | uneconomic %s"
+                % (br.get("too-short", 0), br.get("too-weak", 0),
+                   br.get("contention", 0), br.get("uneconomic", 0)))
+        out += [
             "",
             "%-12s %7s %6s %8s %8s" % ("section", "donors", "store", "re-roll", "recycle"), "",
         ]
@@ -363,6 +375,24 @@ class SteelReusePanel(forms.WPFWindow):
             out.append("%-12s %7s %6s %8s %8s"
                        % (r.get("section", ""), r.get("n", ""), r.get("store", ""),
                           r.get("reroll", ""), r.get("recycle", "")))
+        return "\n".join(out)
+
+    def _fmt_marginal(self):
+        rows = sorted(self._view.marginal_value,
+                      key=lambda r: -(r.get("marginal_co2_kg") or 0))
+        out = [
+            "What each reused donor is worth to the solution (re-solved without it):",
+            "A small value = a close substitute exists; a large value = the result leans on it.",
+            "",
+            "%-10s %-12s %14s %12s %8s" % ("donor", "section", "marginal CO2e", "slots lost",
+                                           "reshuf."), "",
+        ]
+        for r in rows:
+            lost = ", ".join(r.get("slots_lost") or []) or "-"
+            out.append("%-10s %-12s %14.1f %12s %8s"
+                       % (r.get("supply_id", ""), r.get("section", ""),
+                          float(r.get("marginal_co2_kg") or 0), lost,
+                          r.get("reshuffled_slots", 0)))
         return "\n".join(out)
 
     def _fmt_portfolio(self):

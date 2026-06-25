@@ -193,4 +193,8 @@ def test_small_known_run_evidence():
     ev = pkg["assignments"][0]
     assert ev["section"] == "IPE360"
     assert ev["en_1993"]["governing_clause"]  # e.g. bending_y / shear_z
+    # Tier 3: per-assignment next-best alternative is recorded (the lone donor has no substitute).
+    alt = pkg["assignment_alternatives"][0]
+    assert alt["slot_id"] == "S0" and alt["chosen_supply_id"] == "d1"
+    assert alt["alternative_supply_id"] is None and alt["n_alternatives"] == 0
     assert verify_from_package(pkg, catalog=cat) == []
