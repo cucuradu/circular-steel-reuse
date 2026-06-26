@@ -223,6 +223,18 @@ deconstruction-sequence + SCI P427 + existing-PDA-platform research recorded in 
   provably wrong → flag "moment frame or laterally deficient" and surface a global moment-frame toggle
   (`pin_beams=False`), showing `alpha_cr` for both assumptions. Never a silent flip. (The
   `demand_test_1` diagonals were 2.3° roof rafters, not braces — exactly the case this catches.)
+- 🟠 **Bring-your-own-analysis ingestion (engineer analysed elsewhere).** Revit's IFC export drops the
+  analytical model, so fixity can't ride IFC. Ingest the external analytical model (geometry + sections
+  + releases + supports) **directly** from the analysis package → the same `ExtractedMember` JSON, a
+  third extractor front-end beside the Revit and IFC readers, no Revit redo. Targets: **SAP2000**
+  (reuses the existing `frame_sap2000.py` OAPI backend), **ETABS** (same CSI API), **SCIA** + **Tekla
+  Structural Designer** (one **SAF** importer), **Robot** (native Revit↔Robot link → the Revit reader).
+  Per-vendor detail in [docs/CONNECTION_DATA_PLAN.md](docs/CONNECTION_DATA_PLAN.md).
+- ★ **Import the engineer's computed member forces as the demand.** Beyond the model: ingest the solved
+  member forces / utilisations from the external analysis and use them **directly as the demand
+  envelope**, making the in-tool frame solve a cross-check rather than the source of truth. Sidesteps
+  the fixity-fidelity / `alpha_cr` problem outright — the engineer's own analysis is authoritative
+  (numbers ingested, never invented; still subject to the reused-steel member checks).
 - 🟡 **Persistent donor / connection library ("the server remembers").** A durable store of surveyed
   grades + connections per donor so re-runs and future projects reuse the captured data — overlaps the
   multi-donor stock / Material Bank items under *New directions* and CirCoFin below.

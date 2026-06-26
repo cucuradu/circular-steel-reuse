@@ -26,28 +26,33 @@ _DIR = os.path.dirname(__file__)
 # big grid is real compute (and disk) the engineer should opt into deliberately.
 _CONFIRM_ABOVE = 60
 
-# The dials this planner exposes as sweep axes. Each value is picked from tick-boxes (no free text ->
-# no misspelling): (engine param, [(checkbox x:Name, value string), ...]). A dial varies only when at
-# least one of its values is ticked. The value strings are typed by steelreuse_sweep.parse_values
-# (unit-tested), keyed by the param name -- 'none' -> None for the section cap, floats for the rest.
-_AXES = (
+# Sweep dials with a SMALL set of discrete values -> tick-boxes (no free text, no misspelling):
+# (engine param, [(checkbox x:Name, value string), ...]). A dial varies iff >=1 value is ticked. The
+# value strings are typed by steelreuse_sweep.parse_values (unit-tested) -- floats, booleans, strings.
+_CHECK_AXES = (
     ("objective", (("obj_co2", "co2"), ("obj_members", "members"),
                    ("obj_mass", "mass"), ("obj_balanced", "balanced"))),
-    ("min_util", (("mu_00", "0.0"), ("mu_05", "0.5"), ("mu_06", "0.6"), ("mu_07", "0.7"))),
-    ("max_distinct_sections", (("ms_none", "none"), ("ms_6", "6"), ("ms_8", "8"), ("ms_10", "10"))),
-    ("knockdown", (("kd_10", "1.0"), ("kd_09", "0.9"), ("kd_085", "0.85"), ("kd_08", "0.8"))),
     ("carbon_dataset", (("cb_ice_v3", "ice_v3"), ("cb_ice_v4", "ice_v4"),
                         ("cb_oekobaudat", "oekobaudat"))),
     ("counterfactual", (("cf_none", "none"), ("cf_recycling", "recycling"),
                         ("cf_rerolling", "rerolling"))),
     ("w_overspec", (("wo_0", "0.0"), ("wo_03", "0.3"))),
     ("splice", (("sp_off", "off"), ("sp_on", "on"))),
-    ("national_annex", (("na_en", "en"), ("na_dk", "dk"), ("na_fi", "fi"), ("na_cy", "cy"),
-                        ("na_es", "es"), ("na_be", "be"), ("na_it", "it"), ("na_uk", "uk"),
-                        ("na_de", "de"), ("na_fr", "fr"), ("na_nl", "nl"), ("na_ie", "ie"))),
 )
-# Flat list of every value checkbox, for wiring the live run-count update.
-_AXIS_CHECKS = tuple(name for _param, items in _AXES for name, _val in items)
+_CHECK_NAMES = tuple(name for _param, items in _CHECK_AXES for name, _val in items)
+
+# Sweep dials with a LARGE range of values -> multi-select ListBox (param, listbox x:Name). The list
+# is filled from the value lists below; the selected items are read back as the swept values.
+_LIST_AXES = (
+    ("min_util", "minutil_list"),
+    ("max_distinct_sections", "maxsec_list"),
+    ("knockdown", "knock_list"),
+)
+# 0.00, 0.05, ... 1.00 for the utilisation/knockdown lists; 'none' + 1..20 for the section cap.
+_FRACTION_VALUES = ["%.2f" % (i * 0.05) for i in range(21)]
+_MAXSEC_VALUES = ["none"] + [str(i) for i in range(1, 21)]
+_LIST_VALUES = {"minutil_list": _FRACTION_VALUES, "knock_list": _FRACTION_VALUES,
+                "maxsec_list": _MAXSEC_VALUES}
 
 
 class SweepPlanner(forms.WPFWindow):
@@ -65,23 +70,38 @@ class SweepPlanner(forms.WPFWindow):
         if demand:
             self.demand_box.Text = demand if isinstance(demand, str) else "; ".join(demand)
         self.workers_box.Text = str(sweep.default_workers())
+        # Fill the multi-select lists with their full value ranges (added as items, not ItemsSource,
+        # so SelectedItems reads back the plain strings under IronPython).
+        for lb_name, values in _LIST_VALUES.items():
+            lb = getattr(self, lb_name)
+            for v in values:
+                lb.Items.Add(v)
 
         self.donor_browse.Click += self._pick_donor
         self.demand_browse.Click += self._pick_demand
         self.run_button.Click += self._on_run
-        for name in _AXIS_CHECKS:
+        for name in _CHECK_NAMES:
             check = getattr(self, name)
             check.Checked += self._update_count
             check.Unchecked += self._update_count
+        for _param, lb_name in _LIST_AXES:
+            getattr(self, lb_name).SelectionChanged += self._update_count
         self._update_count()
 
     # -- inputs -----------------------------------------------------------------------------------
     def _axes(self):
-        """The ordered ``(param, [values])`` axes from the ticked values; a dial with no ticks is
-        skipped. Ticked value strings go through ``sweep.parse_values`` for typing (floats / None)."""
+        """The ordered ``(param, [values])`` axes from the ticked check-boxes and the selected list
+        items; a dial with no selection is skipped. Values go through ``sweep.parse_values`` for
+        typing (floats / booleans / 'none' -> None)."""
         axes = []
-        for param, items in _AXES:
+        for param, items in _CHECK_AXES:
             picked = [val for name, val in items if getattr(self, name).IsChecked]
+            if picked:
+                vals = sweep.parse_values(param, ", ".join(picked))
+                if vals:
+                    axes.append((param, vals))
+        for param, lb_name in _LIST_AXES:
+            picked = [str(item) for item in getattr(self, lb_name).SelectedItems]
             if picked:
                 vals = sweep.parse_values(param, ", ".join(picked))
                 if vals:
@@ -142,8 +162,13 @@ class SweepPlanner(forms.WPFWindow):
         out_root = os.path.join(runner.reports_dir(self._ext_root),
                                 "sweep_" + time.strftime("%Y%m%d-%H%M%S"))
         # Realistic base shared by every point: moment-shape on (sharper, valid EN check) mirrors the
-        # Run Match default. Donor/demand + the swept axes complete each point.
+        # Run Match default. The National Annex is a single country for the WHOLE sweep (not a varied
+        # dial) -- it sets the q_k imposed loads, the realistic-base side, so it belongs in the fixed
+        # base. Donor/demand + the swept axes complete each point.
         fixed = {"donor": donor, "demand": demand, "moment_shape": True}
+        na = self.na_combo.SelectedItem.Content if self.na_combo.SelectedItem else "en"
+        if na:
+            fixed["national_annex"] = na
         plan_rows = sweep.plan(fixed, axes, out_root)
 
         self.run_button.IsEnabled = False

@@ -93,6 +93,55 @@ are the *build-order* view across them.
 - **A4 · Tests** (pure Python): a moment-frame fixture with explicit `moment_i/j=True` must raise
   `alpha_cr` well above the all-pinned value; a `None` member must reproduce today's result exactly.
 
+## Track A — Source 3: bring your own analysis (engineer analysed elsewhere)
+
+Many engineers run the structural checks in a dedicated FEA package and will **not** re-author the
+analytical model in Revit. Revit's IFC export **drops the analytical model** (releases/supports are
+lost — [Autodesk](https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/How-to-export-analytical-model-to-IFC-in-order-to-use-the-file-with-FEM-programs-from-Revit.html)),
+so fixity must be ingested **directly from the analysis software**, bypassing Revit. The ingest emits
+the **same `ExtractedMember` JSON** (geometry + section + `moment_i/j` + `base_fixed`), so everything
+downstream (frame check, value case, match) is unchanged — it is a third extractor front-end alongside
+the Revit reader (A1) and the IFC reader (`ifc_extract.py`).
+
+Two mechanisms cover the field:
+
+- **SAF (Structural Analysis Format)** — open, Excel-based; carries nodes, members, sections, supports
+  and **hinges/releases** ([SCIA](https://www.scia.net/en/innovations/structural-analysis-format-saf)).
+  The vendor-neutral target: one SAF importer covers SCIA, Tekla SD, Dlubal, ArchiCAD.
+- **Native / API** — per-vendor model file or API where SAF is absent.
+
+### SAP2000
+- Path: the **CSI OAPI** — this repo **already has a SAP2000 backend** (`core/frame_sap2000.py`), so
+  reading the engineer's model (members, sections, **restraints + frame releases**, and solved member
+  forces) reuses an existing connection. Alternatives: the `.s2k`/`.b2k` text model, or the free
+  **CSiXRevit** link into Revit (then the A1 Revit reader picks it up).
+- Carries: full analytical model + results. **Cheapest to build — backend exists.**
+
+### ETABS
+- Path: the **same CSI OAPI family** as SAP2000 (shared API surface), so the SAP2000 backend pattern
+  extends to ETABS with little new code. Alternatives: `.e2k`/`.edb` export, or CSiXRevit.
+- Carries: full analytical model + results. Reuses the SAP2000 work.
+
+### Robot Structural Analysis
+- Path: the native **Revit ↔ Robot link** (AEC Collection) pushes Robot's analytical model — with
+  releases/supports — *into* Revit, where the A1 Revit reader then reads it. Robot also exposes a COM
+  API / file export. **Robot does NOT support SAF**, so the Revit-link (or API) is the route.
+- Carries: full analytical model (+ results via API).
+
+### SCIA Engineer
+- Path: **SAF** (SCIA originated the format — cleanest, native export). Direct SAF ingestion, no Revit.
+- Carries: full analytical model + releases via SAF.
+
+### Tekla Structural Designer
+- Path: **SAF** export → the same SAF importer as SCIA. (Tekla SD also has its own API.)
+- Carries: full analytical model + releases via SAF.
+
+**Build order within Source 3:** SAP2000 first (backend exists) to prove the path → one **SAF importer**
+(unlocks SCIA + Tekla SD together) → ETABS (extends CSI) → Robot (folds into A1 via the Revit link).
+Each is untestable without the respective software/licence — like the Revit reader, you validate each
+against a real export. See also the related FUTURE_IMPROVEMENTS item on **importing the engineer's
+computed member forces as the demand** (bypassing the in-tool frame solve entirely).
+
 ## Track B — donor connection & deconstructability
 
 - **B1 · Source.** (i) **Survey import**: extend `survey.py` / Import Survey with `connection_type`,
