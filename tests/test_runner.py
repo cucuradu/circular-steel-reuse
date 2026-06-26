@@ -106,6 +106,16 @@ def test_command_emits_carbon_and_policy_flags():
     assert _pair(cmd, "--max-distinct-sections") == "8"
 
 
+def test_command_emits_carbon_dataset_and_splice():
+    opts = {"donor": "d", "demand": "m", "carbon_dataset": "oekobaudat", "splice": True}
+    cmd = runner.build_command("py", opts, "o")
+    assert _pair(cmd, "--carbon-dataset") == "oekobaudat"
+    assert "--splice" in cmd
+    # off/absent -> neither flag emitted
+    plain = runner.build_command("py", {"donor": "d", "demand": "m", "splice": False}, "o")
+    assert "--splice" not in plain and "--carbon-dataset" not in plain
+
+
 def test_command_emits_load_and_frame_flags():
     opts = {"donor": "d", "demand": "m", "dead": 4.0, "live": 2.5, "gamma_g": 1.35, "gamma_q": 1.5,
             "trib_width": 2.5, "col_trib_area": 12.0, "col_floors": 3, "col_ecc": 50,

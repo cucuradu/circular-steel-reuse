@@ -80,9 +80,10 @@
           <ComboBoxItem Content="co2"/>
           <ComboBoxItem Content="members"/>
           <ComboBoxItem Content="mass"/>
+          <ComboBoxItem Content="balanced"/>
         </ComboBox>
         <TextBlock Style="{StaticResource InfoIcon}"
-                   ToolTip="What the matcher maximises: net CO2 saved (default), the number of members reused, or the reclaimed steel mass put back to work. 'members' and 'mass' break ties toward CO2. Feasibility is identical across objectives; only which feasible pairings win changes."/>
+                   ToolTip="What the matcher maximises: net CO2 saved (default), the number of members reused, the reclaimed steel mass put back to work, or 'balanced' - fill the most slots and then even out donor utilisation (max-min), so no donor sits grossly under-used. 'members'/'mass' break ties toward CO2. Feasibility is identical across objectives; only which feasible pairings win changes."/>
         <CheckBox x:Name="no_cut_check" Content="Whole-member only (no cutting)"
                   VerticalAlignment="Center" Margin="16,0,0,0"/>
         <TextBlock Style="{StaticResource InfoIcon}"
@@ -121,10 +122,22 @@
                 <CheckBox x:Name="pareto_check" Content="Pareto trade-off"/>
                 <TextBlock Style="{StaticResource InfoIcon}"
                            ToolTip="Connection screen: excludes donors geometrically incompatible with the slot's design section (wrong shape family, too deep) before matching; milder mismatches are flagged 'review'.   Verify optimal: independently re-derives every feasible pairing and confirms no better single move exists.   Pareto trade-off: also solves under each objective (CO2/members/mass) and reports the trade-off table; the shipped assignments still follow the selected objective."/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <CheckBox x:Name="splice_check" Content="Allow splicing"/>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Allow a long slot that NO single in-stock donor reaches to be filled by two same-section, same-grade donors joined end-to-end (one splice, two pieces; AISC 360 J1.4 / EC3). Each splice consumes both pieces in full and books an extra splice-joint carbon penalty on top of the connection refab. Off by default."/></StackPanel>
             </StackPanel>
           </TabItem>
           <TabItem Header="Carbon">
             <StackPanel Margin="10">
+              <StackPanel Orientation="Horizontal" Margin="0,3">
+                <Label Content="Carbon factor dataset" Width="190"/>
+                <ComboBox x:Name="carbon_dataset_combo" Width="120">
+                  <ComboBoxItem Content="ice_v3"/>
+                  <ComboBoxItem Content="ice_v4"/>
+                  <ComboBoxItem Content="oekobaudat"/></ComboBox>
+                <TextBlock Style="{StaticResource InfoIcon}"
+                           ToolTip="Embodied-carbon factor set every saving is booked against: ice_v3 (Circular Ecology ICE v3 2019, A1-A3 1.55 - default), ice_v4 (ICE v4 2024 = Climatiq 'Steel - Section', 1.61), or oekobaudat (German EPD via Oekobaudat, 1.74). The sets differ in the A1-A3 production figure; the dataset used is recorded in the evidence package."/></StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,3">
                 <Label Content="End-of-life counterfactual" Width="190"/>
                 <ComboBox x:Name="counterfactual_combo" Width="120">

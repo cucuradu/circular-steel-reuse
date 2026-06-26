@@ -78,6 +78,7 @@ class SteelReusePanel(forms.WPFWindow):
             self.demand_box.Text = demand if isinstance(demand, str) else "; ".join(demand)
         self.objective_combo.SelectedIndex = 0
         self.counterfactual_combo.SelectedIndex = 0
+        self.carbon_dataset_combo.SelectedIndex = 0
         self.solver_combo.SelectedIndex = 0
         self.status_filter.SelectedIndex = 0
 
@@ -122,7 +123,9 @@ class SteelReusePanel(forms.WPFWindow):
             "connections": bool(self.connections_check.IsChecked),
             "verify_match": bool(self.verify_check.IsChecked),
             "pareto": bool(self.pareto_check.IsChecked),
+            "splice": bool(self.splice_check.IsChecked),
             # Carbon
+            "carbon_dataset": self.carbon_dataset_combo.SelectedItem.Content,
             "counterfactual": self.counterfactual_combo.SelectedItem.Content,
             "disposition": bool(self.disposition_check.IsChecked),
             "donor_value": bool(self.donor_value_check.IsChecked),

@@ -343,8 +343,13 @@ def _run_logged(cmd, out_dir, paths, log_name):
         os.makedirs(out_dir)
     cmd = [cmd[0], "-u"] + cmd[1:]
     log_path = os.path.join(out_dir, log_name)
-    creationflags = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    # Hide the child's console window and isolate it from Revit's console-control events. The
+    # subprocess constants must be hardcoded as a fallback: pyRevit's IronPython engine ships a
+    # subprocess module that does NOT define CREATE_NO_WINDOW, so getattr(..., 0) silently dropped
+    # the flag and a blank terminal popped for every run (one per sweep point). 0x08000000 =
+    # CREATE_NO_WINDOW, 0x00000200 = CREATE_NEW_PROCESS_GROUP (stable Win32 values).
+    creationflags = (getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
     with open(log_path, "w") as logfh:
         proc = subprocess.Popen(cmd, stdout=logfh, stderr=subprocess.STDOUT,
                                 creationflags=creationflags)
