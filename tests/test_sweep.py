@@ -49,6 +49,9 @@ def test_parse_values_types_each_axis_and_skips_junk():
     # max_distinct_sections: 'none' -> no cap (None), numbers coerced to int
     assert sweep.parse_values("max_distinct_sections", "none, 6, 10") == [None, 6, 10]
     assert sweep.parse_values("objective", "") == []
+    # boolean dials (splice) -> real True/False so the runner's flag emission works; junk skipped
+    assert sweep.parse_values("splice", "off, on") == [False, True]
+    assert sweep.parse_values("splice", "on, maybe") == [True]
 
 
 def test_no_axes_is_a_single_run():

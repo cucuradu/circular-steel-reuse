@@ -38,6 +38,13 @@ _AXES = (
     ("knockdown", (("kd_10", "1.0"), ("kd_09", "0.9"), ("kd_085", "0.85"), ("kd_08", "0.8"))),
     ("carbon_dataset", (("cb_ice_v3", "ice_v3"), ("cb_ice_v4", "ice_v4"),
                         ("cb_oekobaudat", "oekobaudat"))),
+    ("counterfactual", (("cf_none", "none"), ("cf_recycling", "recycling"),
+                        ("cf_rerolling", "rerolling"))),
+    ("w_overspec", (("wo_0", "0.0"), ("wo_03", "0.3"))),
+    ("splice", (("sp_off", "off"), ("sp_on", "on"))),
+    ("national_annex", (("na_en", "en"), ("na_dk", "dk"), ("na_fi", "fi"), ("na_cy", "cy"),
+                        ("na_es", "es"), ("na_be", "be"), ("na_it", "it"), ("na_uk", "uk"),
+                        ("na_de", "de"), ("na_fr", "fr"), ("na_nl", "nl"), ("na_ie", "ie"))),
 )
 # Flat list of every value checkbox, for wiring the live run-count update.
 _AXIS_CHECKS = tuple(name for _param, items in _AXES for name, _val in items)

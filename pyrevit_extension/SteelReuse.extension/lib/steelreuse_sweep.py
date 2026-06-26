@@ -75,16 +75,31 @@ def lean(opts):
 # max_distinct_sections is handled specially ('none' -> no cap). Centralised here so the planner UI
 # does not duplicate per-dial parsing and the typing is unit-tested.
 _FLOAT_AXES = ("min_util", "knockdown", "w_overspec", "reserve", "dead", "live", "wind", "seismic")
+# Axes that are on/off toggles (e.g. --splice): tokens map to real booleans so the runner's boolean
+# flag emission (``if opts.get(key)``) sees True/False, not the truthy string "off".
+_BOOL_AXES = ("splice", "connections")
+_TRUE_TOKENS = ("on", "true", "yes", "1")
+_FALSE_TOKENS = ("off", "false", "no", "0")
 
 
 def parse_values(param, text):
     """Parse a comma-separated axis value list into typed values for ``param``.
 
     ``max_distinct_sections`` -> ints with ``'none'`` mapping to ``None`` (no cap); numeric dials
-    (see ``_FLOAT_AXES``) -> floats; everything else (choice dials like ``objective``) -> trimmed
-    strings. Un-parseable tokens are skipped, so a stray comma never aborts a sweep.
+    (see ``_FLOAT_AXES``) -> floats; boolean dials (see ``_BOOL_AXES``) -> True/False; everything
+    else (choice dials like ``objective``) -> trimmed strings. Un-parseable tokens are skipped, so a
+    stray comma never aborts a sweep.
     """
     tokens = [part.strip() for part in (text or "").split(",") if part.strip()]
+    if param in _BOOL_AXES:
+        out = []
+        for tok in tokens:
+            low = tok.lower()
+            if low in _TRUE_TOKENS:
+                out.append(True)
+            elif low in _FALSE_TOKENS:
+                out.append(False)
+        return out
     if param == "max_distinct_sections":
         out = []
         for tok in tokens:

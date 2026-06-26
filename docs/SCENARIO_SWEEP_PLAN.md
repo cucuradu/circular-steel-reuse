@@ -25,17 +25,22 @@ visually separate from the policy axes.
 
 ## 3. Engineer-selectable axes
 
-### 3a. Built — exposed (or to expose) in the planner
+### 3a. Built — exposed in the planner ✅
 
-| Planner label | Engine param | Values (suggested) | What it decides |
+All now exposed as **tick-box value selectors** (no free text → no misspelling; a dial varies iff ≥1
+value is ticked). `objective` includes `balanced` (§5) and there is a `carbon_dataset` axis (§4).
+
+| Planner label | Engine param | Values | What it decides |
 |---|---|---|---|
-| **Optimise for** | `objective` | CO₂ saved / members reused / mass reused | what "best" means |
-| **Carbon credit basis** | `counterfactual` | avoided-new only / − recycling / − re-rolling | what end-of-life we credit against |
-| **National Annex** | `national_annex` | EN / DK / FI / … | country q_k (imposed-load) values |
-| **Prefer lightest adequate donor** | `w_overspec` | off / on (e.g. 0.3) | steer a strong donor away from a weak slot |
-| **Minimum utilisation** | `min_util` | 0.0 / 0.6 | refuse grossly over-spec pairs (keeps long stock for needy slots) |
-| **Max section types** | `max_distinct_sections` | none / 8 | anti-Frankenstein fabrication cap |
-| **Reclaimed strength factor** | `knockdown` | 0.9 / 0.8 | how conservative on reclaimed strength |
+| **Optimise for** | `objective` | co2 / members / mass / balanced | what "best" means |
+| **Carbon credit basis** | `counterfactual` | none / recycling / rerolling | what end-of-life we credit against |
+| **Carbon dataset** | `carbon_dataset` | ice_v3 / ice_v4 / oekobaudat | which EPD set the saving is booked against |
+| **National Annex** | `national_annex` | en / dk / fi / … (12) | country q_k (imposed-load) values |
+| **Prefer lightest donor** | `w_overspec` | off (0.0) / on (0.3) | steer a strong donor away from a weak slot |
+| **Splicing** | `splice` | off / on | join two short same-section donors into one long member (§4) |
+| **Minimum utilisation** | `min_util` | 0.0 / 0.5 / 0.6 / 0.7 | refuse grossly over-spec pairs (keeps long stock for needy slots) |
+| **Max section types** | `max_distinct_sections` | none / 6 / 8 / 10 | anti-Frankenstein fabrication cap |
+| **Reclaimed strength factor** | `knockdown` | 1.0 / 0.9 / 0.85 / 0.8 | how conservative on reclaimed strength |
 
 Capping each axis at ~2 values keeps the grid tractable even with many axes enabled. The planner shows
 a live run-count and confirms above 60.
@@ -160,9 +165,9 @@ You prune on the cheap coarse axes first and spend the deeper exploration only o
 
 ## 9. Suggested build order
 
-1. **Expose the built Tier-1 axes** in the planner (counterfactual, national-annex, w-overspec + the
-   existing min-util / max-sections / knockdown), grouped into collapsible theme sections, plain-English
-   labels. *(zero engine work)*
+1. ✅ **Done — expose the built Tier-1 axes** in the planner (counterfactual, national-annex,
+   w-overspec, splice, carbon-dataset + the existing objective/min-util/max-sections/knockdown), as
+   tick-box value selectors (no free-text misspelling). *(zero engine work)*
 2. **Staged "Refine selected"** flow (§7) — carry opts on records, re-expand survivors.
 3. **Carbon-dataset axis** (§4) and **balanced-utilisation** objective (§5) — small engine adds.
 4. **Splicing** — the one larger feature still in scope.
