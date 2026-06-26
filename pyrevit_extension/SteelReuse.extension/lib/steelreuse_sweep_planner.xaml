@@ -50,12 +50,18 @@
       <Button Grid.Row="1" Grid.Column="2" x:Name="demand_browse" Content="Browse..."/>
     </Grid>
 
-    <Label Grid.Row="2" Content="Dials to vary" FontWeight="Bold" Margin="0,8,0,2"/>
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,2">
+      <Label Content="Dials to vary" FontWeight="Bold"/>
+      <TextBlock Text="(tick the values to try for each dial; a dial varies only if you tick at least one)"
+                 VerticalAlignment="Center" Foreground="#666" FontSize="11" Margin="6,0,0,0"/>
+    </StackPanel>
 
-    <!-- Axes: enable + comma-separated value list each -->
+    <!-- Axes: tick the values to sweep for each dial (no free text -> no misspelling). A dial is
+         active iff at least one of its values is ticked; the run count is the product of the ticked
+         counts across active dials. -->
     <Grid Grid.Row="3">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="200"/>
+        <ColumnDefinition Width="160"/>
         <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
       <Grid.RowDefinitions>
@@ -66,31 +72,44 @@
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
 
-      <CheckBox Grid.Row="0" Grid.Column="0" x:Name="obj_check" IsChecked="True"
-                VerticalAlignment="Center" Margin="0,3" Content="Objective"/>
-      <TextBox  Grid.Row="0" Grid.Column="1" x:Name="obj_box" Margin="0,3" Text="co2, members, mass"
-                ToolTip="Any of: co2, members, mass, balanced (comma-separated)."/>
+      <Label Grid.Row="0" Grid.Column="0" Content="Optimise for"/>
+      <WrapPanel Grid.Row="0" Grid.Column="1" Margin="0,3">
+        <CheckBox x:Name="obj_co2" Content="co2" IsChecked="True" Margin="0,0,14,0"/>
+        <CheckBox x:Name="obj_members" Content="members" IsChecked="True" Margin="0,0,14,0"/>
+        <CheckBox x:Name="obj_mass" Content="mass" IsChecked="True" Margin="0,0,14,0"/>
+        <CheckBox x:Name="obj_balanced" Content="balanced" Margin="0,0,14,0"/>
+      </WrapPanel>
 
-      <CheckBox Grid.Row="1" Grid.Column="0" x:Name="minutil_check"
-                VerticalAlignment="Center" Margin="0,3" Content="Min utilisation"/>
-      <TextBox  Grid.Row="1" Grid.Column="1" x:Name="minutil_box" Margin="0,3" Text="0.0, 0.5, 0.7"
-                ToolTip="Utilisation floor(s), comma-separated (e.g. 0.0, 0.5, 0.7)."/>
+      <Label Grid.Row="1" Grid.Column="0" Content="Min utilisation"/>
+      <WrapPanel Grid.Row="1" Grid.Column="1" Margin="0,3">
+        <CheckBox x:Name="mu_00" Content="0.0" Margin="0,0,14,0"/>
+        <CheckBox x:Name="mu_05" Content="0.5" Margin="0,0,14,0"/>
+        <CheckBox x:Name="mu_06" Content="0.6" Margin="0,0,14,0"/>
+        <CheckBox x:Name="mu_07" Content="0.7" Margin="0,0,14,0"/>
+      </WrapPanel>
 
-      <CheckBox Grid.Row="2" Grid.Column="0" x:Name="maxsec_check"
-                VerticalAlignment="Center" Margin="0,3" Content="Max distinct sections"/>
-      <TextBox  Grid.Row="2" Grid.Column="1" x:Name="maxsec_box" Margin="0,3" Text="none, 6, 10"
-                ToolTip="Section-variety cap(s); 'none' = no cap (e.g. none, 6, 10)."/>
+      <Label Grid.Row="2" Grid.Column="0" Content="Max distinct sections"/>
+      <WrapPanel Grid.Row="2" Grid.Column="1" Margin="0,3">
+        <CheckBox x:Name="ms_none" Content="none" Margin="0,0,14,0"/>
+        <CheckBox x:Name="ms_6" Content="6" Margin="0,0,14,0"/>
+        <CheckBox x:Name="ms_8" Content="8" Margin="0,0,14,0"/>
+        <CheckBox x:Name="ms_10" Content="10" Margin="0,0,14,0"/>
+      </WrapPanel>
 
-      <CheckBox Grid.Row="3" Grid.Column="0" x:Name="knock_check"
-                VerticalAlignment="Center" Margin="0,3" Content="Knockdown"/>
-      <TextBox  Grid.Row="3" Grid.Column="1" x:Name="knock_box" Margin="0,3" Text="0.9, 0.85, 0.8"
-                ToolTip="Reclaimed-steel confidence factor(s); re-runs the EN checks (slower)."/>
+      <Label Grid.Row="3" Grid.Column="0" Content="Knockdown"/>
+      <WrapPanel Grid.Row="3" Grid.Column="1" Margin="0,3">
+        <CheckBox x:Name="kd_10" Content="1.0" Margin="0,0,14,0"/>
+        <CheckBox x:Name="kd_09" Content="0.9" Margin="0,0,14,0"/>
+        <CheckBox x:Name="kd_085" Content="0.85" Margin="0,0,14,0"/>
+        <CheckBox x:Name="kd_08" Content="0.8" Margin="0,0,14,0"/>
+      </WrapPanel>
 
-      <CheckBox Grid.Row="4" Grid.Column="0" x:Name="carbon_check"
-                VerticalAlignment="Center" Margin="0,3" Content="Carbon dataset"/>
-      <TextBox  Grid.Row="4" Grid.Column="1" x:Name="carbon_box" Margin="0,3"
-                Text="ice_v3, ice_v4, oekobaudat"
-                ToolTip="Embodied-carbon factor set(s): ice_v3 (default), ice_v4, oekobaudat."/>
+      <Label Grid.Row="4" Grid.Column="0" Content="Carbon dataset"/>
+      <WrapPanel Grid.Row="4" Grid.Column="1" Margin="0,3">
+        <CheckBox x:Name="cb_ice_v3" Content="ice_v3" Margin="0,0,14,0"/>
+        <CheckBox x:Name="cb_ice_v4" Content="ice_v4" Margin="0,0,14,0"/>
+        <CheckBox x:Name="cb_oekobaudat" Content="oekobaudat" Margin="0,0,14,0"/>
+      </WrapPanel>
     </Grid>
 
     <!-- Workers + grid count -->

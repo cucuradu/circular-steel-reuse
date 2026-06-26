@@ -26,13 +26,21 @@ _DIR = os.path.dirname(__file__)
 # big grid is real compute (and disk) the engineer should opt into deliberately.
 _CONFIRM_ABOVE = 60
 
-# The dials this planner exposes as sweep axes: (enable checkbox, value box, engine param). Value
-# typing lives in steelreuse_sweep.parse_values (unit-tested), keyed by the param name.
-_AXIS_CONTROLS = (("obj_check", "obj_box", "objective"),
-                  ("minutil_check", "minutil_box", "min_util"),
-                  ("maxsec_check", "maxsec_box", "max_distinct_sections"),
-                  ("knock_check", "knock_box", "knockdown"),
-                  ("carbon_check", "carbon_box", "carbon_dataset"))
+# The dials this planner exposes as sweep axes. Each value is picked from tick-boxes (no free text ->
+# no misspelling): (engine param, [(checkbox x:Name, value string), ...]). A dial varies only when at
+# least one of its values is ticked. The value strings are typed by steelreuse_sweep.parse_values
+# (unit-tested), keyed by the param name -- 'none' -> None for the section cap, floats for the rest.
+_AXES = (
+    ("objective", (("obj_co2", "co2"), ("obj_members", "members"),
+                   ("obj_mass", "mass"), ("obj_balanced", "balanced"))),
+    ("min_util", (("mu_00", "0.0"), ("mu_05", "0.5"), ("mu_06", "0.6"), ("mu_07", "0.7"))),
+    ("max_distinct_sections", (("ms_none", "none"), ("ms_6", "6"), ("ms_8", "8"), ("ms_10", "10"))),
+    ("knockdown", (("kd_10", "1.0"), ("kd_09", "0.9"), ("kd_085", "0.85"), ("kd_08", "0.8"))),
+    ("carbon_dataset", (("cb_ice_v3", "ice_v3"), ("cb_ice_v4", "ice_v4"),
+                        ("cb_oekobaudat", "oekobaudat"))),
+)
+# Flat list of every value checkbox, for wiring the live run-count update.
+_AXIS_CHECKS = tuple(name for _param, items in _AXES for name, _val in items)
 
 
 class SweepPlanner(forms.WPFWindow):
@@ -54,22 +62,21 @@ class SweepPlanner(forms.WPFWindow):
         self.donor_browse.Click += self._pick_donor
         self.demand_browse.Click += self._pick_demand
         self.run_button.Click += self._on_run
-        for check in (self.obj_check, self.minutil_check, self.maxsec_check, self.knock_check,
-                      self.carbon_check):
+        for name in _AXIS_CHECKS:
+            check = getattr(self, name)
             check.Checked += self._update_count
             check.Unchecked += self._update_count
-        for box in (self.obj_box, self.minutil_box, self.maxsec_box, self.knock_box,
-                    self.carbon_box):
-            box.TextChanged += self._update_count
         self._update_count()
 
     # -- inputs -----------------------------------------------------------------------------------
     def _axes(self):
-        """The ordered ``(param, [values])`` axes from the enabled, non-empty rows."""
+        """The ordered ``(param, [values])`` axes from the ticked values; a dial with no ticks is
+        skipped. Ticked value strings go through ``sweep.parse_values`` for typing (floats / None)."""
         axes = []
-        for check_name, box_name, param in _AXIS_CONTROLS:
-            if getattr(self, check_name).IsChecked:
-                vals = sweep.parse_values(param, getattr(self, box_name).Text)
+        for param, items in _AXES:
+            picked = [val for name, val in items if getattr(self, name).IsChecked]
+            if picked:
+                vals = sweep.parse_values(param, ", ".join(picked))
                 if vals:
                     axes.append((param, vals))
         return axes
