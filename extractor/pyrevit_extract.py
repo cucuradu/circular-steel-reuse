@@ -226,26 +226,36 @@ def _column_point_xyz(elem, length_mm):
 # common family parameter names (US W-families use d/bf/tf/tw, EU families h/b/tf/tw). The names of
 # the BuiltInParameter members are looked up defensively (getattr) so an older API can't throw.
 # Downstream these let the mapping layer confirm a fuzzy/unknown type NAME by physical dimensions.
+# Each entry: (output key, tuple of candidate BuiltInParameter names tried in order, named fallbacks).
+# The flange/web-thickness built-ins are spelled WITHOUT an underscore before THICKNESS in the live API
+# (verified against Revit 2026: STRUCTURAL_SECTION_ISHAPE_FLANGETHICKNESS / ...WEBTHICKNESS). The old
+# underscored spelling never resolved -> getattr returned None -> tf_mm/tw_mm were silently always None
+# for every steel section. Both spellings are listed so the extractor still works if any Revit version
+# uses the underscored member name.
 _DIM_PARAMS = (
-    ("h_mm", "STRUCTURAL_SECTION_COMMON_HEIGHT", ("d", "h", "Height", "ht")),
-    ("b_mm", "STRUCTURAL_SECTION_COMMON_WIDTH", ("bf", "b", "Width")),
-    ("tf_mm", "STRUCTURAL_SECTION_ISHAPE_FLANGE_THICKNESS", ("tf", "Flange Thickness")),
-    ("tw_mm", "STRUCTURAL_SECTION_ISHAPE_WEB_THICKNESS", ("tw", "Web Thickness")),
+    ("h_mm", ("STRUCTURAL_SECTION_COMMON_HEIGHT",), ("d", "h", "Height", "ht")),
+    ("b_mm", ("STRUCTURAL_SECTION_COMMON_WIDTH",), ("bf", "b", "Width")),
+    ("tf_mm", ("STRUCTURAL_SECTION_ISHAPE_FLANGETHICKNESS",
+               "STRUCTURAL_SECTION_ISHAPE_FLANGE_THICKNESS"), ("tf", "Flange Thickness")),
+    ("tw_mm", ("STRUCTURAL_SECTION_ISHAPE_WEBTHICKNESS",
+               "STRUCTURAL_SECTION_ISHAPE_WEB_THICKNESS"), ("tw", "Web Thickness")),
 )
 
 
-def _dim_from(target, bip_name, fallback_names):
+def _dim_from(target, bip_names, fallback_names):
     """One dimension (mm) from built-in or named parameters of a type/instance, else None."""
     if target is None:
         return None
-    bip = getattr(DB.BuiltInParameter, bip_name, None)
-    if bip is not None:
+    for bip_name in bip_names:
+        bip = getattr(DB.BuiltInParameter, bip_name, None)
+        if bip is None:
+            continue
         try:
             p = target.get_Parameter(bip)
             if p and p.HasValue and p.AsDouble() > 0:
                 return _mm(p.AsDouble())
         except Exception:
-            pass
+            continue
     for nm in fallback_names:
         try:
             p = target.LookupParameter(nm)
