@@ -104,37 +104,57 @@ def _grade(elem):
 # first, then the material's class string as a fallback.
 _NON_STEEL_ASSET_CLASSES = ("Concrete", "Wood")
 _NON_STEEL_CLASS_WORDS = ("CONCRETE", "WOOD", "TIMBER")
+# Last-resort NAME signals: real models often leave the structural material unassigned on
+# concrete/timber families, so the material checks above see nothing — but the family/type name says it
+# plainly ("Concrete-Rectangular-Column ..."). A genuine steel section name never contains these words.
+_NON_STEEL_NAME_WORDS = ("CONCRETE", "PRECAST", "TIMBER", "GLULAM", "WOOD")
 
 
 def _is_non_steel(elem):
-    """True only when the member's structural material is POSITIVELY non-steel (concrete/timber).
+    """True only when the member is POSITIVELY non-steel (concrete/timber).
 
-    Steel, generic, and unknown/unassigned materials all return False, so unmapped *steel* families and
-    members lacking material data are never dropped — we exclude only what we can prove is out of scope.
+    The signal is one-sided, taken from (in order) the structural asset-class enum, the material class
+    string, and finally the family/type NAME. The name check runs even when no structural material is
+    assigned (mat is None) — that unassigned-material concrete/timber case is precisely what it exists
+    for. Steel, generic, and unknown members are still kept: unmapped *steel* families and members with
+    no material data and a non-concrete/timber name are never dropped — we exclude only what we can prove
+    is out of scope.
     """
     mat = _structural_material(elem)
-    if mat is None:
-        return False
-    # Preferred: the structural asset's class (a language-independent enum).
-    try:
-        ps = doc.GetElement(mat.StructuralAssetId)
-        asset = ps.GetStructuralAsset() if ps is not None else None
-        cls = getattr(asset, "StructuralAssetClass", None)
-        if cls is not None:
-            metal = getattr(DB.StructuralAssetClass, "Metal", None)
-            if metal is not None and cls == metal:
-                return False
-            for nm in _NON_STEEL_ASSET_CLASSES:
-                bad = getattr(DB.StructuralAssetClass, nm, None)
-                if bad is not None and cls == bad:
+    # The material-based checks only apply when a structural material is actually assigned. When it is
+    # not (mat is None) we must NOT return early: fall through to the family/type NAME check below, which
+    # is exactly the unassigned-material concrete/timber case that fallback exists for.
+    if mat is not None:
+        # Preferred: the structural asset's class (a language-independent enum).
+        try:
+            ps = doc.GetElement(mat.StructuralAssetId)
+            asset = ps.GetStructuralAsset() if ps is not None else None
+            cls = getattr(asset, "StructuralAssetClass", None)
+            if cls is not None:
+                metal = getattr(DB.StructuralAssetClass, "Metal", None)
+                if metal is not None and cls == metal:
+                    return False
+                for nm in _NON_STEEL_ASSET_CLASSES:
+                    bad = getattr(DB.StructuralAssetClass, nm, None)
+                    if bad is not None and cls == bad:
+                        return True
+        except Exception:
+            pass
+        # Fallback: the material's class string ("Concrete" / "Metal" / "Wood" ...).
+        try:
+            name = (getattr(mat, "MaterialClass", "") or "").upper()
+            for word in _NON_STEEL_CLASS_WORDS:
+                if word in name:
                     return True
-    except Exception:
-        pass
-    # Fallback: the material's class string ("Concrete" / "Metal" / "Wood" ...).
+        except Exception:
+            pass
+    # Last resort: the family/type NAME, for members whose structural material is unassigned/unknown
+    # (so neither check above can fire) OR has no structural material at all. Only ever drops
+    # out-of-scope concrete/timber, never steel (a steel section name carries none of these words).
     try:
-        name = (getattr(mat, "MaterialClass", "") or "").upper()
-        for word in _NON_STEEL_CLASS_WORDS:
-            if word in name:
+        type_name = _type_name(elem).upper()
+        for word in _NON_STEEL_NAME_WORDS:
+            if word in type_name:
                 return True
     except Exception:
         pass
