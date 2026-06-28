@@ -232,13 +232,26 @@ def _column_point_xyz(elem, length_mm):
 # underscored spelling never resolved -> getattr returned None -> tf_mm/tw_mm were silently always None
 # for every steel section. Both spellings are listed so the extractor still works if any Revit version
 # uses the underscored member name.
+#
+# Hollow sections (HSS / pipe / CHS) do NOT use the structural-section schema in the US imperial
+# families shipped with Revit: STRUCTURAL_SECTION_SHAPE is unset and the dimensions live in PLAIN named
+# type parameters instead (verified live, Revit 2026, square HSS6x6x5/8): height "Ht", width "b",
+# wall "t" — NOT "Height"/"Width"/"tf"/"tw". LookupParameter is case-SENSITIVE, so the old "ht" fallback
+# never matched "Ht". Round/CHS members are axisymmetric and the catalog models them as h = b = OD and
+# tf = tw = wall (see core.sections.load_catalog_round), so the outer diameter is fed into BOTH h_mm and
+# b_mm and the wall into BOTH tf_mm and tw_mm here. The round DIAMETER built-in
+# (STRUCTURAL_SECTION_COMMON_DIAMETER, verified to exist in the 2026 enum) and the round named
+# fallbacks ("D"/"OD"/"Diameter") could not be checked against a live value — the donor model has no
+# round member — so they are best-effort, added defensively (getattr / LookupParameter guarded).
 _DIM_PARAMS = (
-    ("h_mm", ("STRUCTURAL_SECTION_COMMON_HEIGHT",), ("d", "h", "Height", "ht")),
-    ("b_mm", ("STRUCTURAL_SECTION_COMMON_WIDTH",), ("bf", "b", "Width")),
+    ("h_mm", ("STRUCTURAL_SECTION_COMMON_HEIGHT", "STRUCTURAL_SECTION_COMMON_DIAMETER"),
+     ("d", "h", "Height", "ht", "Ht", "D", "OD", "Diameter")),
+    ("b_mm", ("STRUCTURAL_SECTION_COMMON_WIDTH", "STRUCTURAL_SECTION_COMMON_DIAMETER"),
+     ("bf", "b", "Width", "D", "OD", "Diameter")),
     ("tf_mm", ("STRUCTURAL_SECTION_ISHAPE_FLANGETHICKNESS",
-               "STRUCTURAL_SECTION_ISHAPE_FLANGE_THICKNESS"), ("tf", "Flange Thickness")),
+               "STRUCTURAL_SECTION_ISHAPE_FLANGE_THICKNESS"), ("tf", "Flange Thickness", "t")),
     ("tw_mm", ("STRUCTURAL_SECTION_ISHAPE_WEBTHICKNESS",
-               "STRUCTURAL_SECTION_ISHAPE_WEB_THICKNESS"), ("tw", "Web Thickness")),
+               "STRUCTURAL_SECTION_ISHAPE_WEB_THICKNESS"), ("tw", "Web Thickness", "t")),
 )
 
 

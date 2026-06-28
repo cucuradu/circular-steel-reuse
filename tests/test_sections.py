@@ -145,6 +145,23 @@ def test_geometry_rescues_unknown_name_only_with_all_dims(catalog):
     assert partial.section is None and len(report.unknown) == 1
 
 
+def test_geometry_confirms_square_hss_from_named_param_dims():
+    # The US imperial HSS family stores its dimensions in PLAIN named type params (height "Ht", width
+    # "b", wall "t"), NOT the structural-section schema, so the extractor now reads them via those
+    # fallbacks (Ht/b/t) and maps the wall onto both tf and tw (catalog models a square HSS as
+    # tf == tw == wall). These are the exact values probed live off HSS6x6x5/8 in Revit 2026. With a
+    # garbled (unknown) name, all four are required and the wall thickness is what makes the match
+    # unique: h+b alone hit several 6x6 sections, only +t resolves to one row.
+    cat = load_default_catalog()
+    full = ExtractedMember(id="a", raw_section="Tube Section ????",
+                           h_mm=152.4, b_mm=152.4, tf_mm=14.757, tw_mm=14.757)
+    no_wall = ExtractedMember(id="b", raw_section="Tube Section ????",
+                              h_mm=152.4, b_mm=152.4)
+    report = resolve_members([full, no_wall], cat)
+    assert full.section == "HSS6X6X5/8" and report.by_member_id["a"].method == "geometry"
+    assert no_wall.section is None        # h+b only is ambiguous across 6x6 walls -> stays unknown
+
+
 def test_member_dims_roundtrip_through_schema(tmp_path):
     m = ExtractedMember(id="x", raw_section="IPE305", h_mm=300.0, b_mm=150.0,
                         tf_mm=10.7, tw_mm=7.1)
